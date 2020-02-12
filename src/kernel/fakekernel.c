@@ -50,6 +50,19 @@ size_t strlen(const char* str)
     return len;
 }
 
+static inline char hexa_digit(uint8_t p){
+	return (p<10 ? '0': ('A'-10)) + p;
+}
+
+void ptr_to_str(char* out, void* ptr){
+	uint32_t iptr = (uint32_t)ptr;
+	for(size_t i=8; i;){
+		--i;
+		out[i] = hexa_digit(iptr&0xf);
+		iptr = iptr >> 4;
+	}
+}
+
 static const size_t VGA_WIDTH = 80;
 static const size_t VGA_HEIGHT = 25;
 
@@ -57,11 +70,13 @@ size_t terminal_row;
 size_t terminal_column;
 uint8_t terminal_color;
 uint16_t* terminal_buffer;
+size_t terminal_tab_size;
 
 void terminal_initialize(void)
 {
-    terminal_row = 0;
-    terminal_column = 0;
+    terminal_row      = 0;
+    terminal_column   = 0;
+	terminal_tab_size = 4;
     terminal_color = vga_entry_color(VGA_COLOR_LIGHT_GREY, VGA_COLOR_BLACK);
     terminal_buffer = (uint16_t*) 0xB8000;
     for (size_t y = 0; y < VGA_HEIGHT; y++) {
@@ -83,14 +98,32 @@ void terminal_putentryat(char c, uint8_t color, size_t x, size_t y)
     terminal_buffer[index] = vga_entry(c, color);
 }
 
+void terminal_nextline(){
+	terminal_column = 0;
+	if (++terminal_row == VGA_HEIGHT)
+		terminal_row = 0;
+}
+
+/*caractère affichable*/
+void terminal_putachar(char c){
+	terminal_putentryat(c, terminal_color, terminal_column, terminal_row);
+	if (++terminal_column == VGA_WIDTH)
+		terminal_nextline();
+}
+
 void terminal_putchar(char c)
 {
-    terminal_putentryat(c, terminal_color, terminal_column, terminal_row);
-    if (++terminal_column == VGA_WIDTH) {
-        terminal_column = 0;
-        if (++terminal_row == VGA_HEIGHT)
-            terminal_row = 0;
-    }
+	switch(c){
+		case '\n':
+			terminal_nextline();
+			break;
+		case '\t':
+			for(size_t i = 0; i < terminal_tab_size; ++i)
+				terminal_putachar(' ');
+			break;
+		default:
+			terminal_putachar(c);
+	}
 }
 
 void terminal_write(const char* data, size_t size)
@@ -104,11 +137,17 @@ void terminal_writestring(const char* data)
     terminal_write(data, strlen(data));
 }
 
+void test_paging(void){
+	volatile char test_good __attribute__((unused)) = *((char*)0x003fffff);
+	//volatile char test_bad = *((char*)0x00400000);
+}
+
 void kernel_main(void)
 {
+	char msg[] = "Hello kernel world\n\t0x.o.o.o.o\n";
     /* Initialize terminal interface */
     terminal_initialize();
 
-    /* Newline support is left as an exercise. */
-    terminal_writestring("Hello, kernel World!\n");
+	ptr_to_str(msg + 22, &terminal_row);
+    terminal_writestring(msg);
 }

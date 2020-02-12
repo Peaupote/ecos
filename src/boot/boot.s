@@ -32,11 +32,18 @@ stack is properly aligned and failure to align the stack will result in
 undefined behavior.
 */
 .section .bss
+.global page_directory
+.global page_table_0
 .align 16
 stack_bottom:
-.skip 16384 # 16 KiB
+.skip 0x4000 # 16 KiB
 stack_top:
 
+.align 0x1000 # 4 KiB - page aligned
+page_directory:
+.skip 0x1000 # 1024 entries 32 bits
+page_table_0:
+.skip 0x1000 # 1024 entries 32 bits
 /*
 The linker script specifies _start as the entry point to the kernel and the
 bootloader will jump to this position once the kernel has been loaded. It
@@ -76,6 +83,19 @@ _start:
     C++ features such as global constructors and exceptions will require
     runtime support to work as well.
     */
+
+	call init_paging_directory
+	/*
+	On place l'adresse du page directory dans CR3
+	*/
+	mov $page_directory, %eax
+	mov %eax, %cr3
+	/*
+	On active le paging: bit 31 de CR0
+	*/
+	mov %cr0, %eax
+	or  $0x80000000, %eax
+	mov %eax, %cr0
 
     /*
     Enter the high-level kernel. The ABI requires the stack is 16-byte

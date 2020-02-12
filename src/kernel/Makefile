@@ -7,6 +7,8 @@ OBJ=$(FILES:%.c=%.o)
 
 ##
 
+.PHONY: all re clean
+
 all: $(NAME)
 
 %.o:%.c

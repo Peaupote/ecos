@@ -1,0 +1,26 @@
+long mode:
+	Mode permettant d'accéder aux fonctionnalités 64 bits
+	https://wiki.osdev.org/X86-64
+	paging obligatoire
+
+paging, virtual addressing:
+	association d'adresse physiques à des adresses virtuelles
+	https://wiki.osdev.org/Paging
+	la correspondance est effectuée via un "page directory" (PD) 
+	et des "page table"
+	ces tables sont des tableaux de "page directory entry" (PDE) et de 
+	"page table entry" (PTE)
+	! cache: Translation Lookaside Buffer (TLB)
+	https://wiki.osdev.org/TLB
+
+Physical Address Extension(PAE)
+	https://wiki.osdev.org/Setting_Up_Paging_With_PAE
+	ajout d'une "Page-Directory-Pointer-Table" (PDPT)
+
+Control register(CR*)
+	registre contrôlant le fonctionnement du processeur
+	https://en.wikipedia.org/wiki/Control_register
+	CR0:
+		0	PE	protected mode si 1, real mode sinon
+		31	PG	activation du paging
+	CR3: paging

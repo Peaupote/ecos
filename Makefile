@@ -4,16 +4,18 @@ AS=i686-elf-as
 CC=i686-elf-gcc
 FLAGS=-ffreestanding -O2 -nostdlib
 
+.PHONY: all clean tests start re boot
+
 all: $(ISO)
 
 src/kernel/kernel.o:
 	$(MAKE) -C src/kernel
 
-src/boot.o: src/boot.s
-	$(AS) src/boot.s -o src/boot.o
+boot:
+	$(MAKE) -C src/boot
 
-$(OS): src/boot.o src/kernel/kernel.o src/linker.ld
-	$(CC) -T src/linker.ld -o $(OS) $(FLAGS) src/boot.o src/kernel/kernel.o -lgcc
+$(OS): boot src/kernel/kernel.o src/linker.ld
+	$(CC) -T src/linker.ld -o $(OS) $(FLAGS) src/boot/boot.o src/boot/init.o src/kernel/kernel.o -lgcc
 	@echo "Grub check multiboot"
 	grub-file --is-x86-multiboot $(OS)
 
@@ -26,9 +28,14 @@ $(ISO): $(OS) src/grub.cfg
 tests:
 	@echo "Testing"
 
+start: $(OS)
+	qemu-system-i386 -kernel $(OS)
+
 clean:
 	$(MAKE) -C src/kernel clean
+	$(MAKE) -C src/boot clean
 	rm -rf *.o *.iso *.bin isodir
+	rm -f src/*.o
 
 
 re: clean all
