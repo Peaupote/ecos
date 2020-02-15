@@ -24,3 +24,16 @@ Control register(CR*)
 		0	PE	protected mode si 1, real mode sinon
 		31	PG	activation du paging
 	CR3: paging
+
+Segmentation:
+	https://wiki.osdev.org/Segmentation
+	segment registers: CS DS SS ES FS GS
+
+Model Specific Register (MSR):
+	https://wiki.osdev.org/MSR
+	EFER: 0xC0000080
+		8	LME	Long Mode Enable 
+
+Global Descriptor Table (GDT):
+	https://wiki.osdev.org/Global_Descriptor_Table
+	GDT descriptor

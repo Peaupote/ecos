@@ -1,3 +1,5 @@
+#include "def.h"
+
 /* From https://wiki.osdev.org/Bare_Bones */
 /* Declare constants for the multiboot header. */
 .set ALIGN,    1<<0             /* align loaded modules on page boundaries */
@@ -34,6 +36,8 @@ undefined behavior.
 .section .bss
 .global page_directory
 .global page_table_0
+.global boot_debug_out
+
 .align 16
 stack_bottom:
 .skip 0x4000 # 16 KiB
@@ -44,6 +48,30 @@ page_directory:
 .skip 0x1000 # 1024 entries 32 bits
 page_table_0:
 .skip 0x1000 # 1024 entries 32 bits
+
+boot_debug_out:
+.skip 0x100 # 256 octets de debug
+
+.section .data
+.global gd_table
+
+/* Tout les segments couvrent l'ensemble de la mémoire */
+gd_table:
+.long GDT_ENTRY_0( 0, 0 )
+.long GDT_ENTRY_1( 0, 0, 0, 0 )
+//code segment
+.long GDT_ENTRY_0( 0, 0xfffff )
+.long GDT_ENTRY_1( 0, 0xfffff, 0x9a, 0xc )
+//data segment
+.long GDT_ENTRY_0( 0, 0xfffff )
+.long GDT_ENTRY_1( 0, 0xfffff, 0x92, 0xc )
+
+gdt_descriptor:
+.short (3*64 - 1) #taille - 1
+gdt_descriptor_ofs:
+.long gd_table  #offset
+
+
 /*
 The linker script specifies _start as the entry point to the kernel and the
 bootloader will jump to this position once the kernel has been loaded. It
@@ -53,6 +81,21 @@ doesn't make sense to return from this function as the bootloader is gone.
 .global _start
 .type _start, @function
 _start:
+	
+	//initial CR0
+	mov %cr0, %eax
+	mov %eax, boot_debug_out
+
+	//A20 test:
+	mov $0x00042, %eax
+	movb (%eax), %al
+	movb %al, (boot_debug_out+8)
+	mov $0x100042, %eax
+	movb (%eax), %al
+	mov %al, (boot_debug_out+9)
+
+	//On suppose la ligne A20 activée
+
     /*
     The bootloader has loaded us into 32-bit protected mode on a x86
     machine. Interrupts are disabled. Paging is disabled. The processor
@@ -84,6 +127,22 @@ _start:
     runtime support to work as well.
     */
 
+	/* --GDT-- */	
+	cli
+   	lgdt  gdt_descriptor
+	jmp $0x8, $reload_seg
+reload_seg:
+	mov $0x10, %ax /*data segment selector*/
+	mov %ax, %ds
+	mov %ax, %ss
+	mov %ax, %es
+	mov %ax, %fs
+	mov %ax, %gs
+
+
+	call test_paging_pre
+
+	/* --Paging-- */
 	call init_paging_directory
 	/*
 	On place l'adresse du page directory dans CR3
@@ -97,6 +156,8 @@ _start:
 	or  $0x80000000, %eax
 	mov %eax, %cr0
 
+	mov %cr0, %eax
+	mov %eax, (boot_debug_out+4)
     /*
     Enter the high-level kernel. The ABI requires the stack is 16-byte
     aligned at the time of the call instruction (which afterwards pushes

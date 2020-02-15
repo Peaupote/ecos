@@ -4,13 +4,14 @@
 
 /* Check if the compiler thinks you are targeting the wrong operating system. */
 #if defined(__linux__)
-#error "You are not using a cross-compiler, you will most certainly run into trouble"
+#error "You are not using a cross-compiler"
 #endif
 
-/* This tutorial will only work for the 32-bit ix86 targets. */
 #if !defined(__i386__)
-#error "This tutorial needs to be compiled with a ix86-elf compiler"
+#error "Needs to be compiled with a ix86-elf compiler"
 #endif
+
+extern uint8_t boot_debug_out[256];
 
 /* Hardware text mode color constants. */
 enum vga_color {
@@ -54,13 +55,22 @@ static inline char hexa_digit(uint8_t p){
 	return (p<10 ? '0': ('A'-10)) + p;
 }
 
-void ptr_to_str(char* out, void* ptr){
-	uint32_t iptr = (uint32_t)ptr;
+void int32_to_str_hexa(char* out, uint32_t v){
 	for(size_t i=8; i;){
 		--i;
-		out[i] = hexa_digit(iptr&0xf);
-		iptr = iptr >> 4;
+		out[i] = hexa_digit(v&0xf);
+		v = v >> 4;
 	}
+}
+void int8_to_str_hexa(char* out, uint8_t v){
+	for(size_t i=2; i;){
+		--i;
+		out[i] = hexa_digit(v&0xf);
+		v = v >> 4;
+	}
+}
+inline void ptr_to_str(char *out, void *ptr){
+	int32_to_str_hexa(out, (uint32_t)ptr);
 }
 
 static const size_t VGA_WIDTH = 80;
@@ -137,17 +147,53 @@ void terminal_writestring(const char* data)
     terminal_write(data, strlen(data));
 }
 
-void test_paging(void){
-	volatile char test_good __attribute__((unused)) = *((char*)0x003fffff);
-	//volatile char test_bad = *((char*)0x00400000);
+void test_paging_pre(void)
+{
+	/*adresses physiques*/
+	*((uint8_t*)0x003fffff) = 42;
+	*((uint8_t*)0x00400000) = 57;
+	*((uint8_t*)0x00000001) = 42;
+}
+
+uint8_t test_paging_post(void)
+{
+	/*adresses virtuelles*/
+	volatile uint8_t* test_good1 = (uint8_t*)0x003fffff;
+	volatile uint8_t* test_good2 = (uint8_t*)0x00000001;
+	volatile uint8_t* test_good3 = (uint8_t*)0x00001001;
+	volatile char t_1 = *test_good1 == 42;
+	volatile char t_2 = *test_good2 == 42;
+	volatile char t_3 = 0;
+	volatile char t_4 = 0, t_5 = 0;
+	t_3 = *test_good3 == 42;
+	*test_good2 = 57;
+	t_4 = *test_good2 == 57;
+	t_5 = *test_good3 == 57;
+	return t_1 && t_2 && t_3 && t_4 && t_5;
+	//uint8_t test_bad = *((uint8_t*)0x00400000);
+	//return test_bad == 57;
 }
 
 void kernel_main(void)
 {
-	char msg[] = "Hello kernel world\n\t0x.o.o.o.o\n";
+	char msg0[] = "Hello kernel world\n";
+	char msg1[] = "\ttest_0: \n";
+	char msg2[] = "\tboot cr0: _._._._.\n";
+	char msg3[] = "\tcur  cr0: _._._._.\n";
+	char msg4[] = "\t._ -- ._\n";
+
     /* Initialize terminal interface */
     terminal_initialize();
 
-	ptr_to_str(msg + 22, &terminal_row);
-    terminal_writestring(msg);
+	msg1[8] = test_paging_post() ? '1' : '0';
+	int32_to_str_hexa(msg2 + 11, *(uint32_t*)boot_debug_out);
+	int32_to_str_hexa(msg3 + 11, *(uint32_t*)(boot_debug_out+4));
+	int8_to_str_hexa(msg4 + 1, *(uint8_t*)(boot_debug_out+8));
+	int8_to_str_hexa(msg4 + 7, *(uint8_t*)(boot_debug_out+9));
+
+    terminal_writestring(msg0);
+    terminal_writestring(msg1);
+    terminal_writestring(msg2);
+    terminal_writestring(msg3);
+    terminal_writestring(msg4);
 }

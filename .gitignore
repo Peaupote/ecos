@@ -2,3 +2,6 @@
 *.o
 *.iso
 isodir
+*.s
+*.swp
+Session.vim
