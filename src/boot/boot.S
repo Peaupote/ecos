@@ -34,23 +34,40 @@ stack is properly aligned and failure to align the stack will result in
 undefined behavior.
 */
 .section .bss
-.global page_directory
-.global page_table_0
+.global page_ml4   #Page Map Level 4
+.global page_dpt_0 #Page Directory Pointer Table
+.global page_d_0   #Page Directory
+.global page_t_01  #Page Tables
+#ifdef BDI
 .global boot_debug_out
+#endif
 
 .align 16
 stack_bottom:
 .skip 0x4000 # 16 KiB
 stack_top:
 
+//--Paging structures--
 .align 0x1000 # 4 KiB - page aligned
-page_directory:
-.skip 0x1000 # 1024 entries 32 bits
-page_table_0:
-.skip 0x1000 # 1024 entries 32 bits
+page_ml4: #PML4
+.skip 0x1000 # 512 * 64 bits
 
+.align 0x1000
+page_dpt_0: #PDPT
+.skip 0x1000 # 512 * 64 bits
+
+.align 0x1000
+page_d_0:
+.skip 0x1000 # 512 * 64 bits
+
+.align 0x1000
+page_t_01:
+.skip 0x1000 # 2*512 * 64 bits
+
+#ifdef BDI
 boot_debug_out:
 .skip 0x100 # 256 octets de debug
+#endif
 
 .section .data
 .global gd_table
@@ -81,7 +98,12 @@ doesn't make sense to return from this function as the bootloader is gone.
 .global _start
 .type _start, @function
 _start:
-	
+
+	//On suppose que l'on démarre en mode protégé
+	//avec des segments 'plats'
+	//Le Paging est désactivé
+
+#ifdef BDI
 	//initial CR0
 	mov %cr0, %eax
 	mov %eax, boot_debug_out
@@ -93,6 +115,7 @@ _start:
 	mov $0x100042, %eax
 	movb (%eax), %al
 	mov %al, (boot_debug_out+9)
+#endif
 
 	//On suppose la ligne A20 activée
 
@@ -144,20 +167,37 @@ reload_seg:
 
 	/* --Paging-- */
 	call init_paging_directory
-	/*
-	On place l'adresse du page directory dans CR3
-	*/
-	mov $page_directory, %eax
-	mov %eax, %cr3
-	/*
-	On active le paging: bit 31 de CR0
-	*/
-	mov %cr0, %eax
-	or  $0x80000000, %eax
-	mov %eax, %cr0
 
-	mov %cr0, %eax
-	mov %eax, (boot_debug_out+4)
+	//On active le PAE - Physical Address Extension
+	movl %cr4, %eax
+	orl  $(1<<5), %eax
+	movl %eax, %cr4
+
+	//On place l'adresse du PML4 dans CR3
+	movl $page_ml4, %eax
+	movl %eax, %cr3
+
+	//On active le long-mode
+	movl $0xC0000080, %ecx //adresse du MSR EFER
+	rdmsr
+	orl  $(1<<8), %eax
+	wrmsr
+
+	//On active le paging: bit 31 de CR0
+	movl %cr0, %eax
+	orl  $(1<<31), %eax
+	movl %eax, %cr0
+
+	/*
+	Long-mode (sous-mode de compatibilité 32 bits)
+	Paging activé
+	*/
+
+#ifdef BDI
+	movl %cr0, %eax
+	movl %eax, (boot_debug_out+4)
+#endif
+
     /*
     Enter the high-level kernel. The ABI requires the stack is 16-byte
     aligned at the time of the call instruction (which afterwards pushes

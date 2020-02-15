@@ -24,6 +24,8 @@ Control register(CR*)
 		0	PE	protected mode si 1, real mode sinon
 		31	PG	activation du paging
 	CR3: paging
+	CR4:
+		5	PAE	physical address extension
 
 Segmentation:
 	https://wiki.osdev.org/Segmentation

@@ -11,7 +11,11 @@
 #error "Needs to be compiled with a ix86-elf compiler"
 #endif
 
+#include "../def.h"
+
+#ifdef BDI
 extern uint8_t boot_debug_out[256];
+#endif
 
 /* Hardware text mode color constants. */
 enum vga_color {
@@ -177,23 +181,31 @@ uint8_t test_paging_post(void)
 void kernel_main(void)
 {
 	char msg0[] = "Hello kernel world\n";
+#ifdef TEST_PAGING
 	char msg1[] = "\ttest_0: \n";
+#endif
+#ifdef BDI
 	char msg2[] = "\tboot cr0: _._._._.\n";
 	char msg3[] = "\tcur  cr0: _._._._.\n";
 	char msg4[] = "\t._ -- ._\n";
+#endif
 
     /* Initialize terminal interface */
     terminal_initialize();
 
+    terminal_writestring(msg0);
+#ifdef TEST_PAGING
 	msg1[8] = test_paging_post() ? '1' : '0';
+    terminal_writestring(msg1);
+#endif
+#ifdef BDI
 	int32_to_str_hexa(msg2 + 11, *(uint32_t*)boot_debug_out);
 	int32_to_str_hexa(msg3 + 11, *(uint32_t*)(boot_debug_out+4));
 	int8_to_str_hexa(msg4 + 1, *(uint8_t*)(boot_debug_out+8));
 	int8_to_str_hexa(msg4 + 7, *(uint8_t*)(boot_debug_out+9));
-
-    terminal_writestring(msg0);
-    terminal_writestring(msg1);
-    terminal_writestring(msg2);
+    
+	terminal_writestring(msg2);
     terminal_writestring(msg3);
     terminal_writestring(msg4);
+#endif
 }

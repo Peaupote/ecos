@@ -29,7 +29,7 @@ tests:
 	@echo "Testing"
 
 start: $(OS)
-	qemu-system-i386 -kernel $(OS)
+	qemu-system-x86_64 -kernel $(OS)
 
 clean:
 	$(MAKE) -C src/kernel clean
