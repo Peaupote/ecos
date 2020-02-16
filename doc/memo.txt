@@ -39,3 +39,6 @@ Model Specific Register (MSR):
 Global Descriptor Table (GDT):
 	https://wiki.osdev.org/Global_Descriptor_Table
 	GDT descriptor
+
+ELF:
+	https://wiki.osdev.org/ELF

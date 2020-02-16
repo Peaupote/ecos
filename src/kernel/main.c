@@ -1,8 +1,17 @@
-#include <stdio.h>
+#include <stdbool.h>
+#include <stddef.h>
+#include <stdint.h>
 
-#include "file.h"
-#include "proc.h"
+#if defined(__linux__)
+#error "You are not using a cross-compiler"
+#endif
 
-int main () {
-    init();
+#include "../util/vga.h"
+
+int test_bss;
+int test_data = 42;
+
+void kernel_main(void) {
+	terminal_initialize();
+	terminal_writestring("Kernel 64 bits lance");
 }

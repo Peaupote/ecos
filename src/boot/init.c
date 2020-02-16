@@ -2,6 +2,8 @@
 #include <stddef.h>
 #include <stdint.h>
 
+#include "../def.h"
+
 extern uint32_t page_ml4[1024];
 extern uint32_t page_dpt_0[1024];
 extern uint32_t page_d_0[1024];
@@ -47,3 +49,13 @@ void init_paging_directory(void){
 	//TODO: accès au mapping depuis les adresses virtuelles
 	//page_directory[1023] = ((uint32_t)page_directory) | 0x003;
 }
+
+#ifdef TEST_PAGING
+void test_paging_pre()
+{
+	/*adresses physiques*/
+	*((uint8_t*)0x003fffff) = 42;
+	*((uint8_t*)0x00400000) = 57;
+	*((uint8_t*)0x00000001) = 42;
+}
+#endif

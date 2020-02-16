@@ -1,3 +1,5 @@
+OUTPUT_FORMAT(elf32-i386)
+
 /* The bootloader will look at this image and start execution at the symbol
    designated as the entry point. */
 ENTRY(_start)
@@ -6,9 +8,7 @@ ENTRY(_start)
    kernel image. */
 SECTIONS
 {
-    /* Begin putting sections at 1 MiB, a conventional place for kernels to be
-       loaded at by the bootloader. */
-    . = 1M;
+    . = 512K;
 
     /* First put the multiboot header, as it is required to be put very early
        early in the image or the bootloader won't recognize the file format.
@@ -37,7 +37,6 @@ SECTIONS
         *(COMMON)
         *(.bss)
     }
-
-    /* The compiler may produce other sections, by default it will put them in
-       a segment with the same name. Simply add stuff here as needed. */
+	ASSERT(end_used_bss <= 1M, "bss utilise trop grand")
+	ASSERT(end_space_for_kernel >= 1M, "pas assez d'espace reserve")
 }

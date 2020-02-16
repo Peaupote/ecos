@@ -38,9 +38,14 @@ undefined behavior.
 .global page_dpt_0 #Page Directory Pointer Table
 .global page_d_0   #Page Directory
 .global page_t_01  #Page Tables
+
+.global mb_info
+.global kernel_entry_addr
 #ifdef BDI
 .global boot_debug_out
 #endif
+.global end_used_bss
+.global end_space_for_kernel
 
 .align 16
 stack_bottom:
@@ -62,12 +67,22 @@ page_d_0:
 
 .align 0x1000
 page_t_01:
-.skip 0x1000 # 2*512 * 64 bits
+.skip 0x2000 # 2*512 * 64 bits
+
+.align 4
+mb_info:
+.skip 4
+kernel_entry_addr:
+.skip 4
 
 #ifdef BDI
 boot_debug_out:
 .skip 0x100 # 256 octets de debug
 #endif
+end_used_bss:
+//space_for_kernel
+.skip 0x200000
+end_space_for_kernel:
 
 .section .data
 .global gd_table
@@ -76,17 +91,21 @@ boot_debug_out:
 gd_table:
 .long GDT_ENTRY_0( 0, 0 )
 .long GDT_ENTRY_1( 0, 0, 0, 0 )
-//code segment
+//code segment 64bits
 .long GDT_ENTRY_0( 0, 0xfffff )
-.long GDT_ENTRY_1( 0, 0xfffff, 0x9a, 0xc )
+.long GDT_ENTRY_1( 0, 0xfffff, 0x9a, 0xa )
 //data segment
 .long GDT_ENTRY_0( 0, 0xfffff )
 .long GDT_ENTRY_1( 0, 0xfffff, 0x92, 0xc )
+//code segment
+.long GDT_ENTRY_0( 0, 0xfffff )
+.long GDT_ENTRY_1( 0, 0xfffff, 0x9a, 0xc )
 
 gdt_descriptor:
-.short (3*64 - 1) #taille - 1
-gdt_descriptor_ofs:
+.short (4*64 - 1) #taille - 1
+gdt_descriptor_ofs0:
 .long gd_table  #offset
+.long 0			#for long mode
 
 
 /*
@@ -99,9 +118,13 @@ doesn't make sense to return from this function as the bootloader is gone.
 .type _start, @function
 _start:
 
-	//On suppose que l'on démarre en mode protégé
-	//avec des segments 'plats'
-	//Le Paging est désactivé
+	//On suppose que l'on est démarré pat GRUB
+	//Mode protégé avec des segments 'plats'
+	//Paging désactivé
+	//Ligne A20 activée
+
+	//On récupère les informations de multiboot
+	movl %ebx, mb_info
 
 #ifdef BDI
 	//initial CR0
@@ -117,43 +140,21 @@ _start:
 	mov %al, (boot_debug_out+9)
 #endif
 
-	//On suppose la ligne A20 activée
 
-    /*
-    The bootloader has loaded us into 32-bit protected mode on a x86
-    machine. Interrupts are disabled. Paging is disabled. The processor
-    state is as defined in the multiboot standard. The kernel has full
-    control of the CPU. The kernel can only make use of hardware features
-    and any code it provides as part of itself. There's no printf
-    function, unless the kernel provides its own <stdio.h> header and a
-    printf implementation. There are no security restrictions, no
-    safeguards, no debugging mechanisms, only what the kernel provides
-    itself. It has absolute and complete power over the
-    machine.
-    */
-
-    /*
-    To set up a stack, we set the esp register to point to the top of the
-    stack (as it grows downwards on x86 systems). This is necessarily done
-    in assembly as languages such as C cannot function without a stack.
-    */
+	//Stack
     mov $stack_top, %esp
 
-    /*
-    This is a good place to initialize crucial processor state before the
-    high-level kernel is entered. It's best to minimize the early
-    environment where crucial features are offline. Note that the
-    processor is not fully initialized yet: Features such as floating
-    point instructions and instruction set extensions are not initialized
-    yet. The GDT should be loaded here. Paging should be enabled here.
-    C++ features such as global constructors and exceptions will require
-    runtime support to work as well.
-    */
+	/*
+	 On charge le kernel ici afin d'être sûr de pouvoir accéder
+	 aux données fournies par GRUB
+	 On récupère l'adresse du kernel 64 bits dans kernel_entry_addr
+	*/
+	call load_main
 
 	/* --GDT-- */	
 	cli
    	lgdt  gdt_descriptor
-	jmp $0x8, $reload_seg
+	ljmp $0x18, $reload_seg
 reload_seg:
 	mov $0x10, %ax /*data segment selector*/
 	mov %ax, %ds
@@ -162,9 +163,9 @@ reload_seg:
 	mov %ax, %fs
 	mov %ax, %gs
 
-
+#ifdef TEST_PAGING
 	call test_paging_pre
-
+#endif
 	/* --Paging-- */
 	call init_paging_directory
 
@@ -182,7 +183,7 @@ reload_seg:
 	rdmsr
 	orl  $(1<<8), %eax
 	wrmsr
-
+	
 	//On active le paging: bit 31 de CR0
 	movl %cr0, %eax
 	orl  $(1<<31), %eax
@@ -198,32 +199,32 @@ reload_seg:
 	movl %eax, (boot_debug_out+4)
 #endif
 
-    /*
-    Enter the high-level kernel. The ABI requires the stack is 16-byte
-    aligned at the time of the call instruction (which afterwards pushes
-    the return pointer of size 4 bytes). The stack was originally 16-byte
-    aligned above and we've pushed a multiple of 16 bytes to the
-    stack since (pushed 0 bytes so far), so the alignment has thus been
-    preserved and the call is well defined.
-    */
-    call kernel_main
+	lgdt gdt_descriptor
+	ljmp $0x18, $reload_seg2
 
-    /*
-    If the system has nothing more to do, put the computer into an
-    infinite loop. To do that:
-    1) Disable interrupts with cli (clear interrupt enable in eflags).
-       They are already disabled by the bootloader, so this is not needed.
-       Mind that you might later enable interrupts and return from
-       kernel_main (which is sort of nonsensical to do).
-    2) Wait for the next interrupt to arrive with hlt (halt instruction).
-       Since they are disabled, this will lock up the computer.
-    3) Jump to the hlt instruction if it ever wakes up due to a
-       non-maskable interrupt occurring or due to system management mode.
-    */
-    cli
-1:	hlt
-    jmp 1b
+reload_seg2:
+	mov $0x10, %ax /*data segment selector*/
+	mov %ax, %ds
+	mov %ax, %ss
+	mov %ax, %es
+	mov %ax, %fs
+	mov %ax, %gs
 
+   	mov (kernel_entry_addr), %ebx
+
+	ljmp $0x8, $enter_64b
+enter_64b:
+	//xorq %rax, %rax
+	.byte 0x48
+	.byte 0x31
+	.byte 0xc0
+	//mov %ebx, %eax
+	.byte 0x89
+	.byte 0xd8
+	//jmpq *%eax
+	.byte 0xff
+	.byte 0xe0
+	
 /*
 Set the size of the _start symbol to the current location '.' minus its start.
 This is useful when debugging or when you implement call tracing.
