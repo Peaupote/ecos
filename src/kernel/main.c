@@ -9,11 +9,13 @@
 #endif
 
 #include "../util/vga.h"
+#include "int.h"
 
 int test_bss;
 int test_data = 42;
 
 void kernel_main(void) {
-    terminal_initialize();
-    printf("64 bits kernel launched.");
+    printf("64 bits kernel launched.\n");
+
+    while(1);
 }

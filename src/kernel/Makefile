@@ -1,8 +1,8 @@
 CC=x86_64-elf-gcc
 AS=x86_64-elf-as
 FLAGS=-O2 -g -Wall -Wextra -std=gnu99 -nostdlib -ffreestanding -mno-red-zone
-FILES=proc.c file.c tty.c
-OBJ=main.o entry.o
+FILES=proc.c file.c tty.c idt.c
+OBJ=main.o entry.o idt.o
 UDEP=vga.o string.o
 export TRG=64
 INCLUDES=-I ../libc/include
@@ -32,6 +32,6 @@ kernel.bin: linker.ld $(OBJ) libc util
 
 clean:
 	@echo "Clean trash files"
-	rm -f *.o *.bin
+	rm -f *.o *.bin entry.s
 
 re: clean $(NAME)
