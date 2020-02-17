@@ -21,42 +21,26 @@ forced to be within the first 8 KiB of the kernel file.
 .long FLAGS
 .long CHECKSUM
 
-/*
-The multiboot standard does not define the value of the stack pointer register
-(esp) and it is up to the kernel to provide a stack. This allocates room for a
-small stack by creating a symbol at the bottom of it, then allocating 16384
-bytes for it, and finally creating a symbol at the top. The stack grows
-downwards on x86. The stack is in its own section so it can be marked nobits,
-which means the kernel file is smaller because it does not contain an
-uninitialized stack. The stack on x86 must be 16-byte aligned according to the
-System V ABI standard and de-facto extensions. The compiler will assume the
-stack is properly aligned and failure to align the stack will result in
-undefined behavior.
-*/
 .section .bss
-.global page_ml4   #Page Map Level 4
-.global page_dpt_0 #Page Directory Pointer Table
-.global page_d_0   #Page Directory
-.global page_t_01  #Page Tables
+
+//Paging structures for id mapping
+.global page_dpt_0
+.global page_d_0
+.global page_t_01
 
 .global mb_info
 .global kernel_entry_addr
+
 #ifdef BDI
+//TODO
 .global boot_debug_out
 #endif
+
+//Pour les asserts de ld
 .global end_used_bss
 .global end_space_for_kernel
 
-.align 16
-stack_bottom:
-.skip 0x4000 # 16 KiB
-stack_top:
-
-//--Paging structures--
-.align 0x1000 # 4 KiB - page aligned
-page_ml4: #PML4
-.skip 0x1000 # 512 * 64 bits
-
+//Structures pour le mapping identité sur les 4 premiers MB
 .align 0x1000
 page_dpt_0: #PDPT
 .skip 0x1000 # 512 * 64 bits
@@ -84,29 +68,6 @@ end_used_bss:
 .skip 0x200000
 end_space_for_kernel:
 
-.section .data
-.global gd_table
-
-/* Tout les segments couvrent l'ensemble de la mémoire */
-gd_table:
-.long GDT_ENTRY_0( 0, 0 )
-.long GDT_ENTRY_1( 0, 0, 0, 0 )
-//code segment 64bits
-.long GDT_ENTRY_0( 0, 0xfffff )
-.long GDT_ENTRY_1( 0, 0xfffff, 0x9a, 0xa )
-//data segment
-.long GDT_ENTRY_0( 0, 0xfffff )
-.long GDT_ENTRY_1( 0, 0xfffff, 0x92, 0xc )
-//code segment
-.long GDT_ENTRY_0( 0, 0xfffff )
-.long GDT_ENTRY_1( 0, 0xfffff, 0x9a, 0xc )
-
-gdt_descriptor:
-.short (4*64 - 1) #taille - 1
-gdt_descriptor_ofs0:
-.long gd_table  #offset
-.long 0			#for long mode
-
 
 /*
 The linker script specifies _start as the entry point to the kernel and the
@@ -118,7 +79,7 @@ doesn't make sense to return from this function as the bootloader is gone.
 .type _start, @function
 _start:
 
-	//On suppose que l'on est démarré pat GRUB
+	//On suppose que l'on est démarré par GRUB
 	//Mode protégé avec des segments 'plats'
 	//Paging désactivé
 	//Ligne A20 activée
@@ -151,9 +112,15 @@ _start:
 	*/
 	call load_main
 
-	/* --GDT-- */	
+	/* --GDT-- */
+#include "gdt.s"
+	/* GDT descriptor */
+	movw $(4*64 - 1), gdt_desc
+	movl $gd_table,  (gdt_desc + 2)
+	movl $0,         (gdt_desc + 6)
+
 	cli
-   	lgdt  gdt_descriptor
+   	lgdt  gdt_desc
 	ljmp $0x18, $reload_seg
 reload_seg:
 	mov $0x10, %ax /*data segment selector*/
@@ -171,7 +138,7 @@ reload_seg:
 
 	//On active le PAE - Physical Address Extension
 	movl %cr4, %eax
-	orl  $(1<<5), %eax
+	btsl $5,   %eax
 	movl %eax, %cr4
 
 	//On place l'adresse du PML4 dans CR3
@@ -181,12 +148,12 @@ reload_seg:
 	//On active le long-mode
 	movl $0xC0000080, %ecx //adresse du MSR EFER
 	rdmsr
-	orl  $(1<<8), %eax
+	btsl  $8, %eax
 	wrmsr
 	
 	//On active le paging: bit 31 de CR0
 	movl %cr0, %eax
-	orl  $(1<<31), %eax
+	btsl $31,  %eax
 	movl %eax, %cr0
 
 	/*
@@ -199,7 +166,7 @@ reload_seg:
 	movl %eax, (boot_debug_out+4)
 #endif
 
-	lgdt gdt_descriptor
+	lgdt gdt_desc
 	ljmp $0x18, $reload_seg2
 
 reload_seg2:
@@ -214,16 +181,7 @@ reload_seg2:
 
 	ljmp $0x8, $enter_64b
 enter_64b:
-	//xorq %rax, %rax
-	.byte 0x48
-	.byte 0x31
-	.byte 0xc0
-	//mov %ebx, %eax
-	.byte 0x89
-	.byte 0xd8
-	//jmpq *%eax
-	.byte 0xff
-	.byte 0xe0
+#include "indj_64.s"
 	
 /*
 Set the size of the _start symbol to the current location '.' minus its start.

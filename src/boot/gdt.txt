@@ -1,0 +1,8 @@
+//Tout les segments couvrent l'ensemble de la mémoire
+0 0 0 0
+//code segment 64 bits
+0 0xfffff 0x9a 0xa
+//data segment
+0 0xfffff 0x92 0xc
+//code segment
+0 0xfffff 0x9a 0xc

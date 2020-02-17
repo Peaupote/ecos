@@ -26,8 +26,9 @@ start: $(ISO)
 
 clean:
 	$(MAKE) -C src/kernel clean
-	$(MAKE) -C src/boot clean
-	$(MAKE) -C src/util clean
+	$(MAKE) -C src/boot   clean
+	$(MAKE) -C src/util   clean
+	$(MAKE) -C tests      clean
 	rm -rf *.o *.iso *.bin isodir
 
 re: clean all

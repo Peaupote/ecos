@@ -93,9 +93,9 @@ typedef struct {
 void elf_readinfo(string_writer, void*, void* elf_begin);
 
 struct elf_loader{
-	void (*fill0)(void*, void*, uint64_t);
-	void (*copy)(void*,  void*, void*, uint64_t);//dst,src,sz
+	void (*fill0)(void*, Elf64_Addr, uint64_t);
+	void (*copy)(void*,  Elf64_Addr, void*, uint64_t);//dst,src,sz
 };
-void* elf_load(struct elf_loader, void* el_i, void* elf_begin);
+Elf64_Addr elf_load(struct elf_loader, void* el_i, void* elf_begin);
 
 #endif

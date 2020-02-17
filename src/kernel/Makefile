@@ -1,6 +1,6 @@
 CC=x86_64-elf-gcc
 AS=x86_64-elf-as
-FLAGS=-O2 -g -Wall -Wextra -std=gnu99 -nostdlib -ffreestanding -mno-red-zone
+FLAGS=-O2 -Wall -Wextra -std=gnu99 -nostdlib -mcmodel=large -ffreestanding -mno-red-zone
 FILES=proc.c file.c
 OBJ=main.o entry.o
 UDEP=vga.o string.o
@@ -13,7 +13,7 @@ all: kernel.bin
 %.o:%.c
 	$(CC) $(FLAGS) -o $@ -c $<
 
-main.o: main.c ../util/vga.h
+main.o: main.c ../util/vga.h ../util/string.h
 
 entry.o: entry.s
 	$(AS) entry.s -o entry.o
@@ -21,7 +21,7 @@ entry.o: entry.s
 util:
 	$(MAKE) -C ../util $(patsubst %,64/%,$(UDEP))
 
-kernel.bin: linker.ld $(OBJ) util
+kernel.bin: linker.ld ../boot/boot_data.ld $(OBJ) util
 	$(CC) -T linker.ld -o kernel.bin $(FLAGS) $(OBJ) \
 		$(patsubst %,../util/64/%,$(UDEP)) -lgcc
 

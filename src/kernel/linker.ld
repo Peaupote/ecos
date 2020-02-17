@@ -3,9 +3,16 @@ OUTPUT_FORMAT(elf64-x86-64)
 
 ENTRY(kernel_entry)
 
+INCLUDE ../boot/boot_data.ld
+
+/* adresse virtuelle du kernel, 
+ * oblige à utiliser des références plus grandes:
+ * flag -mcmodel=large de gcc*/
+KVA = 0x80 << 39;
+
 SECTIONS
 {
-    . = 1M;
+    . = KVA + kba_end;
     .text BLOCK(4K) : ALIGN(4K)
     {
 		entry.o(.text)

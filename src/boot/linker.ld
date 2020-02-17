@@ -1,21 +1,25 @@
 OUTPUT_FORMAT(elf32-i386)
 
-/* The bootloader will look at this image and start execution at the symbol
-   designated as the entry point. */
 ENTRY(_start)
 
-/* Tell where the various sections of the object files will be put in the final
-   kernel image. */
+INCLUDE boot_data.ld
+
+KPA = 1M;    /*Kernel Physic Address*/
+page_ml4   = KPA + kba_pml4;
+page_dpt_1 = KPA + kba_pdpt_1;
+page_d_1   = KPA + kba_pd_1;
+page_t_23  = KPA + kba_pt_23;
+gd_table   = KPA + kba_gdt;
+gdt_desc   = KPA + kba_gdtd;
+stack_top  = KPA + kba_stk_tp;
+
 SECTIONS
 {
     . = 512K;
 
-    /* First put the multiboot header, as it is required to be put very early
-       early in the image or the bootloader won't recognize the file format.
-       Next we'll put the .text section. */
     .text BLOCK(4K) : ALIGN(4K)
     {
-        *(.multiboot)
+        *(.multiboot) /* Doit être vers le début de l'image*/
         *(.text)
     }
 
@@ -38,5 +42,5 @@ SECTIONS
         *(.bss)
     }
 	ASSERT(end_used_bss <= 1M, "bss utilise trop grand")
-	ASSERT(end_space_for_kernel >= 1M, "pas assez d'espace reserve")
+	ASSERT(end_space_for_kernel >= 2M, "pas assez d'espace reserve")
 }
