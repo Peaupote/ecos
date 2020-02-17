@@ -1,8 +1,8 @@
 CC=x86_64-elf-gcc
 AS=x86_64-elf-as
 FLAGS=-O2 -Wall -Wextra -std=gnu99 -nostdlib -mcmodel=large -ffreestanding -mno-red-zone
-FILES=proc.c file.c tty.c
-OBJ=main.o entry.o kmem.o tests.o
+FILES=proc.c file.c tty.c idt.c
+OBJ=main.o entry.o kmem.o tests.o idt.o
 UDEP=vga.o string.o
 export TRG=64
 INCLUDES=-I ../libc/include
@@ -29,13 +29,14 @@ libc: util
 util:
 	$(MAKE) -C ../util $(patsubst %,64/%,$(UDEP))
 
-kernel.bin: linker.ld ../boot/boot_data.ld $(OBJ) util
+kernel.bin: linker.ld ../boot/boot_data.ld $(OBJ) util libc
 	$(CC) -T linker.ld -o kernel.bin $(FLAGS) $(OBJ) \
 		$(patsubst %,../util/64/%,$(UDEP)) \
-		-lgcc
+		../libc/*/*.c \
+		-lgcc $(INCLUDES)
 
 clean:
 	@echo "Clean trash files"
-	rm -f *.o *.bin
+	rm -f *.o *.bin entry.s
 
 re: clean $(NAME)

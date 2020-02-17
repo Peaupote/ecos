@@ -16,7 +16,10 @@
 #include "tests.h"
 
 void kernel_main(void) {
-	kmem_init();
+    kmem_init();
     terminal_initialize();
     terminal_writestring("64 bits kernel launched.\n");
+
+    asm volatile("int $0x80");
+    while(1);
 }

@@ -19,3 +19,8 @@
 #define PIDLE  -1
 #define PZOMB  -10
 #define PSTOP  1
+
+/**
+ * Dont touch to much here
+ */
+#define NGDT 4
