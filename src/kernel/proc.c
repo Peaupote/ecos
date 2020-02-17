@@ -1,3 +1,4 @@
+#include <stdio.h>
 #include "proc.h"
 
 /**
@@ -209,4 +210,5 @@ void init() {
         state.st_proc[pid].p_stat = FREE;
 
     push_ps(1);
+    printf("init.\n");
 }

@@ -1,6 +1,7 @@
 ISO=ecos.iso
 
-.PHONY: all clean tests start re src/boot/boot.bin src/kernel/kernel.bin
+.PHONY: all clean tests start re \
+		src/boot/boot.bin src/kernel/kernel.bin
 
 all: $(ISO)
 
@@ -10,7 +11,7 @@ src/kernel/kernel.bin:
 src/boot/boot.bin:
 	$(MAKE) -C src/boot boot.bin
 
-$(ISO): src/grub.cfg src/boot/boot.bin src/kernel/kernel.bin 
+$(ISO): src/grub.cfg src/boot/boot.bin src/kernel/kernel.bin
 	mkdir -p isodir/boot/grub
 	cp src/boot/boot.bin isodir/boot/ecos_boot.bin
 	cp src/kernel/kernel.bin isodir/boot/ecos_kernel.bin

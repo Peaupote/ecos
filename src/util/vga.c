@@ -12,7 +12,7 @@ void terminal_initialize(void)
 {
     terminal_row      = 0;
     terminal_column   = 0;
-	terminal_tab_size = 4;
+    terminal_tab_size = 4;
     terminal_color = vga_entry_color(VGA_COLOR_LIGHT_GREY, VGA_COLOR_BLACK);
     terminal_buffer = (uint16_t*) 0xB8000;
     for (size_t y = 0; y < VGA_HEIGHT; y++) {
@@ -36,31 +36,31 @@ void terminal_putentryat(char c, uint8_t color, size_t x, size_t y)
 
 void terminal_nextline()
 {
-	terminal_column = 0;
-	if (++terminal_row == VGA_HEIGHT)
-		terminal_row = 0;
+    terminal_column = 0;
+    if (++terminal_row == VGA_HEIGHT)
+        terminal_row = 0;
 }
 
 void terminal_putachar(char c)
 {
-	terminal_putentryat(c, terminal_color, terminal_column, terminal_row);
-	if (++terminal_column == VGA_WIDTH)
-		terminal_nextline();
+    terminal_putentryat(c, terminal_color, terminal_column, terminal_row);
+    if (++terminal_column == VGA_WIDTH)
+        terminal_nextline();
 }
 
 void terminal_putchar(char c)
 {
-	switch(c){
-		case '\n':
-			terminal_nextline();
-			break;
-		case '\t':
-			for(size_t i = 0; i < terminal_tab_size; ++i)
-				terminal_putachar(' ');
-			break;
-		default:
-			terminal_putachar(c);
-	}
+    switch(c){
+        case '\n':
+            terminal_nextline();
+            break;
+        case '\t':
+            for(size_t i = 0; i < terminal_tab_size; ++i)
+                terminal_putachar(' ');
+            break;
+        default:
+            terminal_putachar(c);
+    }
 }
 
 void terminal_write(const char* data, size_t size)
@@ -71,10 +71,10 @@ void terminal_write(const char* data, size_t size)
 
 void terminal_writestring(const char* data)
 {
-    terminal_write(data, strlen(data));
+    terminal_write(data, ustrlen(data));
 }
 
 void terminal_writer(void* none __attribute__((unused)), const char *data)
 {
-    terminal_write(data, strlen(data));
+    terminal_write(data, ustrlen(data));
 }
