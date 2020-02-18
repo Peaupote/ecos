@@ -15,13 +15,13 @@ search for this signature in the first 8 KiB of the kernel file, aligned at a
 32-bit boundary. The signature is in its own section so the header can be
 forced to be within the first 8 KiB of the kernel file.
 */
-.section .multiboot
-.align 4
+	.section .multiboot
+.balign 4
 .long MAGIC
 .long FLAGS
 .long CHECKSUM
 
-.section .bss
+	.section .bss
 
 //Paging structures for id mapping
 .global page_dpt_0
@@ -41,19 +41,19 @@ forced to be within the first 8 KiB of the kernel file.
 .global end_space_for_kernel
 
 //Structures pour le mapping identité sur les 4 premiers MB
-.align 0x1000
+.balign 0x1000
 page_dpt_0: #PDPT
 .skip 0x1000 # 512 * 64 bits
 
-.align 0x1000
+.balign 0x1000
 page_d_0:
 .skip 0x1000 # 512 * 64 bits
 
-.align 0x1000
+.balign 0x1000
 page_t_01:
 .skip 0x2000 # 2*512 * 64 bits
 
-.align 4
+.balign 4
 mb_info:
 .skip 4
 kernel_entry_addr:
@@ -63,10 +63,13 @@ kernel_entry_addr:
 boot_debug_out:
 .skip 0x100 # 256 octets de debug
 #endif
-end_used_bss:
-//space_for_kernel
-.skip 0x200000
-end_space_for_kernel:
+
+//espace pour le kernel
+//évite que GRUB charge le module sur une adresse utilisée
+	.section space_for_kernel
+.global KPA //Adresse physique du kernel
+.balign 0x1000 //alignement à la page 4KB
+KPA: .skip 0x200000 //2MB
 
 
 /*
@@ -74,7 +77,7 @@ The linker script specifies _start as the entry point to the kernel and the
 bootloader will jump to this position once the kernel has been loaded. It
 doesn't make sense to return from this function as the bootloader is gone.
 */
-.section .text
+	.section .text
 .global _start
 .type _start, @function
 _start:

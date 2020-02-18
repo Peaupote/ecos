@@ -10,24 +10,36 @@
 extern multiboot_info_t* mb_info;
 
 extern void* kernel_entry_addr;
+extern uint32_t end_kernel;
+
+extern uint8_t KPA;
 
 const char kernel_cmd[] = "KERNEL_BIN";
 
-inline void* virt2phys(Elf64_Addr a){
+static inline void* virt2phys(Elf64_Addr a){
     // base du kernel dans les adresses virtuelles: KVA,
     // effacée par le cast
-    // KPA: 1<<20 (1MB)
-    return (void*)(((uint32_t) a) + (((uint32_t)1)<<20));
+    // KPA: adresse physique du kernel
+    return (void*)(&KPA + ((uint32_t) a));
 }
+
+unsigned char* virt2phys_section(Elf64_Addr a, uint64_t sz){
+    unsigned char* p_dst = (unsigned char*) virt2phys(a);
+	uint32_t end_s = ((uint32_t) p_dst) + sz;
+	if (end_s > end_kernel) end_kernel = end_s;
+	return p_dst;
+}
+
 void simp_fill0(void* none __attribute__((unused)), Elf64_Addr dst,
         uint64_t sz){
-    unsigned char* p_dst = (unsigned char*) virt2phys(dst);
+    unsigned char* p_dst = virt2phys_section(dst, sz);
     for(uint64_t i=0; i<sz; ++i)
         p_dst[i] = 0;
+	
 }
 void simp_copy(void* none __attribute__((unused)), Elf64_Addr dst,
         void* src, uint64_t sz){
-    unsigned char* p_dst = (unsigned char*) virt2phys(dst);
+    unsigned char* p_dst = virt2phys_section(dst, sz);
     for(uint64_t i=0; i<sz; ++i)
         p_dst[i] = ((unsigned char*) src)[i];
 }
@@ -35,6 +47,7 @@ void simp_copy(void* none __attribute__((unused)), Elf64_Addr dst,
 void load_main(void){
     struct elf_loader el_v = {&simp_fill0, &simp_copy};
     kernel_entry_addr = NULL;
+	end_kernel = 0;
 
     multiboot_uint32_t flags = mb_info->flags;
     if(flags & MULTIBOOT_INFO_MODS){

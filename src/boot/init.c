@@ -20,6 +20,8 @@ extern uint32_t page_dpt_1[1024];
 extern uint32_t page_d_1[1024];
 extern uint32_t page_t_23[2*1024];
 
+extern uint8_t KPA;
+
 /*
  * On met en place un paging de 4 niveaux permettant de couvrir
  * 4*9 + 12 = 48 bits d'adresse
@@ -28,12 +30,14 @@ extern uint32_t page_t_23[2*1024];
  * |47..39|38..30|29..21|20..12|11...0|
  *
  * On initialise 2 PT pour couvrir les adresses:
- * 0x00000000 - 0x003fffff
+ * 0x00000000 -- 0x003fffff
  * en les mappant aux adresses physiques identiques
  *
  * On initialise 2 PT pour couvrir les adresses virtuelles du kernel:
- * KVA - KVA + 3fffff
- * pour le kernel 64 bit
+ * KVA -- KVA + 0x3fffff
+ *
+ * L'entrée PML4_LOOP boucle et permet d'accéder aux structures de paging
+ * depuis les adresses virtuelles
  *
  * TODO: erreur si bit 47 set
  */
@@ -46,11 +50,11 @@ void init_paging_directory(void){
 	uint32_t *stf[2] = {
 		page_t_01, page_t_23
 	};
-	uint32_t stf_l2[2] = {0, ((uint32_t)1)<<20};
+	uint32_t stf_l2[2] = {0, (uint32_t)&KPA};
 	struct{size_t num;void* pa;} pml4_ent[3] = {
 		{0,    page_dpt_0},
-		{0x80, page_dpt_1},
-		{0xff, page_ml4}
+		{PML4_KERNEL_VIRT_ADDR, page_dpt_1},
+		{PML4_LOOP, page_ml4}
 	};
 	
 	//initialisation à vide

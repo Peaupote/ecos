@@ -19,7 +19,8 @@ indj_64.s: indj_64.S
 			if(i!=0) printf(",");\
 			printf("0x%s", substr($$0,i+1,2))\
 		}}\
-		END{printf("\n")}' > indj_64.s 
+		END{printf("\n")}' > indj_64.s
+	rm -f indj_64.o
 
 gdt.s: gdt.txt
 	cpp -P gdt.txt | gawk \
@@ -54,5 +55,10 @@ boot.bin: linker.ld boot_data.ld $(OBJ) util
 	@echo "Grub check multiboot"
 	grub-file --is-x86-multiboot boot.bin
 
+boot.map: linker.ld boot_data.ld $(OBJ) util
+	i686-elf-ld -T linker.ld -o /dev/null \
+		$(OBJ) $(patsubst %,../util/32/%,$(UDEP)) \
+		-M > boot.map
+
 clean:
-	rm -f *.o *.bin *.s
+	rm -f *.o *.bin *.s boot.map
