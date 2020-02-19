@@ -41,7 +41,7 @@ boot.o: boot.s
 %.o:%.c
 	$(CC) $(FLAGS) -o $@ -c $<
 
-init.o: init.c $(HDEP)
+init.o: init.c ../util/paging.h $(HDEP)
 
 load.o: load.c multiboot.h ../util/vga.h ../util/string.h \
 	../util/elf64.h $(HDEP)

@@ -44,7 +44,7 @@ void simp_copy(void* none __attribute__((unused)), Elf64_Addr dst,
         p_dst[i] = ((unsigned char*) src)[i];
 }
 
-void load_main(void){
+void load_kernel64(void){
     struct elf_loader el_v = {&simp_fill0, &simp_copy};
     kernel_entry_addr = NULL;
 	end_kernel = 0;

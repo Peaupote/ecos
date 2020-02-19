@@ -113,7 +113,7 @@ _start:
 	 aux données fournies par GRUB
 	 On récupère l'adresse du kernel 64 bits dans kernel_entry_addr
 	*/
-	call load_main
+	call load_kernel64
 
 	/* --GDT-- */
 #include "gdt.s"
