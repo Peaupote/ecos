@@ -1,5 +1,6 @@
 CC=gcc
 FLAGS=-O2 -Wall -Wextra -std=gnu99
+SRCDEP=elf_info.o
 UDEP=elf64.o string.o
 export TRG=test
 
@@ -7,12 +8,22 @@ export TRG=test
 
 all: elf_info.out
 
-util:
-	$(MAKE) -C ../src/util $(patsubst %,test/%,$(UDEP))
+%.o:%.c
+	$(CC) $(FLAGS) -o $@ -c $<
 
-elf_info.out:elf_info.c ../src/util/elf64.h ../src/util/string.h util
-	$(CC) $(FLAGS) -o elf_info.out elf_info.c \
-		$(patsubst %,../src/util/test/%,$(UDEP))
+UDEP_FROM_HERE=$(patsubst %,..src/util/test/%,$(UDEP))
+UDEP_FROM_UTIL=$(patsubst %,test/%,$(UDEP))
+
+util:
+	$(MAKE) -C ../src/util $(UDEP_FROM_UTIL)
+
+elf_info.out:elf_info.o $(UDEP)
+	$(CC) $(FLAGS) -o elf_info.out elf_info.o $(UDEP_FROM_HERE)
+
+.depends:
+	../../tools/mkdep.sh "$(CC) $(FLAGS)" $(SRCDEP) > .depends
+
+include .depends
 
 clean:
 	rm -f *.out *.o

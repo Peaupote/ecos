@@ -1,7 +1,7 @@
 ISO=ecos.iso
 
-.PHONY: all clean tests start re \
-		src/boot/boot.bin src/kernel/kernel.bin
+.PHONY: all clean tests start re src/kernel/kernel.bin src/boot/boot.bin \
+	depends
 
 all: $(ISO)
 
@@ -24,6 +24,12 @@ tests:
 
 start: $(ISO)
 	qemu-system-x86_64 -cdrom $(ISO)
+
+depends:
+	$(MAKE) -C src/kernel .depends
+	$(MAKE) -C src/boot   .depends
+	$(MAKE) -C src/util clean
+	$(MAKE) -C tests      .depends
 
 clean:
 	$(MAKE) -C src/kernel clean

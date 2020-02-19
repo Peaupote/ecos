@@ -5,3 +5,4 @@ isodir
 *.s
 *.swp
 Session.vim
+*.depends

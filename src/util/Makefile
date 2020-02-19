@@ -9,16 +9,19 @@ else ifeq ($(TRG),test)
 else
 	CC=i686-elf-gcc
 endif
+SRCDEP=vga.c string.c elf64.c
 
-$(TRG):
+$(TRG)/%.o:%.c
 	mkdir -p $(TRG)
-
-$(TRG)/%.o:%.c $(TRG)
 	$(CC) $(FLAGS) -o $@ -c $<
 
-$(TRG)/vga.o: vga.c vga.h string.h
-$(TRG)/string.o: string.c string.h
-$(TRG)/elf64.o: elf64.c elf64.h
+$(TRG)/.depends:
+	mkdir -p $(TRG)
+	../../tools/mkdep.sh "$(CC) $(FLAGS)"\
+		$(foreach file,$(SRCDEP),"-MT 32/$(file) $(file)")\
+		> $(TRG)/.depends
+
+include $(TRG)/.depends
 
 .PHONY: clean
 
