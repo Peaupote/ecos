@@ -32,12 +32,6 @@ irq_sys:
     call syscall_hdl
     iretq
 
-load_idt:
-    lea  8(%rsp), %rdx
-    lidt (%rdx)
-    sti  // turn on interrupt
-    ret
-
 kernel_entry:
     mov %esp, %eax
     xorq %rsp, %rsp

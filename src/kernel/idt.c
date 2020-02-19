@@ -28,7 +28,6 @@ extern void outb(uint16_t port, uint16_t data);
 extern void irq_default(void);
 extern void irq_sys(void);
 extern void irq_keyboard(void);
-extern int load_idt(struct idt_reg*);
 
 typedef void (*idt_handler)(void);
 const idt_handler handlers[NEXCEPTION_VEC] = {
@@ -152,5 +151,7 @@ void idt_init(void) {
     struct idt_reg reg;
     reg.base = idt;
     reg.limit = IDT_ENTRIES * (sizeof(struct gate_desc)) - 1;
-    load_idt(&reg);
+
+    asm volatile("lidt %0"::"m" (reg));
+    asm volatile("sidt %0":"=m" (reg));
 }
