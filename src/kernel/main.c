@@ -20,6 +20,6 @@ void kernel_main(void) {
     terminal_initialize();
     terminal_writestring("64 bits kernel launched.\n");
 
-    asm volatile("int $0x80");
+//    asm volatile("int $0x80");
     while(1);
 }

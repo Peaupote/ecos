@@ -1,3 +1,5 @@
+#include "int.h"
+
 .section .text
 .global kernel_entry
 .global outb
@@ -5,7 +7,6 @@
 .global irq_default
 .global irq_sys
 .global irq_keyboard
-.global load_idt
 .extern common_hdl
 .extern syscall_hdl
 
@@ -37,6 +38,7 @@ kernel_entry:
     xorq %rsp, %rsp
     mov %eax, %esp
 
+    call terminal_initialize
     call idt_init
     call kernel_main
 

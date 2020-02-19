@@ -5,6 +5,13 @@
 
 #include "int.h"
 
+extern char inb(uint16_t port);
+extern void outb(uint16_t port, uint16_t data);
+extern void irq_default(void);
+extern void irq_sys(void);
+extern void irq_keyboard(void);
+extern int load_idt(uint64_t*);
+
 /**
  * IDT gate description
  */
@@ -111,10 +118,20 @@ void common_hdl(void) {
 }
 
 void syscall_hdl(void) {
-    printf("syscall\n");
 }
 
 void idt_init(void) {
+    outb(0x20, 0x11);
+    outb(0xA0, 0x11);
+    outb(0x21, 0x20);
+    outb(0xA1, 40);
+    outb(0x21, 0x04);
+    outb(0xA1, 0x02);
+    outb(0x21, 0x01);
+    outb(0xA1, 0x01);
+    outb(0x21, 0x0);
+    outb(0xA1, 0x0);
+
     uint64_t addr;
 
     // handlers for exceptions interruptions
