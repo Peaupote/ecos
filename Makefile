@@ -28,13 +28,15 @@ start: $(ISO)
 depends:
 	$(MAKE) -C src/kernel .depends
 	$(MAKE) -C src/boot   .depends
-	$(MAKE) -C src/util clean
+	$(MAKE) -C src/util    clean
+	$(MAKE) -C src/libc   .depends
 	$(MAKE) -C tests      .depends
 
 clean:
 	$(MAKE) -C src/kernel clean
 	$(MAKE) -C src/boot   clean
 	$(MAKE) -C src/util   clean
+	$(MAKE) -C src/libc   clean
 	$(MAKE) -C tests      clean
 	rm -rf *.o *.iso *.bin isodir
 

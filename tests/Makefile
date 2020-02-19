@@ -11,17 +11,17 @@ all: elf_info.out
 %.o:%.c
 	$(CC) $(FLAGS) -o $@ -c $<
 
-UDEP_FROM_HERE=$(patsubst %,..src/util/test/%,$(UDEP))
+UDEP_FROM_HERE=$(patsubst %,../src/util/test/%,$(UDEP))
 UDEP_FROM_UTIL=$(patsubst %,test/%,$(UDEP))
 
 util:
 	$(MAKE) -C ../src/util $(UDEP_FROM_UTIL)
 
-elf_info.out:elf_info.o $(UDEP)
+elf_info.out:elf_info.o util
 	$(CC) $(FLAGS) -o elf_info.out elf_info.o $(UDEP_FROM_HERE)
 
 .depends:
-	../../tools/mkdep.sh "$(CC) $(FLAGS)" $(SRCDEP) > .depends
+	../tools/mkdep.sh "$(CC) $(FLAGS)" $(SRCDEP) > .depends
 
 include .depends
 

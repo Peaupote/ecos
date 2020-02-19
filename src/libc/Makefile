@@ -1,30 +1,26 @@
-NAME=libc.bin
 CC=x86_64-elf-gcc
 FLAGS=-O2 -g -Wall -Wextra -std=gnu99 \
-		-nostdlib -ffreestanding \
+		-nostdlib -mcmodel=large -ffreestanding \
 		-mno-red-zone
-FILES=string/memcmp.c \
-	  string/memcpy.c \
-	  string/memset.c \
-	  string/memmove.c \
-	  string/strcpy.c \
-	  string/strlen.c \
-	  stdio/printf.c \
-	  stdio/putchar.c \
-	  stdio/puts.c
-OBJ=$(FILES:%.c=%.o)
+include list.Makefile
+FILES=$(LIBC_FILES)
+OBJ=$(LIBC_OBJ)
+SRCDEP=$(FILES)
 INCLUDES=-I ./include
 
 ##
 
 .PHONY: all re clean
 
-all: $(NAME)
+all: $(OBJ)
 
 %.o:%.c
 	$(CC) $(FLAGS) -c $? -o $@ $(INCLUDES)
 
-$(NAME): $(OBJ)
+.depends:
+	../../tools/mkdep.sh "$(CC) $(FLAGS)" $(SRCDEP) > .depends
+
+include .depends
 
 clean:
 	@echo "Clean trash files"
