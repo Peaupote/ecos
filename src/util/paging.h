@@ -26,8 +26,9 @@
 #define PAGING_FLAG_R		0x2
 //User/supervisor
 #define PAGING_FLAG_U		0x4
-//page Size
-#define PAGING_FLAG_S		0x100
+//page Size: si 1 dans le PD utilise une page de 2MB à la place d'une PT
+//requiert PSE (ou PAE)
+#define PAGING_FLAG_S		(1<<7)
 
 typedef uint64_t phy_addr;//adresse physique
 typedef uint64_t uint_ptr;//adresse virtuelle

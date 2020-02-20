@@ -1,8 +1,8 @@
-CC=gcc
-FLAGS=-O2 -Wall -Wextra -std=gnu99
+export TRG=test
+export CC=gcc
+export FLAGS=-O2 -Wall -Wextra -std=gnu99
 SRCDEP=elf_info.o
 UDEP=elf64.o string.o
-export TRG=test
 
 .PHONY: all util clean
 

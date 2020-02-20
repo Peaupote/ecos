@@ -1,4 +1,5 @@
-#include "def.h"
+#define ASSEMBLY
+#include "../util/gdt.h"
 
 /* From https://wiki.osdev.org/Bare_Bones */
 /* Declare constants for the multiboot header. */

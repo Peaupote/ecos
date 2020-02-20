@@ -1,13 +1,13 @@
-CC=x86_64-elf-gcc
+export TRG=64
+export CC=x86_64-elf-gcc
+export INCLUDES=-I ../libc/include
+export FLAGS=-O2 -Wall -Wextra -std=gnu99 -nostdlib -mcmodel=large -ffreestanding -mno-red-zone
 AS=x86_64-elf-as
-FLAGS=-O2 -Wall -Wextra -std=gnu99 -nostdlib -mcmodel=large -ffreestanding -mno-red-zone
 include ../libc/list.Makefile
 FILES=proc.c file.c tty.c
 SRCDEP=main.c kmem.c "-MT entry.s entry.S" tests.c
 OBJ=main.o entry.o kmem.o tests.o
 UDEP=vga.o string.o
-export TRG=64
-INCLUDES=-I ../libc/include
 
 .PHONY: all re clean
 

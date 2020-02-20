@@ -28,7 +28,7 @@ start: $(ISO)
 depends:
 	$(MAKE) -C src/kernel .depends
 	$(MAKE) -C src/boot   .depends
-	$(MAKE) -C src/util    clean
+	$(MAKE) -C src/util    clean-depends
 	$(MAKE) -C src/libc   .depends
 	$(MAKE) -C tests      .depends
 

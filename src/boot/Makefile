@@ -1,10 +1,10 @@
+export TRG=32
+export CC=i686-elf-gcc
+export FLAGS=-O2 -g -Wall -Wextra -std=gnu99 -nostdlib -ffreestanding
 AS=i686-elf-as
-CC=i686-elf-gcc
-FLAGS=-O2 -g -Wall -Wextra -std=gnu99 -nostdlib -ffreestanding
 SRCDEP="-MT boot.s boot.S" init.c load.c
 UDEP=vga.o string.o elf64.o
 OBJ=boot.o init.o load.o
-export TRG=32
 
 .PHONY: clean all util
 
@@ -24,7 +24,7 @@ indj_64.s: indj_64.S
 
 gdt.s: gdt.txt
 	cpp -P gdt.txt | gawk \
-		'BEGIN{printf("#include \"def.h\"\n"); ofs=0;}\
+		'BEGIN{ofs=0;}\
 		{\
 		printf("movl $$GDT_ENTRY_0(%s, %s), (gd_table + %d)\n", \
 			$$1, $$2, ofs);\

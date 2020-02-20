@@ -1,19 +1,14 @@
+TRG_LIST=32 64 test
 # Default Target:
-TRG?=64
-FLAGS=-O2 -g -Wall -Wextra -std=gnu99 -nostdlib -ffreestanding -mno-red-zone
-ifeq ($(TRG),64)
-	CC=x86_64-elf-gcc
-else ifeq ($(TRG),test)
-	CC=gcc
-	FLAGS=-O2 -g -Wall -Wextra -std=gnu99
-else
-	CC=i686-elf-gcc
-endif
+TRG?=test
+CC?=gcc
+FLAGS?=-O2 -Wall -Wextra -std=gnu99
+INCLUDES?=
 SRCDEP=vga.c string.c elf64.c
 
 $(TRG)/%.o:%.c
 	mkdir -p $(TRG)
-	$(CC) $(FLAGS) -o $@ -c $<
+	$(CC) $(FLAGS) -o $@ -c $< $(INCLUDES)
 
 $(TRG)/.depends:
 	mkdir -p $(TRG)
@@ -23,7 +18,10 @@ $(TRG)/.depends:
 
 include $(TRG)/.depends
 
-.PHONY: clean
+.PHONY: clean clean-depends
 
 clean:
-	rm -rf 32 64 test
+	rm -rf $(TRG_LIST)
+
+clean-depends:
+	rm -f $(patsubst %,%/.depends,$(TRG_LIST))
