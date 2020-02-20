@@ -27,7 +27,6 @@ forced to be within the first 8 KiB of the kernel file.
 //Paging structures for id mapping
 .global page_dpt_0
 .global page_d_0
-.global page_t_01
 
 .global mb_info
 .global kernel_entry_addr
@@ -49,10 +48,6 @@ page_dpt_0: #PDPT
 .balign 0x1000
 page_d_0:
 .skip 0x1000 # 512 * 64 bits
-
-.balign 0x1000
-page_t_01:
-.skip 0x2000 # 2*512 * 64 bits
 
 .balign 4
 mb_info:

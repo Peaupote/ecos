@@ -40,6 +40,6 @@ include .depends
 
 clean:
 	@echo "Clean trash files"
-	rm -f *.o *.bin .depends
+	rm -f *.o *.bin .depends entry.s
 
 re: clean $(NAME)

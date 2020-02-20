@@ -7,6 +7,7 @@
 .global irq_default
 .global irq_sys
 .global irq_keyboard
+
 .extern common_hdl
 .extern syscall_hdl
 
@@ -22,6 +23,10 @@ outb:
     ret
 
 irq_default:
+    /*TEST: infinite loop pour eviter de crasher TODO*/
+    cli
+1:  hlt
+    jmp 1b
     call common_hdl
     iretq
 
@@ -34,12 +39,11 @@ irq_sys:
     iretq
 
 kernel_entry:
-    mov %esp, %eax
-    xorq %rsp, %rsp
-    mov %eax, %esp
+    //On charge la nouvelle adresse virtuelle de la pile
+    movq $stack_top_1, %rsp
+    shlq $32, %rsp
+    movq $stack_top_0, %rsp
 
-    call terminal_initialize
-    call idt_init
     call kernel_main
 
     /*infinite loop*/

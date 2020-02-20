@@ -1,8 +1,9 @@
 //Tout les segments couvrent l'ensemble de la mémoire
+//BASE | LIMIT | ACCESS | FLAGS
 0 0 0 0
 //code segment 64 bits
-0 0xfffff 0x9a 0xa
+0 0xfffff (GDT_ACC_P|GDT_ACC_Pr(0)|GDT_ACC_S|GDT_ACC_R|GDT_ACC_E) (GDT_FLAG_G|GDT_FLAG_L)
 //data segment
-0 0xfffff 0x92 0xc
+0 0xfffff (GDT_ACC_P|GDT_ACC_Pr(0)|GDT_ACC_S|GDT_ACC_R) (GDT_FLAG_G|GDT_FLAG_S)
 //code segment
-0 0xfffff 0x9a 0xc
+0 0xfffff (GDT_ACC_P|GDT_ACC_Pr(0)|GDT_ACC_S|GDT_ACC_R|GDT_ACC_E) (GDT_FLAG_G|GDT_FLAG_S)
