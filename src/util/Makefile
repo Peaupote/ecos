@@ -1,26 +1,27 @@
+TRG_LIST=32 64 test
 # Default Target:
-TRG?=64
-FLAGS=-O2 -g -Wall -Wextra -std=gnu99 -nostdlib -ffreestanding -mno-red-zone
-ifeq ($(TRG),64)
-	CC=x86_64-elf-gcc
-else ifeq ($(TRG),test)
-	CC=gcc
-	FLAGS=-O2 -g -Wall -Wextra -std=gnu99
-else
-	CC=i686-elf-gcc
-endif
+TRG?=test
+CC?=gcc
+FLAGS?=-O2 -Wall -Wextra -std=gnu99
+INCLUDES?=
+SRCDEP=vga.c string.c elf64.c
 
-$(TRG):
+$(TRG)/%.o:%.c
 	mkdir -p $(TRG)
+	$(CC) $(FLAGS) -o $@ -c $< $(INCLUDES)
 
-$(TRG)/%.o:%.c $(TRG)
-	$(CC) $(FLAGS) -o $@ -c $<
+$(TRG)/.depends:
+	mkdir -p $(TRG)
+	../../tools/mkdep.sh "$(CC) $(FLAGS)"\
+		$(foreach file,$(SRCDEP),"-MT 32/$(file) $(file)")\
+		> $(TRG)/.depends
 
-$(TRG)/vga.o: vga.c vga.h string.h
-$(TRG)/string.o: string.c string.h
-$(TRG)/elf64.o: elf64.c elf64.h
+include $(TRG)/.depends
 
-.PHONY: clean
+.PHONY: clean clean-depends
 
 clean:
-	rm -rf 32 64 test
+	rm -rf $(TRG_LIST)
+
+clean-depends:
+	rm -f $(patsubst %,%/.depends,$(TRG_LIST))

@@ -1,10 +1,10 @@
+export TRG=32
+export CC=i686-elf-gcc
+export FLAGS=-O2 -g -Wall -Wextra -std=gnu99 -nostdlib -ffreestanding
 AS=i686-elf-as
-CC=i686-elf-gcc
-FLAGS=-O2 -g -Wall -Wextra -std=gnu99 -nostdlib -ffreestanding -mno-red-zone
-HDEP=../def.h
+SRCDEP="-MT boot.s boot.S" init.c load.c
 UDEP=vga.o string.o elf64.o
 OBJ=boot.o init.o load.o
-export TRG=32
 
 .PHONY: clean all util
 
@@ -24,7 +24,7 @@ indj_64.s: indj_64.S
 
 gdt.s: gdt.txt
 	cpp -P gdt.txt | gawk \
-		'BEGIN{printf("#include \"def.h\"\n"); ofs=0;}\
+		'BEGIN{ofs=0;}\
 		{\
 		printf("movl $$GDT_ENTRY_0(%s, %s), (gd_table + %d)\n", \
 			$$1, $$2, ofs);\
@@ -33,32 +33,27 @@ gdt.s: gdt.txt
 			$$1, $$2, $$3, $$4, ofs);\
 		ofs += 4;}' > gdt.s
 
-boot.s: boot.S indj_64.s $(HDEP) gdt.s def.h
-
 boot.o: boot.s
 	$(AS) boot.s -o boot.o
 
 %.o:%.c
 	$(CC) $(FLAGS) -o $@ -c $<
 
-init.o: init.c ../util/paging.h $(HDEP)
-
-load.o: load.c multiboot.h ../util/vga.h ../util/string.h \
-	../util/elf64.h $(HDEP)
+UDEP_FROM_HERE=$(patsubst %,../util/32/%,$(UDEP))
+UDEP_FROM_UTIL=$(patsubst %,32/%,$(UDEP))
 
 util:
-	$(MAKE) -C ../util $(patsubst %,32/%,$(UDEP))
+	$(MAKE) -C ../util $(UDEP_FROM_UTIL)
 
 boot.bin: linker.ld boot_data.ld $(OBJ) util
-	$(CC) -T linker.ld -o boot.bin $(FLAGS) $(OBJ) \
-		$(patsubst %,../util/32/%,$(UDEP)) -lgcc
+	$(CC) -T linker.ld -o boot.bin $(FLAGS) $(OBJ) $(UDEP_FROM_HERE) -lgcc
 	@echo "Grub check multiboot"
 	grub-file --is-x86-multiboot boot.bin
 
-boot.map: linker.ld boot_data.ld $(OBJ) util
-	i686-elf-ld -T linker.ld -o /dev/null \
-		$(OBJ) $(patsubst %,../util/32/%,$(UDEP)) \
-		-M > boot.map
+.depends:
+	../../tools/mkdep.sh "$(CC) $(FLAGS)" $(SRCDEP) > .depends
+
+include .depends
 
 clean:
-	rm -f *.o *.bin *.s boot.map
+	rm -f *.o *.bin *.s boot.map .depends
