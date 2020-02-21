@@ -23,10 +23,6 @@ outb:
     ret
 
 irq_default:
-    /*TEST: infinite loop pour eviter de crasher TODO*/
-    cli
-1:  hlt
-    jmp 1b
     call common_hdl
     iretq
 

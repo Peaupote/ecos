@@ -15,13 +15,6 @@ extern void irq_default(void);
 extern void irq_sys(void);
 extern void irq_keyboard(void);
 
-extern char inb(uint16_t port);
-extern void outb(uint16_t port, uint16_t data);
-extern void irq_default(void);
-extern void irq_sys(void);
-extern void irq_keyboard(void);
-
-
 const idt_handler handlers[NEXCEPTION_VEC] = {
     irq_default, irq_default, irq_default, irq_default,
     irq_default, irq_default, irq_default, irq_default,
@@ -104,13 +97,14 @@ void common_hdl(void) {
 }
 
 void syscall_hdl(void) {
+    printf("syscall\n");
 }
 
 void idt_init(void) {
-	uint_ptr idt_addr = idt;
+    uint_ptr idt_addr = (uint_ptr)idt;
     uint64_t addr;
 
-	outb(0x20, 0x11);
+    outb(0x20, 0x11);
     outb(0xA0, 0x11);
     outb(0x21, 0x20);
     outb(0xA1, 40);
@@ -134,7 +128,7 @@ void idt_init(void) {
     }
 
     // Sysycalls handler
-    addr = (uint64_t)paging_phy_addr((uint_ptr)irq_sys);
+    addr = (uint64_t)irq_sys;
     idt[SYSCALL_VEC].reserved    = 0;
     idt[SYSCALL_VEC].offset_low  = (uint16_t)addr & 0xffff;
     idt[SYSCALL_VEC].offset_mid  = (uint16_t)(addr >> 16) & 0xffff;
@@ -152,12 +146,11 @@ void idt_init(void) {
     idt[KEYBOARD_VEC].ist         = 0;
     idt[KEYBOARD_VEC].type_attr   = INT_GATE;
 
-	reg.content[0] =IDT_ENTRIES * (sizeof(struct gate_desc)) - 1;
-	for(uint8_t i=1;i<5;++i) {
-    	reg.content[i] = idt_addr & 0xffff;
-		idt_addr = idt_addr >> 16;
-	}
+    reg.content[0] = IDT_ENTRIES * (sizeof(struct gate_desc)) - 1;
+    for(uint8_t i=1;i<5;++i) {
+        reg.content[i] = idt_addr & 0xffff;
+        idt_addr = idt_addr >> 16;
+    }
 
-	asm volatile("lidt %0; sti;"::"m" (reg) : "memory");
-//  asm volatile("sidt %0":"=m" (reg));
+    asm volatile("lidt %0; sti;"::"m" (reg) : "memory");
 }
