@@ -1,3 +1,6 @@
+#ifndef _H_INT
+#define _H_INT
+
 // number of IDT vector numbers
 #define IDT_ENTRIES 256
 
@@ -21,3 +24,32 @@
 #define KEYBOARD_STATUS_PORT 0x64
 #define KEYBOARD_DATA_PORT   0x60
 #define ENTER_KEY_CODE 0x1C
+
+#define PIC1_PORT 0x20
+#define PIC1_DATA 0x21
+#define PIC2_PORT 0xA0
+#define PIC2_DATA 0xA1
+
+#define PIC_INIT_CODE 0x11 // initialisation
+#define PIC_EOI_CODE  0x20 // end-of-interrupt
+
+static inline uint8_t inb(uint16_t port) {
+    uint8_t ret;
+    asm volatile ("inb %1, %0" : "=a"(ret) : "dN"(port));
+    return ret;
+}
+
+static inline void outb(uint16_t port, uint8_t data) {
+    asm volatile ("outb %1, %0"::"dN"(port), "a"(data));
+}
+
+static inline void io_wait(void) {
+    // must be unused port
+    asm volatile ( "outb %%al, $0x80" : : "a"(0) );
+}
+
+static inline void write_eoi(void) {
+    outb(PIC1_PORT, PIC_EOI_CODE);
+}
+
+#endif

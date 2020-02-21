@@ -6,24 +6,53 @@
 #include <stdio.h>
 
 #include "int.h"
-
+#include "../util/vga.h"
 #include "kmem.h"
 
-extern char inb(uint16_t port);
-extern void outb(uint16_t port, uint16_t data);
-extern void irq_default(void);
+extern void irq0(void);
+extern void irq1(void);
+extern void irq2(void);
+extern void irq3(void);
+extern void irq4(void);
+extern void irq5(void);
+extern void irq6(void);
+extern void irq7(void);
+extern void irq8(void);
+extern void irq9(void);
+extern void irq10(void);
+extern void irq11(void);
+extern void irq12(void);
+extern void irq13(void);
+extern void irq14(void);
+extern void irq15(void);
+extern void irq16(void);
+extern void irq17(void);
+extern void irq18(void);
+extern void irq19(void);
+extern void irq20(void);
+extern void irq21(void);
+extern void irq22(void);
+extern void irq23(void);
+extern void irq24(void);
+extern void irq25(void);
+extern void irq26(void);
+extern void irq27(void);
+extern void irq28(void);
+extern void irq29(void);
+extern void irq30(void);
+extern void irq31(void);
 extern void irq_sys(void);
 extern void irq_keyboard(void);
 
 const idt_handler handlers[NEXCEPTION_VEC] = {
-    irq_default, irq_default, irq_default, irq_default,
-    irq_default, irq_default, irq_default, irq_default,
-    irq_default, irq_default, irq_default, irq_default,
-    irq_default, irq_default, irq_default, irq_default,
-    irq_default, irq_default, irq_default, irq_default,
-    irq_default, irq_default, irq_default, irq_default,
-    irq_default, irq_default, irq_default, irq_default,
-    irq_default, irq_default, irq_default, irq_default
+    irq0,  irq1,  irq2,  irq3,
+    irq4,  irq5,  irq6,  irq7,
+    irq8,  irq9,  irq10, irq11,
+    irq12, irq13, irq14, irq15,
+    irq15, irq17, irq18, irq19,
+    irq20, irq21, irq22, irq23,
+    irq24, irq25, irq26, irq27,
+    irq28, irq29, irq30, irq31
 };
 
 struct gate_desc idt[IDT_ENTRIES] = { 0 };
@@ -69,11 +98,15 @@ unsigned char keyboard_map[128] =
 };
 
 void keyboard_hdl(void) {
+    printf("key\n");
+    write_eoi();
+    return;
+
     uint8_t status;
     char keycode;
 
     /* write EOI */
-    outb(0x20, 0x20);
+    // outb(0x20, 0x20);
 
     status = inb(KEYBOARD_STATUS_PORT);
     /* Lowest bit of status will be set if buffer is not empty */
@@ -92,8 +125,9 @@ void keyboard_hdl(void) {
     }
 }
 
-void common_hdl(void) {
-    printf("common hdl\n");
+void common_hdl(uint64_t code) {
+    // TODO : print code
+    printf("hdl\n");
 }
 
 void syscall_hdl(void) {
@@ -104,16 +138,22 @@ void idt_init(void) {
     uint_ptr idt_addr = (uint_ptr)idt;
     uint64_t addr;
 
-    outb(0x20, 0x11);
-    outb(0xA0, 0x11);
-    outb(0x21, 0x20);
-    outb(0xA1, 40);
-    outb(0x21, 0x04);
-    outb(0xA1, 0x02);
-    outb(0x21, 0x01);
-    outb(0xA1, 0x01);
-    outb(0x21, 0x0);
-    outb(0xA1, 0x0);
+    // PROBLEM HERE
+    /* // start init seq */
+    /* outb(PIC1_PORT, PIC_INIT_CODE); */
+    /* outb(PIC2_PORT, PIC_INIT_CODE); */
+
+    /* // change vector offset */
+    /* outb(PIC1_DATA, 0x20); */
+    /* outb(PIC2_DATA, 0x28); */
+
+    /* // purple magic */
+    /* outb(PIC1_DATA, 0x04); */
+    /* outb(PIC2_DATA, 0x02); */
+    /* outb(PIC1_DATA, 0x01); */
+    /* outb(PIC2_DATA, 0x01); */
+    /* outb(PIC1_DATA, 0x0); */
+    /* outb(PIC2_DATA, 0x0); */
 
     // handlers for exceptions interruptions
     for (uint8_t n = 0; n < NEXCEPTION_VEC; n++) {

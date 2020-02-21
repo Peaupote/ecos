@@ -5,6 +5,8 @@
 #include <stddef.h>
 #include <stdint.h>
 
+#include "int.h"
+
 /**
  * IDT gate description
  */
@@ -20,12 +22,13 @@ struct gate_desc {
 
 //Attention au padding
 struct idt_reg {
-	uint16_t content[5];
+    uint16_t content[5];
 //  uint16_t   limit;
 //  struct gate_desc *base;
 };
 
 typedef void (*idt_handler)(void);
+const idt_handler handlers[NEXCEPTION_VEC];
 
 void idt_init(void);
 
