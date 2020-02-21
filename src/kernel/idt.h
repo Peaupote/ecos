@@ -20,15 +20,16 @@ struct gate_desc {
     uint32_t  reserved;
 };
 
-//Attention au padding
 struct idt_reg {
-    uint16_t content[5];
-//  uint16_t   limit;
-//  struct gate_desc *base;
-};
+    uint16_t   limit;
+    struct gate_desc *base;
+}
+//Supprime le padding, rend l'accès plus lent 
+//mais devrais fonctionner en x86
+__attribute__((packed));
 
 typedef void (*idt_handler)(void);
-const idt_handler handlers[NEXCEPTION_VEC];
+const idt_handler irq_handlers[NEXCEPTION_VEC];
 
 void idt_init(void);
 

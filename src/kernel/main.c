@@ -25,5 +25,6 @@ void kernel_main(void) {
     asm volatile("int $0x80" : : : "memory");
     terminal_writestring("Done.\n");
 
-    while(1);
+    while(1)
+		asm volatile("hlt" : : : "memory");
 }
