@@ -23,15 +23,7 @@ indj_64.s: indj_64.S
 	rm -f indj_64.o
 
 gdt.s: gdt.txt
-	cpp -P gdt.txt | gawk \
-		'BEGIN{ofs=0;}\
-		{\
-		printf("movl $$GDT_ENTRY_0(%s, %s), (gd_table + %d)\n", \
-			$$1, $$2, ofs);\
-		ofs += 4;\
-		printf("movl $$GDT_ENTRY_1(%s, %s, %s, %s), (gd_table + %d)\n", \
-			$$1, $$2, $$3, $$4, ofs);\
-		ofs += 4;}' > gdt.s
+	cpp -P gdt.txt | gawk -f ../../tools/fillGDT.awk > gdt.s
 
 boot.o: boot.s
 	$(AS) boot.s -o boot.o

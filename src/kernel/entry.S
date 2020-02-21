@@ -40,9 +40,9 @@ irq_sys:
 
 kernel_entry:
     //On charge la nouvelle adresse virtuelle de la pile
-    movq $stack_top_1, %rsp
+    movl $stack_top_1, %esp
     shlq $32, %rsp
-    movq $stack_top_0, %rsp
+    movl $stack_top_0, %esp
 
     call kernel_main
 
