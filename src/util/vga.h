@@ -42,6 +42,7 @@ void terminal_initialize(void);
 void terminal_setcolor(uint8_t color);
 void terminal_putentryat(char c, uint8_t color, size_t x, size_t y);
 void terminal_nextline();
+void terminal_cursor_at(size_t rw, size_t cl);
 /*caractère affichable*/
 void terminal_putachar(char c);
 void terminal_putchar(char c);

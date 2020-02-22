@@ -41,6 +41,12 @@ void terminal_nextline()
         terminal_row = 0;
 }
 
+void terminal_cursor_at(size_t rw, size_t cl)
+{
+	terminal_row = rw;
+	terminal_column = cl;
+}
+
 void terminal_putachar(char c)
 {
     terminal_putentryat(c, terminal_color, terminal_column, terminal_row);

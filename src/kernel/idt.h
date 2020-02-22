@@ -29,7 +29,7 @@ struct idt_reg {
 __attribute__((packed));
 
 typedef void (*idt_handler)(void);
-const idt_handler irq_handlers[NEXCEPTION_VEC];
+const idt_handler int_handlers[NEXCEPTION_VEC];
 
 void idt_init(void);
 

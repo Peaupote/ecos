@@ -16,8 +16,8 @@ all: kernel.bin
 %.o:%.c
 	$(CC) $(FLAGS) -o $@ -c $< $(INCLUDES)
 
-irq_handlers.s: mkIRQH.awk
-	seq 0 31 | gawk -f mkIRQH.awk > irq_handlers.s
+int_handlers.s: int_handlers.txt int_handlers.awk
+	cpp -P int_handlers.txt | gawk -f int_handlers.awk > int_handlers.s
 
 entry.o: entry.s
 	$(AS) entry.s -o entry.o
@@ -43,6 +43,6 @@ include .depends
 
 clean:
 	@echo "Clean trash files"
-	rm -f *.o *.bin .depends entry.s irq_handlers.s
+	rm -f *.o *.bin .depends entry.s int_handlers.s
 
 re: clean $(NAME)

@@ -11,8 +11,6 @@ INCLUDE ../boot/boot_data.ld
 KVA = 0x80 << 39;
 
 stack_top  = KVA + kba_stk_tp;
-stack_top_0 = stack_top & 0xffffffff;
-stack_top_1 = (stack_top>>32) & 0xffffffff;
 end_kernel = KVA + kba_end_krn;
 
 SECTIONS
