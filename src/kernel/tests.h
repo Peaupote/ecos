@@ -3,4 +3,6 @@
 
 void test_kmem(void);
 
+void test_idt(void);
+
 #endif

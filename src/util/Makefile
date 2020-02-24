@@ -13,7 +13,7 @@ $(TRG)/%.o:%.c
 $(TRG)/.depends:
 	mkdir -p $(TRG)
 	../../tools/mkdep.sh "$(CC) $(FLAGS)"\
-		$(foreach file,$(SRCDEP),"-MT 32/$(file) $(file)")\
+		$(foreach file,$(SRCDEP),"-MT $(TRG)/$(file) $(file)")\
 		> $(TRG)/.depends
 
 include $(TRG)/.depends

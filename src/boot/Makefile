@@ -3,13 +3,14 @@ export CC=i686-elf-gcc
 export FLAGS=-O2 -g -Wall -Wextra -std=gnu99 -nostdlib -ffreestanding
 AS=i686-elf-as
 CFILES=init.c load.c
-SRCDEP="-MT boot.s boot.S" $(CFILES)
+ASFILES=boot.S
+SRCDEP=$(foreach file,$(ASFILES),"-MT $(file:.S=.s) $(file)") $(CFILES)
+OBJ=$(ASFILES:.S=.o) $(CFILES:.c=.o)
 UDEP=vga.o string.o elf64.o
-OBJ=boot.o $(CFILES:.c=.o)
 
 .PHONY: clean all util
 
-all: boot.o init.o
+all: boot.bin
 
 indj_64.s: indj_64.S
 	x86_64-elf-as indj_64.S -o indj_64.o
@@ -26,11 +27,11 @@ indj_64.s: indj_64.S
 gdt.s: gdt.txt
 	cpp -P gdt.txt | gawk -f ../../tools/fillGDT.awk > gdt.s
 
-boot.o: boot.s
-	$(AS) boot.s -o boot.o
-
 %.o:%.c
 	$(CC) $(FLAGS) -o $@ -c $<
+
+%.o:%.s
+	$(AS) $< -o $@
 
 UDEP_FROM_HERE=$(patsubst %,../util/32/%,$(UDEP))
 UDEP_FROM_UTIL=$(patsubst %,32/%,$(UDEP))

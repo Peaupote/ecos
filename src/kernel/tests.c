@@ -8,6 +8,8 @@
 #include "../util/string.h"
 
 #include "kmem.h"
+#include "keyboard.h"
+#include "idt.h"
 
 char nb_str[17];
 
@@ -35,4 +37,31 @@ void test_kmem() {
 	int64_to_str_hexa(nb_str, paging_map_to(v_addr, new_page));
 	terminal_writestring(nb_str);
 	*((unsigned char*)v_addr) = 42;
+}
+
+void test_idt() {
+	char key_char;
+	char key_str[4] = "' '";
+ 	uint64_t test_count = 0;
+	nb_str[16] = '\0';
+
+	asm volatile("int $0x80" : : : "memory");
+    terminal_writestring("Done.\n");
+
+    while(1) {
+		terminal_cursor_at(0, 50);
+		int64_to_str_hexa(nb_str, test_count++);
+		terminal_writestring(nb_str);
+		terminal_cursor_at(1, 50);
+		int64_to_str_hexa(nb_str, keyboard_input_keycode);
+		terminal_writestring(nb_str);
+		terminal_cursor_at(2, 50);
+		key_char = keyboard_char_map[keyboard_input_keycode & 0x7f];
+		if(key_char){
+			key_str[1] = key_char;
+			terminal_writestring(key_str);
+		} else
+			terminal_writestring("???");
+		asm volatile("hlt" : : : "memory");
+	}
 }
