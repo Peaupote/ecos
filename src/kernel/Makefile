@@ -4,9 +4,9 @@ export INCLUDES=-I ../libc/include
 export FLAGS=-O2 -Wall -Wextra -std=gnu99 -nostdlib -mcmodel=large -ffreestanding -mno-red-zone
 AS=x86_64-elf-as
 include ../libc/list.Makefile
-FILES=proc.c file.c tty.c idt.c
-SRCDEP=main.c kmem.c "-MT entry.s entry.S" idt.c tests.c
-OBJ=main.o entry.o kmem.o idt.o tests.o
+CFILES=main.c kmem.c idt.c keyboard.c tests.c
+SRCDEP="-MT entry.s entry.S" $(CFILES)
+OBJ=entry.o $(CFILES:.c=.o)
 UDEP=vga.o string.o
 
 .PHONY: all re clean

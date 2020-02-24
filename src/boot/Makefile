@@ -2,9 +2,10 @@ export TRG=32
 export CC=i686-elf-gcc
 export FLAGS=-O2 -g -Wall -Wextra -std=gnu99 -nostdlib -ffreestanding
 AS=i686-elf-as
-SRCDEP="-MT boot.s boot.S" init.c load.c
+CFILES=init.c load.c
+SRCDEP="-MT boot.s boot.S" $(CFILES)
 UDEP=vga.o string.o elf64.o
-OBJ=boot.o init.o load.o
+OBJ=boot.o $(CFILES:.c=.o)
 
 .PHONY: clean all util
 

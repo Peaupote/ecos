@@ -3,11 +3,8 @@
 
     .section .data
 .global test_count
-.global test_data_in
 test_count:
     .quad 0
-test_data_in:
-    .byte 0
 
     .section .text
 .global kernel_entry
@@ -15,30 +12,49 @@ test_data_in:
 .global irq_sys
 .global irq_keyboard
 .extern common_hdl
-.extern syscall_hdl
 .extern keyboard_hdl
+.extern syscall_hdl
+.extern input_keycode
+
+//Sauvegarde des registres pouvant être modifiés par un appel à une 
+//fonction C. Place 9*8 octets sur la pile
+.macro save_c_reg
+	pushq %rax
+	pushq %rcx
+	pushq %rdx
+	pushq %rsi
+	pushq %rdi
+	pushq %r8
+	pushq %r9
+	pushq %r10
+	pushq %r11
+.endm
+.macro restore_c_reg
+	popq  %r11
+	popq  %r10
+	popq  %r9
+	popq  %r8
+	popq  %rdi
+	popq  %rsi
+	popq  %rdx
+	popq  %rcx
+	popq  %rax
+.endm
 
 int_handlers:
 #include "int_handlers.s"
 
 irq_keyboard:
-    pushq %rax
-    pushq %rdi
-    movabsq $test_count, %rdi
-    movq $0x10000000, (%rdi)
+	cli
+  	save_c_reg
+	leaq -8(%rsp), %rsp //Alignement 16 octets
 
-//    call keyboard_hdl
-    inb $KEYBOARD_STATUS_PORT, %al
-    testb 0x01, %al
-    je statut_0
-    inb $KEYBOARD_DATA_PORT, %al
-    movabsq $test_data_in, %rdi
-    movb %al, (%rdi)
-statut_0:
-    mov $PIC_EOI_CODE, %al
-    outb %al, $PIC1_PORT
-    popq %rdi
-    popq %rax
+	call keyboard_hdl
+    
+	leaq 8(%rsp), %rsp
+	restore_c_reg
+	iretq
+	sti
     iretq
 
 irq_sys:

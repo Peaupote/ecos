@@ -13,14 +13,17 @@
 
 #include "kmem.h"
 #include "idt.h"
+#include "keyboard.h"
 
 #include "tests.h"
 
 char num_str[17];
+char key_str[4] = "' '";
 extern uint64_t test_count;
-extern uint8_t test_data_in;
 
 void kernel_main(void) {
+	char key_char;
+
     idt_init();
     kmem_init();
     terminal_initialize();
@@ -36,8 +39,15 @@ void kernel_main(void) {
 		int64_to_str_hexa(num_str, test_count++);
 		terminal_writestring(num_str);
 		terminal_cursor_at(1, 50);
-		int64_to_str_hexa(num_str, test_data_in);
+		int64_to_str_hexa(num_str, keyboard_input_keycode);
 		terminal_writestring(num_str);
-//		asm volatile("hlt" : : : "memory");
+		terminal_cursor_at(2, 50);
+		key_char = keyboard_char_map[keyboard_input_keycode & 0x7f];
+		if(key_char){
+			key_str[1] = key_char;
+			terminal_writestring(key_str);
+		} else
+			terminal_writestring("???");
+		asm volatile("hlt" : : : "memory");
 	}
 }
