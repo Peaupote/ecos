@@ -12,14 +12,20 @@
 
 #include "kmem.h"
 #include "idt.h"
+#include "tty.h"
 
 #include "tests.h"
 
 void kernel_main(void) {
-
-    idt_init();
+    terminal_init();
+	tty_init();
     kmem_init();
-    terminal_initialize();
+    idt_init();
 
-    terminal_writestring("64 bits kernel launched.\n");
+    tty_writestring("64 bits kernel launched.");
+	tty_afficher_buffer_all();
+
+	tty_new_prompt();
+
+	while(true) halt();
 }

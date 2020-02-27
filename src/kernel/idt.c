@@ -10,6 +10,7 @@
 #include "../util/string.h"
 #include "kmem.h"
 #include "keyboard.h"
+#include "tty.h"
 
 extern const idt_handler int_handlers[NEXCEPTION_VEC];
 extern void irq_sys(void);
@@ -21,8 +22,11 @@ void keyboard_hdl(void){
 
     status = inb(KEYBOARD_STATUS_PORT);
     /* Lowest bit of status will be set if buffer is not empty */
-    if (status & 0x01)
+    if (status & 0x01) {
         keyboard_input_keycode = inb(KEYBOARD_DATA_PORT);
+		keyboard_update_state(keyboard_input_keycode);
+		tty_input(keyboard_input_keycode);
+	}
 	write_eoi();
 }
 

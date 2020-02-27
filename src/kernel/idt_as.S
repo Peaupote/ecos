@@ -47,7 +47,6 @@ irq_keyboard:
 
     leaq 8(%rsp), %rsp
     restore_c_reg
-    iretq
     sti
     iretq
 

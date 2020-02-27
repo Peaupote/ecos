@@ -52,6 +52,19 @@ static inline void io_wait(void) {
 static inline void write_eoi(void) {
     outb(PIC1_PORT, PIC_EOI_CODE);
 }
+
+static inline void clear_interrupt_flag(void) {
+	asm volatile ("cli");
+}
+
+static inline void set_interrupt_flag(void) {
+	asm volatile ("sti");
+}
+
+static inline void halt(void) {
+	asm volatile ("hlt");
+}
+
 #endif
 
 #endif

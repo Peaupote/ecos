@@ -25,6 +25,11 @@ enum vga_color {
     VGA_COLOR_WHITE = 15,
 };
 
+typedef struct {
+	size_t x;
+	size_t y;
+} vga_pos;
+
 static inline uint8_t vga_entry_color(enum vga_color fg, enum vga_color bg)
 {
     return fg | bg << 4;
@@ -38,11 +43,17 @@ static inline uint16_t vga_entry(unsigned char uc, uint8_t color)
 static const size_t VGA_WIDTH = 80;
 static const size_t VGA_HEIGHT = 25;
 
-void terminal_initialize(void);
+extern vga_pos terminal_pos;
+extern uint8_t terminal_color;
+
+void terminal_init(void);
+void terminal_clear(void);
 void terminal_setcolor(uint8_t color);
+void terminal_putcentryat(uint16_t e, size_t x, size_t y);
 void terminal_putentryat(char c, uint8_t color, size_t x, size_t y);
 void terminal_nextline();
-void terminal_cursor_at(size_t rw, size_t cl);
+void terminal_cursor_at(size_t row, size_t col);
+
 /*caractère affichable*/
 void terminal_putachar(char c);
 void terminal_putchar(char c);

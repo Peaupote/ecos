@@ -56,7 +56,7 @@ void test_idt() {
 		int64_to_str_hexa(nb_str, keyboard_input_keycode);
 		terminal_writestring(nb_str);
 		terminal_cursor_at(2, 50);
-		key_char = keyboard_char_map[keyboard_input_keycode & 0x7f];
+		key_char = keycode_to_printable(keyboard_input_keycode);
 		if(key_char){
 			key_str[1] = key_char;
 			terminal_writestring(key_str);
