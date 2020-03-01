@@ -12,32 +12,72 @@
 #include "keyboard.h"
 #include "tty.h"
 
-extern const idt_handler int_handlers[NEXCEPTION_VEC];
 extern void irq_sys(void);
 extern void irq_keyboard(void);
+extern void irq0();
+extern void irq1();
+extern void irq2();
+extern void irq3();
+extern void irq4();
+extern void irq5();
+extern void irq6();
+extern void irq7();
+extern void irq8();
+extern void irq9();
+extern void irq10();
+extern void irq11();
+extern void irq12();
+extern void irq13();
+extern void irq14();
+extern void irq15();
+extern void irq16();
+extern void irq17();
+extern void irq18();
+extern void irq19();
+extern void irq20();
+extern void irq21();
+extern void irq22();
+extern void irq23();
+extern void irq24();
+extern void irq25();
+extern void irq26();
+extern void irq27();
+extern void irq28();
+extern void irq29();
+extern void irq30();
+extern void irq31();
+
+const idt_handler int_handlers[NEXCEPTION_VEC] = {
+    irq0, irq1, irq2, irq3, irq4, irq5, irq6, irq7,
+    irq8, irq9, irq10, irq11, irq12, irq13, irq14, irq15,
+    irq16, irq17, irq18, irq19, irq20, irq21, irq22, irq23,
+    irq24, irq25, irq26, irq27, irq28, irq29, irq30, irq31 };
+
+/* static int count = 0; */
 
 struct gate_desc idt[IDT_ENTRIES] = { 0 };
 void keyboard_hdl(void){
     uint8_t status;
-	key_event ev;
+    key_event ev;
 
     status = inb(KEYBOARD_STATUS_PORT);
     /* Lowest bit of status will be set if buffer is not empty */
     if (status & 0x01) {
         scancode_byte ks = inb(KEYBOARD_DATA_PORT);
-		ev = keyboard_update_state(ks);
-		tty_input(ks, ev);
-	}
-	write_eoi();
+        ev = keyboard_update_state(ks);
+        tty_input(ks, ev);
+    }
+    write_eoi();
 }
 
 char code_str[17] = "__..__..__..__..";
 
-void common_hdl(uint64_t code) {
-    int64_to_str_hexa(code_str, code);
-    printf("hdl:");
-    printf(code_str);
-    printf("\n");
+void common_hdl(void) {
+    /* int64_to_str_hexa(code_str, count++); */
+    /* terminal_cursor_at(10,10); */
+    /* terminal_writestring(code_str); */
+
+    write_eoi();
 }
 
 void syscall_hdl(void) {
@@ -62,8 +102,8 @@ void idt_init(void) {
     outb(PIC1_DATA, 0x01);
     outb(PIC2_DATA, 0x01);
 
-    //masks: keyboard only
-    outb(PIC1_DATA,0xfd);
+    // masks
+    outb(PIC1_DATA,0xfc);
     outb(PIC2_DATA,0xff);
 
     // handlers for exceptions interruptions

@@ -21,6 +21,8 @@
 #define SYSCALL_VEC           0x80
 #define KEYBOARD_VEC          0x21
 
+#define NSYSCALL 1
+
 #define KEYBOARD_STATUS_PORT 0x64
 #define KEYBOARD_DATA_PORT   0x60
 #define ENTER_KEY_CODE 0x1C
@@ -32,6 +34,12 @@
 
 #define PIC_INIT_CODE 0x11 // initialisation
 #define PIC_EOI_CODE  0x20 // end-of-interrupt
+
+// PIT = Programmable Interval Timer
+#define PIT_DATA_PORT0 0x40
+#define PIT_DATA_PORT1 0x41
+#define PIT_DATA_PORT2 0x42
+#define PIT_CONF_PORT  0x43
 
 #ifndef ASSEMBLY
 static inline uint8_t inb(uint16_t port) {
@@ -46,7 +54,7 @@ static inline void outb(uint16_t port, uint8_t data) {
 
 static inline void io_wait(void) {
     // must be unused port
-    asm volatile ( "outb %%al, $0x80" : : "a"(0) );
+    asm volatile ("outb %%al, $0x80" : : "a"(0) );
 }
 
 static inline void write_eoi(void) {
@@ -54,15 +62,15 @@ static inline void write_eoi(void) {
 }
 
 static inline void clear_interrupt_flag(void) {
-	asm volatile ("cli");
+    asm volatile ("cli");
 }
 
 static inline void set_interrupt_flag(void) {
-	asm volatile ("sti");
+    asm volatile ("sti");
 }
 
 static inline void halt(void) {
-	asm volatile ("hlt");
+    asm volatile ("hlt");
 }
 
 #endif

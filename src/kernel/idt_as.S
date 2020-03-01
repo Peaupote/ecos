@@ -5,7 +5,7 @@
 .global irq_handlers
 .global irq_sys
 .global irq_keyboard
-
+.global irq0
 .extern common_hdl
 .extern keyboard_hdl
 .extern syscall_hdl
@@ -35,21 +35,24 @@
     popq  %rax
 .endm
 
-int_handlers:
 #include "int_handlers.s"
 
 irq_keyboard:
     cli
-      save_c_reg
+    save_c_reg
     leaq -8(%rsp), %rsp //Alignement 16 octets
-
     call keyboard_hdl
-
     leaq 8(%rsp), %rsp
     restore_c_reg
     sti
     iretq
 
 irq_sys:
+    cli
+    save_c_reg
+    leaq -8(%rsp), %rsp //Alignement 16 octets
     call syscall_hdl
+    leaq 8(%rsp), %rsp
+    restore_c_reg
+    sti
     iretq

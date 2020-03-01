@@ -9,6 +9,7 @@
 #endif
 
 #include "../util/vga.h"
+#include "../util/string.h"
 
 #include "kmem.h"
 #include "idt.h"
@@ -18,14 +19,19 @@
 
 void kernel_main(void) {
     terminal_init();
-	tty_init();
+    tty_init();
     kmem_init();
     idt_init();
 
     tty_writestring("64 bits kernel launched.");
-	tty_afficher_buffer_all();
+    tty_afficher_buffer_all();
 
-	tty_new_prompt();
+    tty_new_prompt();
 
-	while(true) halt();
+    // -- PIT init --
+    outb(PIT_CONF_PORT, 0b00110000);
+    outb(PIT_DATA_PORT0, 0);
+    outb(PIT_DATA_PORT0, 0);
+
+    while(true) halt();
 }
