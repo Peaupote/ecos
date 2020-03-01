@@ -47,7 +47,7 @@ void tty_init() {
 	
 	ib_printed = ib_size = ib_ashift = 0;
 	input_height = 0;
-	input_bottom_line = input_top_line = 0;
+	input_bottom_line = input_top_line = ~0;
 
 	sb_ashift = 0;
 	sb_display_shift = 0;
@@ -79,7 +79,7 @@ void decomp_cmd(size_t in_begin, size_t in_len) {
 	}
 }
 
-enum {Statut_prompt, Statut_kprint} statut;
+uint8_t do_kprint = 0;
 
 size_t built_in_exec(size_t in_begin, size_t in_len) {
 	decomp_cmd(in_begin, in_len);
@@ -93,7 +93,7 @@ size_t built_in_exec(size_t in_begin, size_t in_len) {
 		return tty_writestring(data_str);
 	}
 	else if(!ustrcmp(cmd_decomp + cmd_decomp_idx[0], "kprint"))
-		statut = Statut_kprint;
+		do_kprint = !do_kprint;
 	else if(!ustrcmp(cmd_decomp + cmd_decomp_idx[0], "a"))
 		use_azerty = 1;
 	else if(!ustrcmp(cmd_decomp + cmd_decomp_idx[0], "q"))
@@ -101,49 +101,47 @@ size_t built_in_exec(size_t in_begin, size_t in_len) {
 	return 0;
 }
 
-void tty_input(keycode k) {
-	switch(statut) {
-	case Statut_prompt:
-	if(k & 0x80) return; //relache
-	if(k == key_enter) {
-		size_t idx_b = tty_buffer_next_idx();
-		size_t shift = tty_prompt_to_buffer(ib_ashift, ib_size);
-		shift += built_in_exec(ib_ashift, ib_size);
-		ib_size = ib_printed = 0;
-		if (statut == Statut_prompt){
+void tty_input(scancode_byte s, key_event ev) {
+	size_t  shift  = 0;
+	size_t  idx_b  = tty_buffer_next_idx();
+	uint8_t p_updt = 0;
+
+	if (do_kprint) {
+		char str[] = "s=__ c=__ f=__ p=__\n";
+		int8_to_str_hexa(str + 2,  s);
+		int8_to_str_hexa(str + 7,  ev.key);
+		int8_to_str_hexa(str + 12, ev.flags);
+		int8_to_str_hexa(str + 17, keycode_to_printable(ev.key));
+		p_updt = 1;
+		shift += tty_writestring(str);
+		shift += tty_update_prompt_pos();
+	}
+	if (ev.key && !(ev.flags & 0x1)) {//évènement appui
+		if ((ev.key&KEYS_MASK) == KEYS_ENTER) {
+			p_updt = 1;
+			shift += tty_prompt_to_buffer(ib_ashift, ib_size);
+			shift += built_in_exec(ib_ashift, ib_size);
+			ib_size = ib_printed = 0;
 			shift += tty_new_prompt();
-			if (shift)
-				tty_afficher_buffer_all(); //scroll
-			else
-				tty_afficher_buffer_range(idx_b, tty_buffer_next_idx());
-		}
-	} else if(k == key_backspace) {
-		if(ib_size > 0) {
-			--ib_size;
-			if(ib_printed > ib_size) ib_printed = ib_size;
-			terminal_putentryat(' ', input_color,
-					2 + ib_size % input_width,
-					input_top_line + ib_size / input_width);
-		}
-	} else {
-		char kchar = keycode_to_printable(k);
-		if (kchar && ib_size < IB_LENGTH) {
-			ibuffer[(ib_ashift + ib_size++) & IB_MASK] = kchar;
-			tty_afficher_prompt();
+		} else if(ev.key == KEY_BACKSPACE) {
+			if(ib_size > 0) {
+				--ib_size;
+				if(ib_printed > ib_size) ib_printed = ib_size;
+				terminal_putentryat(' ', input_color,
+						2 + ib_size % input_width,
+						input_top_line + ib_size / input_width);
+			}
+		} else {
+			char kchar = keycode_to_printable(ev.key);
+			if (kchar && ib_size < IB_LENGTH) {
+				ibuffer[(ib_ashift + ib_size++) & IB_MASK] = kchar;
+				tty_afficher_prompt();
+			}
 		}
 	}
-	break;
-	case Statut_kprint:
-	{
-		char str[] = "code=__ b8=_ char=__\n";
-		int8_to_str_hexa(str + 5, k);
-		str[11] = (k&0x80) ? '1' : '0';
-		int8_to_str_hexa(str+18, keycode_to_printable(k));
-		size_t idx_b = tty_buffer_next_idx();
-		size_t shift = tty_writestring(str);
-		if (shift) tty_afficher_buffer_all();
+	if (p_updt) {
+		if (shift) tty_afficher_buffer_all(); //scroll
 		else tty_afficher_buffer_range(idx_b, tty_buffer_next_idx());
-	}break;
 	}
 }
 
@@ -179,7 +177,6 @@ void tty_afficher_buffer_all() {
 }
 
 size_t tty_new_prompt() {
-	statut = Statut_prompt;
 	input_height = 1;
 	if (sb_nb_lines >= VGA_HEIGHT) {
 		input_top_line = VGA_HEIGHT - 1;
@@ -197,31 +194,18 @@ size_t tty_new_prompt() {
 	return sb_display_shift;
 }
 
-void tty_afficher_prompt() {
+inline size_t get_input_height () {
 	size_t new_input_height = ib_size / input_width;
-	size_t bt_line_0;
-	uint8_t fill = 0;
-	vga_pos pos;
+	if((ib_size % input_width) || !ib_size)
+		return 1 + new_input_height;
+	return new_input_height;
+}
 
-	if (ib_size % input_width) ++new_input_height;
-	
-	if (new_input_height != input_height) {
-		input_height = new_input_height;
-		bt_line_0 = input_top_line + input_height - 1;
-		fill = 1;
-		if (bt_line_0 >= VGA_HEIGHT) {
-			input_bottom_line = VGA_HEIGHT - 1;
-			input_top_line = input_bottom_line - input_height + 1;
-			sb_display_shift = sb_nb_lines + input_height - VGA_HEIGHT;
-			tty_afficher_buffer_all(); //scroll
-			terminal_putentryat('>', prompt_color, 0, input_top_line);
-			ib_printed = 0;
-		} else
-			input_bottom_line = bt_line_0;
-	}
-
-	pos.x = 2 + ib_printed % input_width;
-	pos.y = input_top_line + ib_printed / input_width;
+void tty_afficher_prompt_do(uint8_t fill) {
+	vga_pos pos = {
+			.x = 2 + ib_printed % input_width,
+			.y = input_top_line + ib_printed / input_width
+		};
 
 	for (size_t i = ib_printed; i < ib_size; ++pos.x, ++i) {
 		if (pos.x >= VGA_WIDTH) {
@@ -241,6 +225,61 @@ void tty_afficher_prompt() {
 			terminal_putentryat(' ', input_color, x, pos.y);
 
 	ib_printed = ib_size;
+}
+
+void tty_afficher_prompt_all() {
+	terminal_putentryat('>', prompt_color, 0, input_top_line);
+	terminal_putentryat(' ', prompt_color, 1, input_top_line);
+	ib_printed = 0;
+	tty_afficher_prompt_do(1);
+}
+
+void tty_afficher_prompt() {
+	size_t new_input_height = get_input_height();
+	size_t bt_line_0;
+
+	if (new_input_height != input_height) {
+		input_height = new_input_height;
+		bt_line_0 = input_top_line + input_height - 1;
+		
+		if (bt_line_0 >= VGA_HEIGHT) {
+			input_bottom_line = VGA_HEIGHT - 1;
+			input_top_line = input_bottom_line - input_height + 1;
+			sb_display_shift = sb_nb_lines + input_height - VGA_HEIGHT;
+			tty_afficher_buffer_all(); //scroll
+			tty_afficher_prompt_all();
+			return;
+		}
+
+		input_bottom_line = bt_line_0;
+		tty_afficher_prompt_do(1);
+		return;
+	}
+	tty_afficher_prompt_do(0);
+}
+
+size_t tty_update_prompt_pos() {
+	if (~input_top_line) {
+		size_t n_top;
+		size_t n_shift;
+		size_t d_shift;
+		if (sb_nb_lines + input_height >= VGA_HEIGHT) {
+			n_top   = VGA_HEIGHT - input_height;
+			n_shift = sb_nb_lines + input_height - VGA_HEIGHT;
+		} else {
+			n_top = sb_nb_lines;
+			n_shift = 0;
+		}
+		d_shift = n_shift - sb_display_shift;
+		sb_display_shift = n_shift;
+		if (n_top != input_top_line) {
+			input_top_line    = n_top;
+			input_bottom_line = input_top_line + input_height - 1;
+			tty_afficher_prompt_all();
+		}
+		return d_shift;
+	}
+	return 0;//Pas de prompt
 }
 
 size_t tty_prompt_to_buffer(size_t in_begin, size_t in_len) {

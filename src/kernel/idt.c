@@ -19,13 +19,14 @@ extern void irq_keyboard(void);
 struct gate_desc idt[IDT_ENTRIES] = { 0 };
 void keyboard_hdl(void){
     uint8_t status;
+	key_event ev;
 
     status = inb(KEYBOARD_STATUS_PORT);
     /* Lowest bit of status will be set if buffer is not empty */
     if (status & 0x01) {
-        keyboard_input_keycode = inb(KEYBOARD_DATA_PORT);
-		keyboard_update_state(keyboard_input_keycode);
-		tty_input(keyboard_input_keycode);
+        scancode_byte ks = inb(KEYBOARD_DATA_PORT);
+		ev = keyboard_update_state(ks);
+		tty_input(ks, ev);
 	}
 	write_eoi();
 }

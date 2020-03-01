@@ -40,8 +40,6 @@ void test_kmem() {
 }
 
 void test_idt() {
-	char key_char;
-	char key_str[4] = "' '";
  	uint64_t test_count = 0;
 	nb_str[16] = '\0';
 
@@ -52,16 +50,6 @@ void test_idt() {
 		terminal_cursor_at(0, 50);
 		int64_to_str_hexa(nb_str, test_count++);
 		terminal_writestring(nb_str);
-		terminal_cursor_at(1, 50);
-		int64_to_str_hexa(nb_str, keyboard_input_keycode);
-		terminal_writestring(nb_str);
-		terminal_cursor_at(2, 50);
-		key_char = keycode_to_printable(keyboard_input_keycode);
-		if(key_char){
-			key_str[1] = key_char;
-			terminal_writestring(key_str);
-		} else
-			terminal_writestring("???");
 		asm volatile("hlt" : : : "memory");
 	}
 }
