@@ -1,31 +1,12 @@
-#include <stdio.h>
+#include <stddef.h>
+#include <stdint.h>
+
 #include "proc.h"
-
-/**
- * Global state of the machine
- */
-
-struct {
-    pid_t      st_curr_pid;          // pid of current running process
-    pid_t      st_runqueues[NHEAP];  // queue of processes to run
-    int        st_waiting_ps;        // number of processes in queue
-    proc_t     st_proc[NPROC];       // table containing all processes
-    chann_t    st_chann[NCHAN];      // table containing all channels
-} state;
 
 // priority in runqueue according to process status
 int proc_state_pri[7] = { PFREE, PSLEEP, PWAIT, PRUN, PIDLE, PZOMB, PSTOP };
 
 // some heap utilitary functions
-
-proc_t *gproc(pid_t pid) {
-    return &state.st_proc[pid];
-}
-
-int waiting_ps() {
-    return state.st_waiting_ps;
-}
-
 // the priority queue is probably bugged
 // has not been tested
 
@@ -108,6 +89,7 @@ void kexit(int status) {
             pp->p_ppid = 1;
 
             // not sure here
+            pp->p_reg.rax = status;
             if (pp->p_stat != RUN) pp->p_stat = ZOMB;
         }
     }
@@ -149,10 +131,6 @@ pid_t fork() {
     return pid;
 }
 
-void sleep() {
-    // TODO
-}
-
 int open(char *name, enum chann_mode mode) {
     // TODO : find file on disc
 
@@ -187,20 +165,23 @@ int close(int filedes) {
     return 0;
 }
 
-int write(int filedes, const void *buf, size_t len) {
-    return 0;
-}
-
-int read (int filedes, const void *buf, size_t len) {
-    return 0;
-}
-
 void init() {
     // construct processus one
     proc_t *one = &state.st_proc[1];
     one->p_pid  = 1;
     one->p_ppid = 0;
     one->p_stat = RUN;
+    one->p_pc   = 0;
+
+    one->p_reg.rax = 0;
+    one->p_reg.rcx = 0;
+    one->p_reg.rdx = 0;
+    one->p_reg.rsi = 0;
+    one->p_reg.rdi = 0;
+    one->p_reg.r8 = 0;
+    one->p_reg.r9 = 0;
+    one->p_reg.r10 = 0;
+    one->p_reg.r11 = 0;
 
     state.st_curr_pid     = 1;
     state.st_waiting_ps   = 0;
@@ -210,5 +191,4 @@ void init() {
         state.st_proc[pid].p_stat = FREE;
 
     push_ps(1);
-    printf("init.\n");
 }

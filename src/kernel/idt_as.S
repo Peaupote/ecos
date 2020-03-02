@@ -1,14 +1,16 @@
 #define ASSEMBLY
 #include "int.h"
+#include "sys.h"
 
     .section .text
 .global irq_handlers
 .global irq_sys
 .global irq_keyboard
-.global irq0
+.global irq_pit
 .extern common_hdl
 .extern keyboard_hdl
 .extern syscall_hdl
+.extern sleep_hdl
 
 //Sauvegarde des registres pouvant être modifiés par un appel à une
 //fonction C. Place 9*8 octets sur la pile
@@ -47,12 +49,21 @@ irq_keyboard:
     sti
     iretq
 
-irq_sys:
+irq_pit:
     cli
     save_c_reg
     leaq -8(%rsp), %rsp //Alignement 16 octets
-    call syscall_hdl
+    call pit_hdl
     leaq 8(%rsp), %rsp
+    restore_c_reg
+    sti
+    iretq
+
+irq_sys:
+    cli
+    save_c_reg
+    // TODO : implement switch on %rax values
+    call sleep_hdl
     restore_c_reg
     sti
     iretq

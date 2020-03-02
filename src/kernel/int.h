@@ -19,9 +19,8 @@
 
 // special interrupt vectors
 #define SYSCALL_VEC           0x80
+#define PIT_VEC               0x20
 #define KEYBOARD_VEC          0x21
-
-#define NSYSCALL 1
 
 #define KEYBOARD_STATUS_PORT 0x64
 #define KEYBOARD_DATA_PORT   0x60
@@ -40,8 +39,14 @@
 #define PIT_DATA_PORT1 0x41
 #define PIT_DATA_PORT2 0x42
 #define PIT_CONF_PORT  0x43
+#define PIT_MODE       0b00110110
+#define PIT_FREQ       18 // = 1193180 / 0xffff
 
 #ifndef ASSEMBLY
+
+#include <stddef.h>
+#include <stdint.h>
+
 static inline uint8_t inb(uint16_t port) {
     uint8_t ret;
     asm volatile ("inb %1, %0" : "=a"(ret) : "dN"(port));
@@ -71,6 +76,10 @@ static inline void set_interrupt_flag(void) {
 
 static inline void halt(void) {
     asm volatile ("hlt");
+}
+
+static inline void int_syscall(int code) {
+    asm volatile ("mov %0, %%rax; int $0x80" :: "dN"(code) : "rax", "memory");
 }
 
 #endif

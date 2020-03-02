@@ -14,6 +14,7 @@
 #include "kmem.h"
 #include "idt.h"
 #include "tty.h"
+#include "sys.h"
 
 #include "tests.h"
 
@@ -28,10 +29,8 @@ void kernel_main(void) {
 
     tty_new_prompt();
 
-    // -- PIT init --
-    outb(PIT_CONF_PORT, 0b00110000);
-    outb(PIT_DATA_PORT0, 0);
-    outb(PIT_DATA_PORT0, 0);
+    // TODO : handle processes
 
-    while(true) halt();
+    sleep(2);
+    while (true) halt();
 }

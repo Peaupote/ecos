@@ -4,7 +4,7 @@
  */
 
 #define NPROC 100  // number of processes
-#define NFD   100  // number of file descriptors
+#define NFD   128  // number of file descriptors
 #define NCHAN 1000 // number of channels
 #define INODE 100  // number of inodes
 #define NHEAP 10   // number of enqued processes
