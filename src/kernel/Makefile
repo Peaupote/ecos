@@ -23,6 +23,8 @@ all: kernel.bin
 %.o:%.s
 	$(AS) $< -o $@
 
+int_handlers_tab.s:
+	seq 0 31 | gawk '{printf(".quad irq%d\n",$$1)}' > int_handlers_tab.s
 int_handlers.s: int_handlers.txt int_handlers.awk
 	cpp -P int_handlers.txt | gawk -f int_handlers.awk > int_handlers.s
 

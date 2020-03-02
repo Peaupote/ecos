@@ -1,10 +1,5 @@
 #!/usr/bin/awk -f
 
-BEGIN {
-    for (i=0; i<32; i++)
-        printf("    .global irq%d\n", i);
-    printf("\n");
-}
 /^n /{#none num pile_pop
     printf("irq%d:\n", $2);
     printf("    cli\n");
