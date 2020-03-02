@@ -1,4 +1,5 @@
 #include "../int.h"
+#include "../sys.h"
 
 uint32_t counter = 0;
 char     is_sleep = 0;
@@ -12,5 +13,5 @@ void end_sleep(void) {
     is_sleep = 0;
 
     // sleep call itself for test purposes
-    _int();
+    int_syscall(SLEEP);
 }
