@@ -2,8 +2,12 @@
 #include "int.h"
 #include "sys.h"
 
+	.section .data
+.global int_handlers
+int_handlers:
+#include "int_handlers_tab.s"
+
     .section .text
-.global irq_handlers
 .global irq_sys
 .global irq_keyboard
 .global irq_pit
