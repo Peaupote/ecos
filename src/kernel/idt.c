@@ -10,6 +10,7 @@
 #include "kmem.h"
 #include "keyboard.h"
 #include "tty.h"
+#include "proc.h"
 
 extern void irq_sys(void);
 extern void irq_keyboard(void);
@@ -41,9 +42,10 @@ void common_hdl(void) {
 }
 
 void pit_hdl(void) {
-    if (is_sleep && counter-- <= 0) {
-        end_sleep();
-    }
+    static uint8_t clock = 0;
+    if ((clock++ & 3) == 0) schedule_proc();
+
+    lookup_end_sleep();
     write_eoi();
 }
 

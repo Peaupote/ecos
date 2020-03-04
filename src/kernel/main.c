@@ -16,6 +16,7 @@
 #include "gdt.h"
 #include "tty.h"
 #include "sys.h"
+#include "proc.h"
 
 #include "tests.h"
 
@@ -23,21 +24,21 @@ void kernel_init(void) {
     terminal_init();
     tty_init();
     kmem_init();
-	gdt_init();
-	tss_init();
+    gdt_init();
+    tss_init();
     idt_init();
 }
 
 void kernel_main(void) {
-	kernel_init();
+    kernel_init();
 
     tty_writestring("64 bits kernel launched.\n");
     tty_afficher_buffer_all();
 
     tty_new_prompt();
 
-    // TODO : handle processes
-
-    sleep(2);
+    init();
+    fork();
+    fork();
     while (true) halt();
 }

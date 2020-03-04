@@ -6,7 +6,6 @@
     .global sleep
 
 sleep:
-    imul $PIT_FREQ, %rdi
-    mov $SLEEP, %rax
+    mov $SYS_SLEEP, %rax
     int $SYSCALL_VEC
     ret
