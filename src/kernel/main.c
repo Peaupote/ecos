@@ -13,18 +13,25 @@
 
 #include "kmem.h"
 #include "idt.h"
+#include "gdt.h"
 #include "tty.h"
 #include "sys.h"
 
 #include "tests.h"
 
-void kernel_main(void) {
+void kernel_init(void) {
     terminal_init();
     tty_init();
     kmem_init();
+	gdt_init();
+	tss_init();
     idt_init();
+}
 
-    tty_writestring("64 bits kernel launched.");
+void kernel_main(void) {
+	kernel_init();
+
+    tty_writestring("64 bits kernel launched.\n");
     tty_afficher_buffer_all();
 
     tty_new_prompt();

@@ -18,8 +18,11 @@ kba_pt_23    = _ofs;
 	_ofs    += 0x2000;		/* 2 tables: 8KB */
 
 	/* GDT */
+_ofs = ALIGN(_ofs, 0x10);
 kba_gdt      = _ofs;
-	_ofs    += (4*8);		/* 4 * 8 octets */
+	_ofs    += (5*8 + 16);
+_ofs = ALIGN(_ofs, 0x4);
+_ofs += 2;  /*align = 2 mod 4*/
 kba_gdtd     = _ofs;
 	_ofs    += 2 + 8;
 

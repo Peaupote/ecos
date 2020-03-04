@@ -52,7 +52,7 @@ page_d_0:
 .balign 4
 mb_info:
 .skip 4
-kernel_entry_addr:
+kernel_entry_addr: //adresse physique
 .skip 4
 
 #ifdef BDI
@@ -63,16 +63,11 @@ boot_debug_out:
 //espace pour le kernel
 //évite que GRUB charge le module sur une adresse utilisée
 	.section space_for_kernel
-.global KPA //Adresse physique du kernel
-.balign 0x1000 //alignement à la page 4KB
-KPA: .skip 0x200000 //2MB
+.global KPA           //Adresse physique du kernel
+.balign 0x1000        //alignement à la page 4KB
+KPA: .skip 0x200000   //2MB
 
 
-/*
-The linker script specifies _start as the entry point to the kernel and the
-bootloader will jump to this position once the kernel has been loaded. It
-doesn't make sense to return from this function as the bootloader is gone.
-*/
 	.section .text
 .global _start
 .type _start, @function
@@ -114,12 +109,13 @@ _start:
 	/* --GDT-- */
 #include "gdt.s"
 	/* GDT descriptor */
-	movw $(4*64 - 1), gdt_desc
+	movw $(4*8 - 1), gdt_desc
 	movl $gd_table,  (gdt_desc + 2)
 	movl $0,         (gdt_desc + 6)
 
 	cli
-   	lgdt  gdt_desc
+	lgdt gdt_desc
+
 	ljmp $0x18, $reload_seg
 reload_seg:
 	mov $0x10, %ax /*data segment selector*/
@@ -129,9 +125,6 @@ reload_seg:
 	mov %ax, %fs
 	mov %ax, %gs
 
-#ifdef TEST_PAGING
-	call test_paging_pre
-#endif
 	/* --Paging-- */
 	call init_paging_directory
 
@@ -177,11 +170,10 @@ reload_seg2:
 	mov %ax, %gs
 
    	mov (kernel_entry_addr), %ebx
+	pushl $0x8 //CS
+	pushl %ebx //IP
+	retf       //Far ret
 
-	ljmp $0x8, $enter_64b
-enter_64b:
-#include "indj_64.s"
-	
 /*
 Set the size of the _start symbol to the current location '.' minus its start.
 This is useful when debugging or when you implement call tracing.

@@ -10,6 +10,7 @@
 #include "kmem.h"
 #include "keyboard.h"
 #include "idt.h"
+#include "gdt.h"
 
 char nb_str[17];
 
@@ -52,4 +53,11 @@ void test_idt() {
 		terminal_writestring(nb_str);
 		asm volatile("hlt" : : : "memory");
 	}
+}
+
+uint8_t test_struct_layout() {
+	return
+		sizeof(struct      GDT) == 0x38
+	 && sizeof(struct GDT_desc) == 0xa
+	 && sizeof(struct      TSS) == 0x68;
 }

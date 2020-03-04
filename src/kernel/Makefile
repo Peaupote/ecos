@@ -5,7 +5,7 @@ export FLAGS=-O2 -Wall -Wextra -std=gnu99 -nostdlib \
 			 -mcmodel=large -ffreestanding -mno-red-zone
 AS=x86_64-elf-as
 include ../libc/list.Makefile
-CFILES=main.c kmem.c idt.c keyboard.c tty.c tests.c \
+CFILES=main.c kmem.c idt.c gdt.c keyboard.c tty.c tests.c \
 		syscalls/sleep.c
 ASFILES=entry.S idt_as.S data.S sys.S
 SRCDEP=$(foreach file,$(ASFILES),"-MT $(file:.S=.s) $(file)") $(CFILES)

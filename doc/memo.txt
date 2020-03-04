@@ -20,6 +20,7 @@ Physical Address Extension(PAE)
 Control register(CR*)
 	registre contrôlant le fonctionnement du processeur
 	https://en.wikipedia.org/wiki/Control_register
+	https://wiki.osdev.org/CPU_Registers_x86
 	CR0:
 		0	PE	protected mode si 1, real mode sinon
 		31	PG	activation du paging
@@ -30,7 +31,12 @@ Control register(CR*)
 
 Segmentation:
 	https://wiki.osdev.org/Segmentation
-	segment registers: CS DS SS ES FS GS
+	segment registers:
+		CS      Code Segment
+		DS      Data Segment
+		SS      Stack Segment
+		ES      Extra Segment
+		FS,GS   General Purpose Segments
 
 Model Specific Register (MSR):
 	https://wiki.osdev.org/MSR
@@ -43,3 +49,19 @@ Global Descriptor Table (GDT):
 
 ELF:
 	https://wiki.osdev.org/ELF
+
+FLAGS register:
+	32b: EFLAGS, 64b: RFLAGS
+	PUSHF* push ce registre
+	https://en.wikipedia.org/wiki/FLAGS_register
+
+IP register:
+	instruction pointer
+	32b: EIP, 64b: RIP
+
+CPL:
+	current privilege level
+
+TSS:
+	Task State Segment
+	https://wiki.osdev.org/TSS

@@ -13,8 +13,8 @@
  */
 
 #define PAGE_SIZE 			0x1000
-#define PAGE_MASK 			((uint64_t) ~0x111)
-#define PAGE_OFS_MASK		((uint64_t)  0x111)
+#define PAGE_MASK 			(~(uint64_t) 0xfff)
+#define PAGE_OFS_MASK		( (uint64_t) 0xfff)
 
 #define VADDR_MASK ((((uint64_t)1)<<48)-1)
 

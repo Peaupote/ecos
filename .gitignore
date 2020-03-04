@@ -4,6 +4,6 @@
 isodir
 *.s
 *.swp
-Session.vim
+*.vim
 *.depends
 *.out

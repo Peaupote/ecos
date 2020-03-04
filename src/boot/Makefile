@@ -12,18 +12,6 @@ UDEP=vga.o string.o elf64.o
 
 all: boot.bin
 
-indj_64.s: indj_64.S
-	x86_64-elf-as indj_64.S -o indj_64.o
-	x86_64-elf-objcopy indj_64.o -O binary
-	xxd -ps indj_64.o | gawk \
-		'BEGIN{printf(".byte ")}\
-		{for(i=0;i<length($$0);i+=2){\
-			if(i!=0) printf(",");\
-			printf("0x%s", substr($$0,i+1,2))\
-		}}\
-		END{printf("\n")}' > indj_64.s
-	rm -f indj_64.o
-
 gdt.s: gdt.txt
 	cpp -P gdt.txt | gawk -f ../../tools/fillGDT.awk > gdt.s
 
