@@ -36,7 +36,14 @@ void keyboard_hdl(void){
 }
 
 
-void common_hdl(void) {
+void common_hdl(uint8_t num, uint64_t errcode) {
+	char str[]="____....____....\n";
+	int64_to_str_hexa(str, num);
+	tty_writestring(str);
+	int64_to_str_hexa(str, errcode);
+	tty_writestring(str);
+	tty_afficher_buffer_all();
+	while(1) halt();
     // TODO : something
 }
 
@@ -47,14 +54,14 @@ void pit_hdl(void) {
     write_eoi();
 }
 
-static inline void idt_int_asgn(int n, uint64_t addr) {
+static inline void idt_int_asgn(int n, uint64_t addr, uint8_t attr) {
     idt[n].reserved    = 0;
     idt[n].offset_low  = (uint16_t)addr & 0xffff;
     idt[n].offset_mid  = (uint16_t)(addr >> 16) & 0xffff;
     idt[n].offset_high = (uint32_t)(addr >> 32);
     idt[n].segment     = KERNEL_SEGMENT_OFFSET;
     idt[n].ist         = 0;
-    idt[n].type_attr   = INT_GATE;
+    idt[n].type_attr   = attr;
 }
 
 void idt_init(void) {
@@ -84,11 +91,11 @@ void idt_init(void) {
 
     // handlers for exceptions interruptions
     for (uint8_t n = 0; n < NEXCEPTION_VEC; n++)
-        idt_int_asgn(n, (uint64_t)int_handlers[n]);
+        idt_int_asgn(n, (uint64_t)int_handlers[n], INT_GATE);
 
-    idt_int_asgn(SYSCALL_VEC,  (uint64_t)irq_sys);
-    idt_int_asgn(PIT_VEC,      (uint64_t)irq_pit);
-    idt_int_asgn(KEYBOARD_VEC, (uint64_t)irq_keyboard);
+    idt_int_asgn(SYSCALL_VEC,  (uint64_t)irq_sys, INT_GATE | 0x60);
+    idt_int_asgn(PIT_VEC,      (uint64_t)irq_pit, INT_GATE);
+    idt_int_asgn(KEYBOARD_VEC, (uint64_t)irq_keyboard, INT_GATE);
 
     struct idt_reg reg;
     reg.limit = IDT_ENTRIES * (sizeof(struct gate_desc)) - 1;

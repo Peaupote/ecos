@@ -5,8 +5,11 @@
 
 #include "../util/vga.h"
 #include "../util/string.h"
+#include "../util/elf64.h"
 
 #include "kmem.h"
+#include "proc.h"
+#include "int.h"
 
 #define SB_HEIGHT 32
 #define SB_MASK 0x1f
@@ -81,6 +84,8 @@ void decomp_cmd(size_t in_begin, size_t in_len) {
 
 uint8_t do_kprint = 0;
 
+extern uint8_t t0_data[];
+
 size_t built_in_exec(size_t in_begin, size_t in_len) {
 	decomp_cmd(in_begin, in_len);
 	if(!ustrcmp(cmd_decomp + cmd_decomp_idx[0], "tprint"))
@@ -98,7 +103,36 @@ size_t built_in_exec(size_t in_begin, size_t in_len) {
 		use_azerty = 1;
 	else if(!ustrcmp(cmd_decomp + cmd_decomp_idx[0], "q"))
 		use_azerty = 0;
+	else if(!ustrcmp(cmd_decomp + cmd_decomp_idx[0], "t0_info")) {
+		size_t shift = 0;
+		elf_readinfo(&tty_writer, &shift, t0_data);
+		return shift;
+	}
+	else if(!ustrcmp(cmd_decomp + cmd_decomp_idx[0], "t0_exec")) {
+		struct user_space us;
+		struct user_space_start uss;
+		uint8_t rt = proc_create_userspace(t0_data, &us, &uss);
+		if (!rt) {
+			ib_size = ib_printed = 0;
+    		write_eoi();
+			iret_to_userspace(uss.entry, uss.rsp);
+		}
+	}
+
 	return 0;
+}
+
+void tty_test_prg_rt(uint64_t rdi, uint64_t rsi) {
+	char str[]   = "__..__..__..__..\n";
+	size_t idx_b = tty_buffer_next_idx();
+	size_t shift;
+	int64_to_str_hexa(str, rdi);
+	shift = tty_writestring(str);
+	int64_to_str_hexa(str, rsi);
+	shift += tty_writestring(str);
+	if (shift) tty_afficher_buffer_all();
+	else tty_afficher_buffer_range(idx_b, tty_buffer_next_idx());
+	tty_new_prompt();
 }
 
 void tty_input(scancode_byte s, key_event ev) {
@@ -338,7 +372,7 @@ void tty_force_new_line() {
 	cur_ln_x = VGA_WIDTH;
 }
 
-size_t tty_writestring(char* str) {
+size_t tty_writestring(const char* str) {
 	size_t rt = 0;
 	char c = *str;
 	size_t x = cur_ln_x;
@@ -366,4 +400,8 @@ size_t tty_writestring(char* str) {
 	}
 	cur_ln_x = x;
 	return rt;
+}
+
+void tty_writer(void* shift, const char *str) {
+	*((size_t*)shift) = tty_writestring(str);
 }

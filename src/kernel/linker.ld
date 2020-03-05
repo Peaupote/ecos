@@ -15,6 +15,9 @@ gd_table   = KVA + kba_gdt;
 gdt_desc   = KVA + kba_gdtd;
 end_kernel = KVA + kba_end_krn;
 
+low_addr     = KVA + (0x100 << 30);
+dynamic_slot = KVA + (0x180 << 30);
+
 SECTIONS
 {
     . = KVA + kba_end;

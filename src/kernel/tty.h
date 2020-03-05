@@ -25,6 +25,7 @@ size_t tty_buffer_next_idx();
 size_t tty_new_buffer_line(size_t* index);
 
 void   tty_force_new_line(void);
-size_t tty_writestring(char* str);
+size_t tty_writestring(const char* str);
+void   tty_writer(void* shift, const char* str);
 
 #endif

@@ -3,6 +3,13 @@
 
 #include "proc.h"
 
+#include "kmem.h"
+#include "int.h"
+#include "../util/elf64.h"
+
+#define USER_STACK_TOP  0x57AC3000
+#define USER_STACK_SIZE 0x4000
+
 // priority in runqueue according to process status
 int proc_state_pri[7] = { PFREE, PSLEEP, PWAIT, PRUN, PIDLE, PZOMB, PSTOP };
 
@@ -191,4 +198,56 @@ void init() {
         state.st_proc[pid].p_stat = FREE;
 
     push_ps(1);
+}
+
+
+extern uint8_t dynamic_slot;
+uint8_t err = 0;
+void proc_ldr_alloc_pages(uint_ptr begin, uint_ptr end) {
+	for(uint_ptr it = begin & PAGE_MASK; it < end; ++it)
+		if(kmem_paging_alloc(it, PAGING_FLAG_U | PAGING_FLAG_R) >= 2)
+			err = 1;
+}
+void proc_ldr_fill0(void* none __attribute__((unused)),
+		Elf64_Addr dst, uint64_t sz) {
+	proc_ldr_alloc_pages(dst, dst + sz);
+	//TODO: use quad
+	for (size_t i=0; i<sz; ++i)
+		((uint8_t*) dst)[i] = 0;
+}
+void proc_ldr_copy(void* none __attribute__((unused)),
+		Elf64_Addr dst, void* src, uint64_t sz) {
+	proc_ldr_alloc_pages(dst, dst + sz);
+	for (size_t i=0; i<sz; ++i)
+		((uint8_t*) dst)[i] = ((uint8_t*) src)[i];
+}
+
+uint8_t proc_create_userspace(void* prg_elf, struct user_space* us,
+		struct user_space_start* uss) {
+	struct elf_loader proc_ldr = {
+		.fill0 = &proc_ldr_fill0,
+		.copy  = &proc_ldr_copy
+	};
+
+	volatile phy_addr pml4_loc = kmem_alloc_page(); //TODO crash sans volatile
+	if(paging_force_map_to((uint_ptr)&dynamic_slot, pml4_loc))
+		return 1;
+	if(paging_phy_addr((uint_ptr)&dynamic_slot) != pml4_loc)// TODO rm TEST
+		return 2;
+	kmem_init_pml4((uint64_t*)&dynamic_slot, pml4_loc);
+	clear_interrupt_flag();
+	pml4_to_cr3(pml4_loc);
+	set_interrupt_flag();
+
+	//On est désormais dans le paging du processus
+	err = 0;
+	proc_ldr_alloc_pages(USER_STACK_TOP - USER_STACK_SIZE,
+				USER_STACK_TOP);
+	uss->entry = (void*)elf_load(proc_ldr, NULL, prg_elf);
+	uss->rsp   = (void*)USER_STACK_TOP;
+	us->pml4   = pml4_loc;
+
+	if (err) return 3;
+
+	return 0;
 }

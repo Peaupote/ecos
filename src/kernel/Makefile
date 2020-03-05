@@ -6,14 +6,14 @@ export FLAGS=-O2 -Wall -Wextra -std=gnu99 -nostdlib \
 AS=x86_64-elf-as
 include ../libc/list.Makefile
 CFILES=main.c kmem.c idt.c gdt.c keyboard.c tty.c tests.c \
-		syscalls/sleep.c
+		syscalls/sleep.c proc.c
 ASFILES=entry.S idt_as.S data.S sys.S
 SRCDEP=$(foreach file,$(ASFILES),"-MT $(file:.S=.s) $(file)") $(CFILES)
 OBJ=$(ASFILES:.S=.o) $(CFILES:.c=.o)
 KBMAP=gawk -f ../../tools/keyboard_map.awk
-UDEP=vga.o string.o
+UDEP=vga.o string.o elf64.o
 
-.PHONY: all re clean
+.PHONY: all re clean util libc tests_prg
 
 all: kernel.bin
 
@@ -34,6 +34,8 @@ keyboard_layout.s: ../../data/keyboard_azerty.txt ../../data/keyboard_qwerty.txt
 	echo "keyboard_qwerty_layout:" >> keyboard_layout.s
 	$(KBMAP) ../../data/keyboard_qwerty.txt >> keyboard_layout.s
 
+data.o:data.s tests_prg
+
 libc: util
 	$(MAKE) -C ../libc all
 
@@ -42,6 +44,9 @@ UDEP_FROM_UTIL=$(patsubst %,64/%,$(UDEP))
 
 util:
 	$(MAKE) -C ../util $(UDEP_FROM_UTIL)
+
+tests_prg:
+	$(MAKE) -C ../../tests/prg all
 
 kernel.bin:linker.ld ../boot/boot_data.ld $(OBJ) util libc
 	$(CC) -T linker.ld -o kernel.bin $(FLAGS) $(OBJ) $(UDEP_FROM_HERE) \

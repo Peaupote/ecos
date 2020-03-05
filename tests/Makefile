@@ -27,3 +27,4 @@ include .depends
 
 clean:
 	rm -f *.out *.o
+	$(MAKE) -C prg clean

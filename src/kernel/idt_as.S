@@ -4,6 +4,7 @@
 
 	.section .data
 .global int_handlers
+.align 0x20
 int_handlers:
 #include "int_handlers_tab.s"
 
@@ -11,6 +12,8 @@ int_handlers:
 .global irq_sys
 .global irq_keyboard
 .global irq_pit
+.global iret_to_userspace
+
 .extern common_hdl
 .extern keyboard_hdl
 .extern syscall_hdl
@@ -41,6 +44,13 @@ int_handlers:
     popq  %rax
 .endm
 
+.macro set_data_segments
+	mov %bx, %ds
+	mov %bx, %es
+	mov %bx, %fs
+	mov %bx, %gs
+.endm
+
 #include "int_handlers.s"
 
 irq_keyboard:
@@ -66,8 +76,37 @@ irq_pit:
 irq_sys:
     cli
     save_c_reg
+	mov   %ds, %bx
+	pushq %rbx
+	mov   $0x10, %bx
+	set_data_segments
+
     // TODO : implement switch on %rax values
+	cmpq $0x42, %rax
+	je test_proc_int
+
     call sleep_hdl
+
+	popq %rbx
+	set_data_segments
     restore_c_reg
     sti
     iretq
+
+//arg: RIP, RSP
+iret_to_userspace:
+	mov   $0x23, %bx
+	set_data_segments
+	pushq $0x23 //SS
+	pushq %rsi  //RSP
+	pushfq      //RFLAGS
+	pushq $0x1B //CS
+	pushq %rdi  //RIP
+	iretq
+
+test_proc_int:
+	movq %rsp, %rsi
+	call tty_test_prg_rt
+	sti
+lh:	hlt
+	jmp lh

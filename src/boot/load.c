@@ -43,7 +43,7 @@ void simp_copy(void* none __attribute__((unused)), Elf64_Addr dst,
 }
 
 void load_kernel64(void){
-    struct elf_loader el_v = {&simp_fill0, &simp_copy};
+    struct elf_loader el_v = {.fill0=&simp_fill0, .copy=&simp_copy};
     kernel_entry_addr = NULL;
 	end_kernel = 0;
 

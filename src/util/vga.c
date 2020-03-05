@@ -7,11 +7,11 @@ uint8_t terminal_color;
 uint16_t* terminal_buffer;
 size_t terminal_tab_size;
 
-void terminal_init(void)
+void terminal_init(uint16_t* p_buffer)
 {
     terminal_tab_size = 4;
     terminal_color = vga_entry_color(VGA_COLOR_LIGHT_GREY, VGA_COLOR_BLACK);
-    terminal_buffer = (uint16_t*) 0xB8000;
+    terminal_buffer = p_buffer;
 	terminal_clear();
 }
 

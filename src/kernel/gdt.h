@@ -5,10 +5,10 @@
 
 struct GDT {//size = 0x38
 	uint64_t null;
-	uint64_t kernel_code;
-	uint64_t kernel_data;
-	uint64_t ring3_code;
-	uint64_t ring3_data;
+	uint64_t kernel_code; //0x08
+	uint64_t kernel_data; //0x10
+	uint64_t ring3_code;  //0x18
+	uint64_t ring3_data;  //0x20
 	uint64_t tss_low;
 	uint64_t tss_high;
 } __attribute__((packed));

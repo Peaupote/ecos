@@ -18,15 +18,12 @@ struct gate_desc {
     uint16_t  offset_mid;   // offset 16..31
     uint32_t  offset_high;  // offset 32..64
     uint32_t  reserved;
-};
+} __attribute__((packed));
 
 struct idt_reg {
     uint16_t   limit;
     struct gate_desc *base;
-}
-//Supprime le padding, rend l'accès plus lent 
-//mais devrais fonctionner en x86
-__attribute__((packed));
+} __attribute__((packed));
 
 typedef void (*idt_handler)(void);
 const idt_handler int_handlers[NEXCEPTION_VEC];

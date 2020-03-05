@@ -26,8 +26,8 @@
 #define PAGING_FLAG_R		0x2
 //User/supervisor
 #define PAGING_FLAG_U		0x4
-//page Size: si 1 dans le PD utilise une page de 2MB à la place d'une PT
-//requiert PSE (ou PAE)
+//page Size: si 1 dans le PD utilise une page de 2MB (si PAE)
+//à la place d'une PT requiert PSE (ou PAE)
 #define PAGING_FLAG_S		(1<<7)
 
 typedef uint64_t phy_addr;//adresse physique
@@ -105,6 +105,10 @@ static inline phy_addr paging_phy_addr(uint_ptr v_addr) {
 
 static inline void paging_refresh() {
 	asm volatile("movq %%cr3,%%rax; movq %%rax,%%cr3;" : : : "memory");
+}
+
+static inline void pml4_to_cr3(phy_addr pml4_loc) {
+	asm volatile("movq %%rax,%%cr3" :: "rax"(pml4_loc) : "memory");
 }
 
 #endif

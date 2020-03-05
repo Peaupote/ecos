@@ -3,6 +3,7 @@
 
 #include "param.h"
 #include "file.h"
+#include "kmem.h"
 
 typedef unsigned long size_t;
 typedef int  pid_t;
@@ -87,5 +88,21 @@ struct {
 void       init();
 int        push_ps(pid_t pid);
 pid_t      pop_ps();
+
+
+struct user_space {
+	phy_addr pml4;
+};
+struct user_space_start {
+	void* entry;
+	void* rsp;
+};
+//! change le paging vers celui du processus
+//  les objets doivent se trouver dans l'espace du kernel
+uint8_t    proc_create_userspace(void* prg_elf, struct user_space*,
+		        struct user_space_start*);
+
+//! ne retourne pas à l'appelant
+extern void iret_to_userspace(void* rip, void* rsp);
 
 #endif

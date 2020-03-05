@@ -5,6 +5,8 @@
 #include <stddef.h>
 #include <stdint.h>
 
+#define VGA_BUFFER 0xB8000
+
 /* Hardware text mode color constants. */
 enum vga_color {
     VGA_COLOR_BLACK = 0,
@@ -46,7 +48,7 @@ static const size_t VGA_HEIGHT = 25;
 extern vga_pos terminal_pos;
 extern uint8_t terminal_color;
 
-void terminal_init(void);
+void terminal_init(uint16_t* buffer);
 void terminal_clear(void);
 void terminal_setcolor(uint8_t color);
 void terminal_putcentryat(uint16_t e, size_t x, size_t y);

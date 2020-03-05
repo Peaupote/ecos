@@ -20,9 +20,9 @@
 #include "tests.h"
 
 void kernel_init(void) {
-    terminal_init();
-    tty_init();
     kmem_init();
+    terminal_init((uint16_t*)(low_addr + VGA_BUFFER));
+    tty_init();
 	gdt_init();
 	tss_init();
     idt_init();
@@ -37,7 +37,6 @@ void kernel_main(void) {
     tty_new_prompt();
 
     // TODO : handle processes
-
-    sleep(2);
-    while (true) halt();
+    
+	while (true) halt();
 }
