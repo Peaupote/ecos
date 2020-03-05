@@ -116,8 +116,8 @@ void init() {
 
     proc_create_userspace(proc_init, one);
 
-    state.st_curr_pid     = 1;
-    state.st_waiting_ps   = 0;
+    state.st_curr_pid   = 1;
+    state.st_waiting_ps = 0;
 
     // set all remaining slots to free processus
     for (pid_t pid = 2; pid < NPROC; pid++)
@@ -136,20 +136,11 @@ void schedule_proc(void) {
         pid = pop_ps();
         state.st_curr_pid = pid;
 
-        char str[]   = "__..__..__..__..";
-        size_t idx_b = tty_buffer_next_idx();
-        size_t shift = tty_writestring("=== ");
-        int64_to_str_hexa(str, state.st_waiting_ps);
-        shift += tty_writestring(str);
-        shift += tty_writestring("\nproc ");
-        int64_to_str_hexa(str, pid);
-        shift += tty_writestring(str);
-        shift += tty_writestring(" ");
-        int64_to_str_hexa(str, state.st_proc[pid].p_stat);
-        shift += tty_writestring(str);
-        shift += tty_writestring("\n");
-        if (shift) tty_afficher_buffer_all();
-        else tty_afficher_buffer_range(idx_b, tty_buffer_next_idx());
+        kprintf("==\n");
+        kprintf("nb waiting %d\n", state.st_waiting_ps);
+        kprintf("proc %d : rip %h, rsp %h\n", pid,
+                state.st_proc[pid].p_entry,
+                state.st_proc[pid].p_rsp);
 
         iret_to_userspace(state.st_proc[pid].p_entry,
                           state.st_proc[pid].p_rsp);
@@ -190,9 +181,6 @@ uint8_t proc_create_userspace(void* prg_elf, proc_t *proc) {
     volatile phy_addr pml4_loc = kmem_alloc_page(); //TODO crash sans volatile
     if(paging_force_map_to((uint_ptr)&dynamic_slot, pml4_loc))
         return 1;
-
-    if(paging_phy_addr((uint_ptr)&dynamic_slot) != pml4_loc)// TODO rm TEST
-         return 2;
 
     kmem_init_pml4((uint64_t*)&dynamic_slot, pml4_loc);
     clear_interrupt_flag();
