@@ -26,7 +26,7 @@ int push_ps(pid_t pid) {
     pid_t* rq1 = state.st_runqueues - 1;
     proc_t *p = state.st_proc + pid;
     priority_t ps_priority = p->p_pri = proc_state_pri[p->p_stat];
-    size_t i = state.st_waiting_ps++;
+    size_t i = ++state.st_waiting_ps;
 
     pid_t hp_pid = rq1[i >> 1];
     priority_t hp_priority = state.st_proc[hp_pid].p_pri;
@@ -92,6 +92,8 @@ pid_t pop_ps() {
     return pid;
 }
 
+extern uint8_t proc_init[];
+
 void init() {
     // construct processus one
     proc_t *one = &state.st_proc[1];
@@ -111,6 +113,8 @@ void init() {
     one->p_reg.r9 = 0;
     one->p_reg.r10 = 0;
     one->p_reg.r11 = 0;
+
+    proc_create_userspace(proc_init, one);
 
     state.st_curr_pid     = 1;
     state.st_waiting_ps   = 0;
@@ -132,11 +136,23 @@ void schedule_proc(void) {
         pid = pop_ps();
         state.st_curr_pid = pid;
 
-        // TODO : jump ring 3 to exec process
-        // for test purposes when not sleeping call sleep
-        if (state.st_proc[pid].p_stat == RUN) {
-            sleep(1);
-        }
+        char str[]   = "__..__..__..__..";
+        size_t idx_b = tty_buffer_next_idx();
+        size_t shift = tty_writestring("=== ");
+        int64_to_str_hexa(str, state.st_waiting_ps);
+        shift += tty_writestring(str);
+        shift += tty_writestring("\nproc ");
+        int64_to_str_hexa(str, pid);
+        shift += tty_writestring(str);
+        shift += tty_writestring(" ");
+        int64_to_str_hexa(str, state.st_proc[pid].p_stat);
+        shift += tty_writestring(str);
+        shift += tty_writestring("\n");
+        if (shift) tty_afficher_buffer_all();
+        else tty_afficher_buffer_range(idx_b, tty_buffer_next_idx());
+
+        iret_to_userspace(state.st_proc[pid].p_entry,
+                          state.st_proc[pid].p_rsp);
     }
 }
 

@@ -38,8 +38,15 @@ void kernel_main(void) {
     tty_new_prompt();
 
     init();
-    fork();
-    fork();
+
+    char str[]   = "__..__..__..__..\n";
+    size_t idx_b = tty_buffer_next_idx();
+    size_t shift = tty_writestring("nb proc");
+    int64_to_str_hexa(str, state.st_waiting_ps);
+    shift += tty_writestring(str);
+    shift += tty_writestring("\n");
+    if (shift) tty_afficher_buffer_all();
+    else tty_afficher_buffer_range(idx_b, tty_buffer_next_idx());
 
     while (true) halt();
 }

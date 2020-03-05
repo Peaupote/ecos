@@ -8,6 +8,12 @@
 int_handlers:
 #include "int_handlers_tab.s"
 
+.extern sleep
+
+syscall_tab:
+    .quad sleep_hdl
+    .quad fork
+
     .section .text
 .global irq_sys
 .global irq_keyboard
@@ -81,11 +87,10 @@ irq_sys:
     mov   $0x10, %bx
     set_data_segments
 
-    // TODO : implement switch on %rax values
-    cmpq $0x42, %rax
-    je test_proc_int
-
-    call sleep_hdl
+    movabs $syscall_tab, %rbx
+    lea   (%rbx, %rax, 8), %rax
+    movq  (%rax), %rax
+    callq *%rax
 
     popq %rbx
     set_data_segments

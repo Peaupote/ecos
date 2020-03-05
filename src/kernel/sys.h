@@ -2,6 +2,7 @@
 #define _H_SYS
 
 #define SYS_SLEEP 0
+#define SYS_FORK  1
 
 #ifndef ASSEMBLY
 

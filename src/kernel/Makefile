@@ -13,7 +13,7 @@ OBJ=$(ASFILES:.S=.o) $(CFILES:.c=.o)
 KBMAP=gawk -f ../../tools/keyboard_map.awk
 UDEP=vga.o string.o elf64.o
 
-.PHONY: all re clean util libc tests_prg
+.PHONY: all re clean util libc tests_prg aux_prg
 
 all: kernel.bin
 
@@ -34,7 +34,7 @@ keyboard_layout.s: ../../data/keyboard_azerty.txt ../../data/keyboard_qwerty.txt
 	echo "keyboard_qwerty_layout:" >> keyboard_layout.s
 	$(KBMAP) ../../data/keyboard_qwerty.txt >> keyboard_layout.s
 
-data.o:data.s tests_prg
+data.o:data.s tests_prg aux_prg
 
 libc: util
 	$(MAKE) -C ../libc all
@@ -44,6 +44,9 @@ UDEP_FROM_UTIL=$(patsubst %,64/%,$(UDEP))
 
 util:
 	$(MAKE) -C ../util $(UDEP_FROM_UTIL)
+
+aux_prg:
+	$(MAKE) -C aux_prg
 
 tests_prg:
 	$(MAKE) -C ../../tests/prg all
