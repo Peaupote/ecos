@@ -7,6 +7,7 @@
 
 #include "kmem.h"
 #include "int.h"
+#include "tty.h"
 #include "../util/elf64.h"
 
 #define USER_STACK_TOP  0x57AC3000
@@ -16,33 +17,28 @@
 int proc_state_pri[7] = { PFREE, PSLEEP, PWAIT, PRUN, PIDLE, PZOMB, PSTOP };
 
 // some heap utilitary functions
-// the priority queue is probably bugged
-// has not been tested
 
 int push_ps(pid_t pid) {
     // test if remain space
-    if (state.st_waiting_ps == NHEAP)
+    if (state.st_waiting_ps >= NHEAP)
         return -1;
 
-    proc_t *p = &state.st_proc[pid];
-    p->p_pri = proc_state_pri[p->p_stat];
-    priority_t ps_priority = state.st_proc[pid].p_pri;
-    state.st_runqueues[state.st_waiting_ps++] = pid;
+    pid_t* rq1 = state.st_runqueues - 1;
+    proc_t *p = state.st_proc + pid;
+    priority_t ps_priority = p->p_pri = proc_state_pri[p->p_stat];
+    size_t i = state.st_waiting_ps++;
 
-    int i = state.st_waiting_ps;
-    pid_t hp_pid = state.st_runqueues[i / 2 - 1];
+    pid_t hp_pid = rq1[i >> 1];
     priority_t hp_priority = state.st_proc[hp_pid].p_pri;
 
     // up heap
-    while (i / 2 > 0 && ps_priority > hp_priority) {
-        state.st_runqueues[i - 1] = hp_pid;
-
-        i /= 2;
-        state.st_runqueues[i - 1] = pid;
-        hp_pid = state.st_runqueues[i / 2 - 1];
-        hp_priority = state.st_proc[hp_pid].p_pri;
+    while ((i>>1)
+        && (hp_pid = rq1[i>>1],
+            ps_priority > (hp_priority = state.st_proc[hp_pid].p_pri))) {
+        rq1[i] = hp_pid;
+        i >>= 1;
     }
-
+    rq1[i] = pid;
     return 0;
 }
 
@@ -51,32 +47,48 @@ pid_t pop_ps() {
     if (state.st_waiting_ps == 0)
         return -1;
 
-    pid_t pid = state.st_runqueues[0];
-    state.st_runqueues[0]  = state.st_runqueues[--state.st_waiting_ps];
+    pid_t* rq1 = state.st_runqueues - 1;
+    pid_t pid  = rq1[1];
+    rq1[1]     = rq1[state.st_waiting_ps--];
 
     // down heap
-    for (int i = 1; 2 * i < state.st_waiting_ps;) {
-        int win = i, l = 2 * i, r = 2 * i + 1;
+    for (int i = 1; (i<<1) <= state.st_waiting_ps;) {
+        int win = i, l = i<<1, r = (i<<1) + 1;
+        size_t lpr_index = i - 1;
+        uint8_t lpr_shift = 1 << (lpr_index % 8);
+        lpr_index /= 8;
 
-        pid_t pidwin = state.st_runqueues[win - 1],
-            pidl = state.st_runqueues[l - 1],
-            pidr = state.st_runqueues[r - 1];
+        pid_t pidwin = rq1[win],
+                pidl = rq1[l];
 
         priority_t winp = state.st_proc[pidwin].p_pri,
-            left  = state.st_proc[pidl].p_pri,
-            right = state.st_proc[pidr].p_pri;
+                   lp   = state.st_proc[pidl].p_pri;
 
-        if (left < winp)  { pidwin = pidl; winp = left; }
-        if (right < winp) { pidwin = pidr; winp = right; }
+        if (lp < winp) {
+            win    = l;
+            pidwin = pidl;
+            winp   = lp;
+        }
+        if (r <= state.st_waiting_ps){
+            pid_t pidr    = rq1[r];
+            priority_t rp = state.st_proc[r].p_pri;
+            if (rp < winp ||
+                (rp == winp
+                 && (lpr_shift &
+                     (state.st_runqueues_lpr[lpr_index] ^= lpr_shift)))) {
+                win    = r;
+                pidwin = pidr;
+                winp   = lp;
+            }
+        }
 
         if (win == i) break;
 
-        state.st_runqueues[win - 1] = state.st_runqueues[i];
+        rq1[win] = state.st_runqueues[i];
         state.st_runqueues[i - 1]   = pidwin;
         i = win;
     }
 
-    state.st_waiting_ps--;
     return pid;
 }
 

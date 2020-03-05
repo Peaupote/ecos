@@ -2,6 +2,8 @@
 #include "../sys.h"
 #include "../proc.h"
 
+#include "../tty.h"
+
 #define NSLEEP 128
 
 struct {
@@ -36,6 +38,5 @@ void lookup_end_sleep(void) {
                 push_ps(pid);
             }
         }
-
     }
 }

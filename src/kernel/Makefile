@@ -1,7 +1,7 @@
 export TRG=64
 export CC=x86_64-elf-gcc
 export INCLUDES=-I ../libc/include
-export FLAGS=-O2 -Wall -Wextra -std=gnu99 -nostdlib \
+export FLAGS=-O1 -Wall -Wextra -std=gnu99 -nostdlib \
 			 -mcmodel=large -ffreestanding -mno-red-zone
 AS=x86_64-elf-as
 include ../libc/list.Makefile

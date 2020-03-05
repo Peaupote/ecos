@@ -13,9 +13,6 @@
 // magic numbers
 #define KERNEL_SEGMENT_OFFSET 0x08
 #define INT_GATE              0x8e
-#define INT_TRAP              0xf
-#define INT_CALL              0xc
-#define INT_TASK              0x5
 
 // special interrupt vectors
 #define SYSCALL_VEC           0x80
@@ -24,7 +21,6 @@
 
 #define KEYBOARD_STATUS_PORT 0x64
 #define KEYBOARD_DATA_PORT   0x60
-#define ENTER_KEY_CODE 0x1C
 
 #define PIC1_PORT 0x20
 #define PIC1_DATA 0x21

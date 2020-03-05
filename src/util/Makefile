@@ -4,19 +4,11 @@ TRG?=test
 CC?=gcc
 FLAGS?=-O2 -Wall -Wextra -std=gnu99
 INCLUDES?=
-SRCDEP=vga.c string.c
-
-ALLO2?=true
-FLAGSO1=-Wall -Wextra -std=gnu99 -nostdlib \
-		-mcmodel=large -ffreestanding -mno-red-zone
+SRCDEP=vga.c string.c elf64.c
 
 $(TRG)/%.o:%.c
 	mkdir -p $(TRG)
-	if $(ALLO2) && [ "$@" = "64/elf64.o" ]; then \
-		$(CC) $(FLAGSO1) -o $@ -c $< $(INCLUDES); \
-	else \
-		$(CC) $(FLAGS) -o $@ -c $< $(INCLUDES); \
-	fi
+	$(CC) $(FLAGS) -o $@ -c $< $(INCLUDES)
 
 $(TRG)/.depends:
 	mkdir -p $(TRG)
