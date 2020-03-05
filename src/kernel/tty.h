@@ -28,4 +28,6 @@ void   tty_force_new_line(void);
 size_t tty_writestring(const char* str);
 void   tty_writer(void* shift, const char* str);
 
+int kprintf(const char *format, ...);
+
 #endif

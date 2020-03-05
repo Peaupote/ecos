@@ -56,14 +56,15 @@ pid_t fork() {
     fp->p_pri   = p->p_pri;
     fp->p_entry = p->p_entry;
     fp->p_rsp   = p->p_rsp;
-	fp->p_pml4  = kmem_alloc_page();
-	
-	kmem_copy_paging(fp->p_pml4);
+    fp->p_pml4  = kmem_alloc_page();
+
+    kmem_copy_paging(fp->p_pml4);
 
     // copy file descriptors
     for (int i = 0; i < NFD; i++)
         fp->p_fds[i] = p->p_fds[i];
 
+    push_ps(p->p_pid);
     push_ps(pid);
     return pid;
 }
