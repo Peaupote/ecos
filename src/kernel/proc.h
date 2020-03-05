@@ -6,8 +6,8 @@
 #include "kmem.h"
 
 typedef unsigned long size_t;
-typedef int  pid_t;
-typedef int  priority_t;
+typedef int32_t  pid_t;
+typedef int32_t  priority_t;
 
 /**
  * Processus
@@ -65,6 +65,7 @@ typedef struct channel {
 struct {
     pid_t      st_curr_pid;          // pid of current running process
     pid_t      st_runqueues[NHEAP];  // queue of processes to run
+	uint8_t    st_runqueues_lpr[(NHEAP + 7)/8];
     int        st_waiting_ps;        // number of processes in queue
     proc_t     st_proc[NPROC];       // table containing all processes
     chann_t    st_chann[NCHAN];      // table containing all channels

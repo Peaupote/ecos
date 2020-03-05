@@ -21,6 +21,6 @@
 #define PSTOP  1
 
 /**
- * Dont touch to much here
+ * Dont touch too much here
  */
 #define NGDT 4
