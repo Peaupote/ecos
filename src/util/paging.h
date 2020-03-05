@@ -30,6 +30,8 @@
 //à la place d'une PT requiert PSE (ou PAE)
 #define PAGING_FLAG_S		(1<<7)
 
+#define PAGING_FLAGS PAGING_FLAG_P|PAGING_FLAG_R|PAGING_FLAG_U|PAGING_FLAG_S
+
 typedef uint64_t phy_addr;//adresse physique
 typedef uint64_t uint_ptr;//adresse virtuelle
 
@@ -56,6 +58,10 @@ static inline uint_ptr paging_set_pt  (uint16_t e) {
 }
 static inline uint16_t paging_get_pt  (uint_ptr v) {
 	return (uint16_t)((v >> 12) & 0x1ff);
+}
+
+static inline uint_ptr paging_rm_loop (uint_ptr v) {
+	return (v << 9) & VADDR_MASK;
 }
 
 #ifndef __i386__
@@ -101,6 +107,7 @@ static inline phy_addr paging_phy_addr(uint_ptr v_addr) {
 	return paging_phy_addr_page(v_addr & PAGE_MASK)
 		| (v_addr & PAGE_OFS_MASK);
 }
+
 #endif
 
 static inline void paging_refresh() {

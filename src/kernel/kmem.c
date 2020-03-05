@@ -46,7 +46,7 @@ uint64_t* acc_pt_entry(uint_ptr v_addr, uint16_t flags) {
 			return NULL;
 		else {
 			*query |=  flags;
-			query_addr = (query_addr << 9) & VADDR_MASK;
+			query_addr = paging_rm_loop(query_addr);
 		}
 		query_addr |= (v_addr >> ((3-i) * 9)) & 0xff8;
 	}
@@ -87,4 +87,52 @@ void kmem_init_pml4(uint64_t* pml4, phy_addr p_loc) {
 	pml4[PML4_KERNEL_VIRT_ADDR] = *paging_acc_pml4(PML4_KERNEL_VIRT_ADDR) 
 		& (PAGE_MASK | PAGING_FLAG_P | PAGING_FLAG_R);
 	pml4[PML4_LOOP] = p_loc | PAGING_FLAG_R | PAGING_FLAG_P;
+}
+
+#include "int.h"
+
+void kmem_copy_pml4(uint64_t* pml4, phy_addr p_loc) {
+	for(uint16_t i=0; i<512; ++i)
+		pml4[i] = *paging_acc_pml4(i) 
+			& (PAGE_MASK | PAGING_FLAGS);
+	pml4[PML4_LOOP] = p_loc | PAGING_FLAG_R | PAGING_FLAG_P;
+}
+
+void kmem_copy_rec(uint64_t* dst_entry, uint64_t* src_page, uint8_t lvl) {
+	phy_addr pg_phy = kmem_alloc_page();
+	*dst_entry = ((*dst_entry) & PAGE_OFS_MASK) | pg_phy;
+	uint64_t* dst_page = (uint64_t*) paging_rm_loop((uint_ptr)dst_entry);
+	if (lvl)
+		for (size_t i = 0; i < 512; ++i) {
+			dst_page[i] = src_page[i];
+			if (dst_page[i] & PAGING_FLAG_P)
+				kmem_copy_rec(
+						dst_page+i,
+						(uint64_t*) paging_rm_loop((uint_ptr)(src_page+i)),
+						lvl - 1);
+		}
+	else
+		for (size_t i = 0; i < 512; ++i)
+			dst_page[i] = src_page[i];
+}
+
+void kmem_copy_paging(volatile phy_addr new_pml4) {
+	*paging_acc_pml4(PML4_COPY_RES) = new_pml4 
+									| PAGING_FLAG_R | PAGING_FLAG_P;
+	paging_refresh();
+
+	kmem_copy_pml4(paging_pts_acc(
+				PML4_LOOP, PML4_LOOP, PML4_LOOP,PML4_COPY_RES, 0),
+				new_pml4);
+	
+	pml4_to_cr3(new_pml4);
+	
+	for (int i = 0; i < PML4_KERNEL_VIRT_ADDR; ++i)
+		if(*paging_acc_pml4(i) & PAGING_FLAG_P) {
+			*paging_acc_pml4(PML4_COPY_RES) 
+				= *paging_acc_pml4(i) & ~PAGING_FLAG_U;
+			paging_refresh();
+			kmem_copy_rec(paging_acc_pml4(i),
+					paging_acc_pdpt(PML4_COPY_RES,0), 3);
+		}
 }

@@ -49,13 +49,16 @@ pid_t fork() {
     if (pid == state.st_curr_pid)
         return -1;
 
-    fp         = &state.st_proc[pid];
+    fp          = &state.st_proc[pid];
     fp->p_pid   = pid;
     fp->p_ppid  = state.st_curr_pid;
     fp->p_stat  = RUN;
     fp->p_pri   = p->p_pri;
     fp->p_entry = p->p_entry;
     fp->p_rsp   = p->p_rsp;
+	fp->p_pml4  = kmem_alloc_page();
+	
+	kmem_copy_paging(fp->p_pml4);
 
     // copy file descriptors
     for (int i = 0; i < NFD; i++)
