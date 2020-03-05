@@ -40,7 +40,6 @@
 #define PIT_DATA_PORT2 0x42
 #define PIT_CONF_PORT  0x43
 #define PIT_MODE       0b00110110
-#define PIT_FREQ       18 // = 1193180 / 0xffff
 
 #ifndef ASSEMBLY
 

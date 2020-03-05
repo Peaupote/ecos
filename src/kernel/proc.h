@@ -57,17 +57,6 @@ typedef struct channel {
     unsigned int    chann_acc;  // number of times the channel is referenced
 } chann_t;
 
-/**
- * Associated syscalls
- */
-pid_t wait();
-pid_t fork();
-void  kexit(int status);
-
-int open(char *fname, enum chann_mode);
-int close(int fildes);
-int write(int filedes, const void *buf, size_t len);
-int read (int filedes, const void *buf, size_t len);
 
 /**
  * Global state of the machine
@@ -85,9 +74,9 @@ struct {
  * Initialize state of the machine
  * and create process one
  */
-void       init();
-int        push_ps(pid_t pid);
-pid_t      pop_ps();
+void init(void);
+void schedule_proc(void);
+pid_t push_ps(pid_t pid);
 
 
 struct user_space {
