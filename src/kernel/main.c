@@ -24,8 +24,8 @@ void kernel_init(void) {
     kmem_init();
     terminal_init((uint16_t*)(low_addr + VGA_BUFFER));
     tty_init();
-	gdt_init();
-	tss_init();
+    gdt_init();
+    tss_init();
     idt_init();
 }
 
@@ -40,5 +40,6 @@ void kernel_main(void) {
     init();
     fork();
     fork();
+
     while (true) halt();
 }

@@ -34,9 +34,11 @@ typedef struct proc {
     pid_t            p_ppid;     // parent pid
     enum proc_state  p_stat;     // current status of the processus
     uint32_t         p_pri;      // priority of the process in the heap
-    uint64_t         p_pc;       // program counter
     struct reg       p_reg;      // saved registers
     int              p_fds[NFD]; // table of file descriptors
+    phy_addr         p_pml4;     // paging
+    void*            p_entry;    // rip
+    void*            p_rsp;      //
 } proc_t;
 
 /**
@@ -78,18 +80,9 @@ void init(void);
 void schedule_proc(void);
 pid_t push_ps(pid_t pid);
 
-
-struct user_space {
-	phy_addr pml4;
-};
-struct user_space_start {
-	void* entry;
-	void* rsp;
-};
 //! change le paging vers celui du processus
 //  les objets doivent se trouver dans l'espace du kernel
-uint8_t    proc_create_userspace(void* prg_elf, struct user_space*,
-		        struct user_space_start*);
+uint8_t    proc_create_userspace(void* prg_elf, proc_t *proc);
 
 //! ne retourne pas à l'appelant
 extern void iret_to_userspace(void* rip, void* rsp);

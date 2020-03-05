@@ -83,10 +83,12 @@ pid_t pop_ps() {
 void init() {
     // construct processus one
     proc_t *one = &state.st_proc[1];
-    one->p_pid  = 1;
-    one->p_ppid = 0;
-    one->p_stat = RUN;
-    one->p_pc   = 0;
+    one->p_pid   = 1;
+    one->p_ppid  = 0;
+    one->p_stat  = RUN;
+    one->p_pml4  = 0;
+    one->p_entry = 0;
+    one->p_rsp   = 0;
 
     one->p_reg.rax = 0;
     one->p_reg.rcx = 0;
@@ -129,51 +131,55 @@ void schedule_proc(void) {
 
 extern uint8_t dynamic_slot;
 uint8_t err = 0;
+
 void proc_ldr_alloc_pages(uint_ptr begin, uint_ptr end) {
-	for(uint_ptr it = begin & PAGE_MASK; it < end; ++it)
-		if(kmem_paging_alloc(it, PAGING_FLAG_U | PAGING_FLAG_R) >= 2)
-			err = 1;
+    for(uint_ptr it = begin & PAGE_MASK; it < end; ++it)
+        if(kmem_paging_alloc(it, PAGING_FLAG_U | PAGING_FLAG_R) >= 2)
+            err = 1;
 }
+
 void proc_ldr_fill0(void* none __attribute__((unused)),
-		Elf64_Addr dst, uint64_t sz) {
-	proc_ldr_alloc_pages(dst, dst + sz);
-	//TODO: use quad
-	for (size_t i=0; i<sz; ++i)
-		((uint8_t*) dst)[i] = 0;
+                    Elf64_Addr dst, uint64_t sz) {
+    proc_ldr_alloc_pages(dst, dst + sz);
+    //TODO: use quad
+    for (size_t i=0; i<sz; ++i)
+        ((uint8_t*) dst)[i] = 0;
 }
+
 void proc_ldr_copy(void* none __attribute__((unused)),
-		Elf64_Addr dst, void* src, uint64_t sz) {
-	proc_ldr_alloc_pages(dst, dst + sz);
-	for (size_t i=0; i<sz; ++i)
-		((uint8_t*) dst)[i] = ((uint8_t*) src)[i];
+                   Elf64_Addr dst, void* src, uint64_t sz) {
+    proc_ldr_alloc_pages(dst, dst + sz);
+    for (size_t i=0; i<sz; ++i)
+        ((uint8_t*) dst)[i] = ((uint8_t*) src)[i];
 }
 
-uint8_t proc_create_userspace(void* prg_elf, struct user_space* us,
-		struct user_space_start* uss) {
-	struct elf_loader proc_ldr = {
-		.fill0 = &proc_ldr_fill0,
-		.copy  = &proc_ldr_copy
-	};
+uint8_t proc_create_userspace(void* prg_elf, proc_t *proc) {
+    struct elf_loader proc_ldr = {
+        .fill0 = &proc_ldr_fill0,
+        .copy  = &proc_ldr_copy
+    };
 
-	volatile phy_addr pml4_loc = kmem_alloc_page(); //TODO crash sans volatile
-	if(paging_force_map_to((uint_ptr)&dynamic_slot, pml4_loc))
-		return 1;
-	if(paging_phy_addr((uint_ptr)&dynamic_slot) != pml4_loc)// TODO rm TEST
-		return 2;
-	kmem_init_pml4((uint64_t*)&dynamic_slot, pml4_loc);
-	clear_interrupt_flag();
-	pml4_to_cr3(pml4_loc);
-	set_interrupt_flag();
+    volatile phy_addr pml4_loc = kmem_alloc_page(); //TODO crash sans volatile
+    if(paging_force_map_to((uint_ptr)&dynamic_slot, pml4_loc))
+        return 1;
 
-	//On est désormais dans le paging du processus
-	err = 0;
-	proc_ldr_alloc_pages(USER_STACK_TOP - USER_STACK_SIZE,
-				USER_STACK_TOP);
-	uss->entry = (void*)elf_load(proc_ldr, NULL, prg_elf);
-	uss->rsp   = (void*)USER_STACK_TOP;
-	us->pml4   = pml4_loc;
+    if(paging_phy_addr((uint_ptr)&dynamic_slot) != pml4_loc)// TODO rm TEST
+         return 2;
 
-	if (err) return 3;
+    kmem_init_pml4((uint64_t*)&dynamic_slot, pml4_loc);
+    clear_interrupt_flag();
+    pml4_to_cr3(pml4_loc);
+    set_interrupt_flag();
 
-	return 0;
+    //On est désormais dans le paging du processus
+    err = 0;
+    proc_ldr_alloc_pages(USER_STACK_TOP - USER_STACK_SIZE,
+                         USER_STACK_TOP);
+    proc->p_entry = (void*)elf_load(proc_ldr, NULL, prg_elf);
+    proc->p_rsp   = (void*)USER_STACK_TOP;
+    proc->p_pml4  = pml4_loc;
+
+    if (err) return 3;
+
+    return 0;
 }
