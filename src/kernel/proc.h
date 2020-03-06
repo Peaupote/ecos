@@ -37,7 +37,7 @@ typedef struct proc {
     struct reg       p_reg;      // saved registers
     int              p_fds[NFD]; // table of file descriptors
     phy_addr         p_pml4;     // paging
-    void*            p_entry;    // rip
+    void*            p_rip;      // rip
     void*            p_rsp;      //
 } proc_t;
 

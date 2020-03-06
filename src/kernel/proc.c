@@ -101,7 +101,7 @@ void init() {
     one->p_ppid  = 0;
     one->p_stat  = RUN;
     one->p_pml4  = 0;
-    one->p_entry = 0;
+    one->p_rip   = 0;
     one->p_rsp   = 0;
 
     one->p_reg.rax = 0;
@@ -139,35 +139,37 @@ void schedule_proc(void) {
         kprintf("==\n");
         kprintf("nb waiting %d\n", state.st_waiting_ps);
         kprintf("proc %d : rip %h, rsp %h\n", pid,
-                state.st_proc[pid].p_entry,
+                state.st_proc[pid].p_rip,
                 state.st_proc[pid].p_rsp);
 
-        iret_to_userspace(state.st_proc[pid].p_entry,
+        iret_to_userspace(state.st_proc[pid].p_rip,
                           state.st_proc[pid].p_rsp);
     }
 }
 
 
 extern uint8_t dynamic_slot;
-uint8_t err = 0;
 
-void proc_ldr_alloc_pages(uint_ptr begin, uint_ptr end) {
-    for(uint_ptr it = begin & PAGE_MASK; it < end; ++it)
-        if(kmem_paging_alloc(it, PAGING_FLAG_U | PAGING_FLAG_R) >= 2)
-            err = 1;
+uint8_t proc_ldr_alloc_pages(uint_ptr begin, uint_ptr end) {
+	uint8_t err;
+    for(uint_ptr it = begin & PAGE_MASK; it < end; ++it) {
+		err = kmem_paging_alloc(it, PAGING_FLAG_U | PAGING_FLAG_R);
+        if(err >= 2) return err;
+	}
+	return 0;
 }
 
-void proc_ldr_fill0(void* none __attribute__((unused)),
-                    Elf64_Addr dst, uint64_t sz) {
-    proc_ldr_alloc_pages(dst, dst + sz);
+void proc_ldr_fill0(void* err_pt, Elf64_Addr dst, uint64_t sz) {
+    uint8_t err = proc_ldr_alloc_pages(dst, dst + sz);
+	if (err) *((uint8_t*)err_pt) = err;
     //TODO: use quad
     for (size_t i=0; i<sz; ++i)
         ((uint8_t*) dst)[i] = 0;
 }
 
-void proc_ldr_copy(void* none __attribute__((unused)),
-                   Elf64_Addr dst, void* src, uint64_t sz) {
-    proc_ldr_alloc_pages(dst, dst + sz);
+void proc_ldr_copy(void* err_pt, Elf64_Addr dst, void* src, uint64_t sz) {
+    uint8_t err = proc_ldr_alloc_pages(dst, dst + sz);
+	if (err) *((uint8_t*)err_pt) = err;
     for (size_t i=0; i<sz; ++i)
         ((uint8_t*) dst)[i] = ((uint8_t*) src)[i];
 }
@@ -177,6 +179,7 @@ uint8_t proc_create_userspace(void* prg_elf, proc_t *proc) {
         .fill0 = &proc_ldr_fill0,
         .copy  = &proc_ldr_copy
     };
+	uint8_t err = 0;
 
     volatile phy_addr pml4_loc = kmem_alloc_page(); //TODO crash sans volatile
     if(paging_force_map_to((uint_ptr)&dynamic_slot, pml4_loc))
@@ -191,11 +194,11 @@ uint8_t proc_create_userspace(void* prg_elf, proc_t *proc) {
     err = 0;
     proc_ldr_alloc_pages(USER_STACK_TOP - USER_STACK_SIZE,
                          USER_STACK_TOP);
-    proc->p_entry = (void*)elf_load(proc_ldr, NULL, prg_elf);
+    proc->p_rip = (void*)elf_load(proc_ldr, &err, prg_elf);
+	if (err) return 2;
+
     proc->p_rsp   = (void*)USER_STACK_TOP;
     proc->p_pml4  = pml4_loc;
-
-    if (err) return 3;
 
     return 0;
 }

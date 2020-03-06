@@ -89,8 +89,6 @@ void kmem_init_pml4(uint64_t* pml4, phy_addr p_loc) {
 	pml4[PML4_LOOP] = p_loc | PAGING_FLAG_R | PAGING_FLAG_P;
 }
 
-#include "int.h"
-
 void kmem_copy_pml4(uint64_t* pml4, phy_addr p_loc) {
 	for(uint16_t i=0; i<512; ++i)
 		pml4[i] = *paging_acc_pml4(i) 

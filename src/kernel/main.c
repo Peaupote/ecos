@@ -17,12 +17,13 @@
 #include "tty.h"
 #include "sys.h"
 #include "proc.h"
+#include "kutil.h"
 
 #include "tests.h"
 
 void kernel_init(void) {
     kmem_init();
-    terminal_init((uint16_t*)(low_addr + VGA_BUFFER));
+    vga_init((uint16_t*)(low_addr + VGA_BUFFER));
     tty_init();
     gdt_init();
     tss_init();
@@ -32,8 +33,9 @@ void kernel_init(void) {
 void kernel_main(void) {
     kernel_init();
 
-    tty_writestring("64 bits kernel launched.\n");
-    tty_afficher_buffer_all();
+    klog(Log_info, "statut", "64 bits kernel launched.");
+    
+	tty_afficher_buffer_all();
 
     tty_new_prompt();
 

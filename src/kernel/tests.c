@@ -21,22 +21,22 @@ void test_kmem() {
 
 	nb_str[16] = '\0';
 	int64_to_str_hexa(nb_str, end_kernel);
-	terminal_writestring("end_kernel=");
-	terminal_writestring(nb_str);
-	terminal_writestring("\naddresse: virtuelle=");
+	vga_writestring("end_kernel=");
+	vga_writestring(nb_str);
+	vga_writestring("\naddresse: virtuelle=");
 	int64_to_str_hexa(nb_str, (uint_ptr)&test_bss);
-	terminal_writestring(nb_str);
-	terminal_writestring(" physique=");
+	vga_writestring(nb_str);
+	vga_writestring(" physique=");
 	int64_to_str_hexa(nb_str, paging_phy_addr((uint_ptr)&test_bss));
-	terminal_writestring(nb_str);
+	vga_writestring(nb_str);
 
 	new_page = kmem_alloc_page();
-	terminal_writestring("\npa=");
+	vga_writestring("\npa=");
 	int64_to_str_hexa(nb_str, new_page);
-	terminal_writestring(nb_str);
-	terminal_writestring(" rt=");
+	vga_writestring(nb_str);
+	vga_writestring(" rt=");
 	int64_to_str_hexa(nb_str, paging_map_to(v_addr, new_page));
-	terminal_writestring(nb_str);
+	vga_writestring(nb_str);
 	*((unsigned char*)v_addr) = 42;
 }
 
@@ -45,12 +45,12 @@ void test_idt() {
 	nb_str[16] = '\0';
 
 	asm volatile("int $0x80" : : : "memory");
-    terminal_writestring("Done.\n");
+    vga_writestring("Done.\n");
 
     while(1) {
-		terminal_cursor_at(0, 50);
+		vga_cursor_at(0, 50);
 		int64_to_str_hexa(nb_str, test_count++);
-		terminal_writestring(nb_str);
+		vga_writestring(nb_str);
 		asm volatile("hlt" : : : "memory");
 	}
 }

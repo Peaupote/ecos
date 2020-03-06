@@ -114,7 +114,7 @@ size_t built_in_exec(size_t in_begin, size_t in_len) {
         if (!rt) {
             ib_size = ib_printed = 0;
             write_eoi();
-            iret_to_userspace(proc->p_entry, proc->p_rsp);
+            iret_to_userspace(proc->p_rip, proc->p_rsp);
         }
     }
 
@@ -160,7 +160,7 @@ void tty_input(scancode_byte s, key_event ev) {
             if(ib_size > 0) {
                 --ib_size;
                 if(ib_printed > ib_size) ib_printed = ib_size;
-                terminal_putentryat(' ', input_color,
+                vga_putentryat(' ', input_color,
                         2 + ib_size % input_width,
                         input_top_line + ib_size / input_width);
             }
@@ -192,7 +192,7 @@ void tty_afficher_buffer_range(size_t idx_begin, size_t idx_end) {
 
     while(it != idx_end) {
         for (size_t x = 0; x < VGA_WIDTH; ++x)
-            terminal_putcentryat(sbuffer[it][x], x, y);
+            vga_putcentryat(sbuffer[it][x], x, y);
         ++y;
         it = SB_MASK & (it + 1);
     }
@@ -204,7 +204,7 @@ void tty_afficher_buffer_all() {
         size_t it = (sb_ashift + sb_display_shift + i)
                         & SB_MASK;
         for (size_t x = 0; x < VGA_WIDTH; ++x)
-            terminal_putcentryat(sbuffer[it][x], x, y);
+            vga_putcentryat(sbuffer[it][x], x, y);
         ++y;
     }
 }
@@ -220,9 +220,9 @@ size_t tty_new_prompt() {
     }
     input_bottom_line = input_top_line;
 
-    terminal_putentryat('>', prompt_color, 0, input_top_line);
+    vga_putentryat('>', prompt_color, 0, input_top_line);
     for (size_t i=1; i<VGA_WIDTH; ++i)
-        terminal_putentryat(' ', input_color, i, input_top_line);
+        vga_putentryat(' ', input_color, i, input_top_line);
 
     return sb_display_shift;
 }
@@ -235,7 +235,7 @@ inline size_t get_input_height () {
 }
 
 void tty_afficher_prompt_do(uint8_t fill) {
-    vga_pos pos = {
+    vga_pos_t pos = {
             .x = 2 + ib_printed % input_width,
             .y = input_top_line + ib_printed / input_width
         };
@@ -244,25 +244,25 @@ void tty_afficher_prompt_do(uint8_t fill) {
         if (pos.x >= VGA_WIDTH) {
             ++pos.y;
             if(fill) {
-                terminal_putentryat(' ', input_color, 0, pos.y);
-                terminal_putentryat(' ', input_color, 1, pos.y);
+                vga_putentryat(' ', input_color, 0, pos.y);
+                vga_putentryat(' ', input_color, 1, pos.y);
             }
             pos.x = 2;
         }
-        terminal_putentryat(ibuffer[(ib_ashift + i) & IB_MASK],
+        vga_putentryat(ibuffer[(ib_ashift + i) & IB_MASK],
                 input_color, pos.x, pos.y);
     }
 
     if(fill)
         for(size_t x = pos.x; x < VGA_WIDTH; ++x)
-            terminal_putentryat(' ', input_color, x, pos.y);
+            vga_putentryat(' ', input_color, x, pos.y);
 
     ib_printed = ib_size;
 }
 
 void tty_afficher_prompt_all() {
-    terminal_putentryat('>', prompt_color, 0, input_top_line);
-    terminal_putentryat(' ', prompt_color, 1, input_top_line);
+    vga_putentryat('>', prompt_color, 0, input_top_line);
+    vga_putentryat(' ', prompt_color, 1, input_top_line);
     ib_printed = 0;
     tty_afficher_prompt_do(1);
 }

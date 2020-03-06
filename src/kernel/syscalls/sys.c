@@ -54,7 +54,7 @@ pid_t fork() {
     fp->p_ppid  = state.st_curr_pid;
     fp->p_stat  = RUN;
     fp->p_pri   = p->p_pri;
-    fp->p_entry = p->p_entry;
+    fp->p_rip   = p->p_rip;
     fp->p_rsp   = p->p_rsp;
     fp->p_pml4  = kmem_alloc_page();
 
