@@ -37,10 +37,10 @@ static void cpy(const void *src, void *dst, size_t len) {
 }
 
 int vprintf(const char *format, va_list params) {
-    size_t idx_b = tty_buffer_next_idx();
+    size_t idx_b = tty_buffer_cur_idx();
     int count = 0;
     int shift = 0;
-    while(*format) {
+    while (*format) {
         if (format[0] != '%' || format[1] == '%') {
             size_t len = 1;
             if (format[0] == '%') format++;

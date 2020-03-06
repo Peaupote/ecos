@@ -9,6 +9,7 @@
 #include "int.h"
 #include "tty.h"
 #include "../util/elf64.h"
+#include "kutil.h"
 
 #define USER_STACK_TOP  0x57AC3000
 #define USER_STACK_SIZE 0x4000
@@ -136,13 +137,14 @@ void schedule_proc(void) {
         pid = pop_ps();
         state.st_curr_pid = pid;
 
-        kprintf("==\n");
-        kprintf("nb waiting %d\n", state.st_waiting_ps);
-        kprintf("proc %d : rip %h, rsp %h\n", pid,
+        klogf(Log_info, "sched",
+             "nb waiting %d\n"
+             "proc %d : rip %h, rsp %h",
+				state.st_waiting_ps, pid,
                 state.st_proc[pid].p_rip,
                 state.st_proc[pid].p_rsp);
 
-        iret_to_userspace(state.st_proc[pid].p_rip,
+        eoi_iret_to_userspace(state.st_proc[pid].p_rip,
                           state.st_proc[pid].p_rsp);
     }
 }

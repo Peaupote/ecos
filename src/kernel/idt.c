@@ -11,6 +11,7 @@
 #include "keyboard.h"
 #include "tty.h"
 #include "proc.h"
+#include "kutil.h"
 
 extern void irq_sys(void);
 extern void irq_keyboard(void);

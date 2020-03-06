@@ -85,7 +85,8 @@ pid_t push_ps(pid_t pid);
 //  les objets doivent se trouver dans l'espace du kernel
 uint8_t    proc_create_userspace(void* prg_elf, proc_t *proc);
 
-//! ne retourne pas à l'appelant
+//! ne retournent pas à l'appelant
 extern void iret_to_userspace(void* rip, void* rsp);
+extern void eoi_iret_to_userspace(void* rip, void* rsp);
 
 #endif

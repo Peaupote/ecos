@@ -123,7 +123,7 @@ size_t built_in_exec(size_t in_begin, size_t in_len) {
 
 void tty_test_prg_rt(uint64_t rdi, uint64_t rsi) {
     char str[]   = "__..__..__..__..\n";
-    size_t idx_b = tty_buffer_next_idx();
+    size_t idx_b = tty_buffer_cur_idx();
     size_t shift;
     int64_to_str_hexa(str, rdi);
     shift = tty_writestring(str);
@@ -136,7 +136,7 @@ void tty_test_prg_rt(uint64_t rdi, uint64_t rsi) {
 
 void tty_input(scancode_byte s, key_event ev) {
     size_t  shift  = 0;
-    size_t  idx_b  = tty_buffer_next_idx();
+    size_t  idx_b  = tty_buffer_cur_idx();
     uint8_t p_updt = 0;
 
     if (do_kprint) {
@@ -349,6 +349,10 @@ size_t tty_prompt_to_buffer(size_t in_begin, size_t in_len) {
         sbuffer[index][x] = vga_entry(' ', input_color);
     tty_force_new_line();
     return rt;
+}
+
+size_t tty_buffer_cur_idx(){
+    return (sb_ashift + sb_nb_lines - 1) & SB_MASK;
 }
 
 size_t tty_buffer_next_idx(){

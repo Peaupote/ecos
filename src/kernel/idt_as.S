@@ -19,6 +19,7 @@ syscall_tab:
 .global irq_keyboard
 .global irq_pit
 .global iret_to_userspace
+.global eoi_iret_to_userspace
 
 .extern common_hdl
 .extern keyboard_hdl
@@ -98,6 +99,7 @@ irq_sys:
     sti
     iretq
 
+//TODO: restore registers
 //arg: RIP, RSP
 iret_to_userspace:
     mov   $0x23, %bx
@@ -109,9 +111,19 @@ iret_to_userspace:
     pushq %rdi  //RIP
     iretq
 
-test_proc_int:
-    movq %rsp, %rsi
-    call tty_test_prg_rt
-    sti
-lh:	hlt
-    jmp lh
+eoi_iret_to_userspace:
+    mov   $0x23, %bx
+    set_data_segments
+    pushq $0x23 //SS
+    pushq %rsi  //RSP
+    pushfq      //RFLAGS
+	popq  %rsi
+	btsq  $9, %rsi //IF: interrupt flag
+	pushq %rsi
+    pushq $0x1B //CS
+    pushq %rdi  //RIP
+   
+	movb $PIC_EOI_CODE, %al
+	outb %al, $PIC1_PORT
+	
+	iretq
