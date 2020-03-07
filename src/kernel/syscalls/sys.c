@@ -24,6 +24,7 @@ void kexit() {
 
     pp->p_nchd--; // one child less
 
+    p->p_ppid = 0;
     p->p_stat = FREE;
     for (pid_t pid = 2; pid < NPROC; pid++) {
         pp = &state.st_proc[pid];
@@ -61,7 +62,23 @@ void wait() {
 }
 
 void waitpid() {
-    // TODO
+    proc_t *p = &state.st_proc[state.st_curr_pid];
+    pid_t pid = p->p_reg.rdi;
+    if (p->p_nchd > 0) {
+        if (state.st_proc[pid].p_ppid == p->p_pid &&
+            state.st_proc[pid].p_stat == SLEEP) {
+            p->p_stat = WAIT;
+            klogf(Log_info, "syscall",
+                  "process %d wait %d", p->p_pid, p->p_nchd);
+            schedule_proc(1);
+        } else {
+            klogf(Log_info, "syscall",
+                  "process %d is not %d's child", pid, p->p_pid);
+        }
+    } else {
+        klogf(Log_info, "syscall",
+              "process %d has no child. dont wait", p->p_pid);
+    }
 }
 
 void fork() {

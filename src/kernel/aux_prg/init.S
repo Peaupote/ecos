@@ -22,6 +22,9 @@ _start:
     movq    $42, %rax
     int     $0x80
 
+    movq    $SYS_WAIT, %rax
+    int     $0x80
+
     movq    $0, %rdi
     movq    $SYS_EXIT, %rax
     int     $0x80

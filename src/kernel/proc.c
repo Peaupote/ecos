@@ -116,8 +116,10 @@ void init() {
     st_curr_reg = &one->p_reg;
 
     // set all remaining slots to free processus
-    for (pid_t pid = 2; pid < NPROC; pid++)
+    for (pid_t pid = 2; pid < NPROC; pid++) {
         state.st_proc[pid].p_stat = FREE;
+        state.st_proc[pid].p_ppid = 0;
+    }
 
     klog(Log_info, "init", "Start");
     iret_to_userspace(one->p_reg.rip, one->p_reg.rsp);
