@@ -88,34 +88,41 @@ int vprintf(const char *format, va_list params) {
 
 int kprintf(const char *format, ...) {
     va_list params;
-	int count;
+    int count;
     va_start(params, format);
-	count = vprintf(format, params);
-	va_end(params);
-	return count;
+    count = vprintf(format, params);
+    va_end(params);
+    return count;
 }
 
 enum klog_level log_level = Log_info;
 
 void klog(enum klog_level lvl, const char *hd, const char *msg) {
-	if (lvl <= log_level)
-		kprintf("[%s] %s\n", hd, msg);
+    if (lvl <= log_level)
+        kprintf("[%s] %s\n", hd, msg);
 }
 
 void klogf(enum klog_level lvl, const char *hd, const char *msgf, ...) {
-	if (lvl <= log_level){
-		kprintf("[%s] ", hd);
-		va_list params;
-		va_start(params, msgf);
-		vprintf(msgf, params);
-		va_end(params);
-		kprintf("\n");
-	}
+    if (lvl <= log_level){
+        kprintf("[%s] ", hd);
+        va_list params;
+        va_start(params, msgf);
+        vprintf(msgf, params);
+        va_end(params);
+        kprintf("\n");
+    }
 }
 
 void kpanic(const char *msg) {
     vga_init((uint16_t*)(low_addr + VGA_BUFFER));
-	vga_writestring("PANIC!\n");
-	vga_writestring(msg);
-	while(1) halt();
+    vga_writestring("PANIC!\n");
+    vga_writestring(msg);
+    while(1) halt();
+}
+
+void memcpy(void* dst, const void* src, size_t len) {
+    uint8_t *d = (uint8_t*)dst;
+    uint8_t *s = (uint8_t*)src;
+    for (size_t i = 0; i < len; i++)
+        d[i] = s[i];
 }

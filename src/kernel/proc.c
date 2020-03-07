@@ -107,68 +107,67 @@ void init() {
     one->p_ppid  = 0;
     one->p_stat  = RUN;
     one->p_pml4  = 0;
-    one->p_rip   = 0;
-    one->p_rsp   = 0;
-
-    one->p_reg.rax = 0;
-    one->p_reg.rcx = 0;
-    one->p_reg.rdx = 0;
-    one->p_reg.rsi = 0;
-    one->p_reg.rdi = 0;
-    one->p_reg.r8 = 0;
-    one->p_reg.r9 = 0;
-    one->p_reg.r10 = 0;
-    one->p_reg.r11 = 0;
 
     proc_create_userspace(proc_init, one);
 
     state.st_curr_pid   = 1;
     state.st_waiting_ps = 0;
+    st_curr_reg = &one->p_reg;
 
     // set all remaining slots to free processus
     for (pid_t pid = 2; pid < NPROC; pid++)
         state.st_proc[pid].p_stat = FREE;
+
+    iret_to_userspace(one->p_reg.rip, one->p_reg.rsp);
 }
 
 
 void schedule_proc(void) {
-    pid_t pid = state.st_curr_pid;
-
-    if (state.st_proc[pid].p_stat == RUN)
-        push_ps(pid);
-
     if (state.st_waiting_ps > 0) {
         // pick a new process to run
-        pid = pop_ps();
-        state.st_curr_pid = pid;
+        pid_t pid = pop_ps();
+        proc_t *p = switch_proc(pid);
 
         klogf(Log_info, "sched",
-             "nb waiting %d\n"
-             "proc %d : rip %h, rsp %h",
-				state.st_waiting_ps, pid,
-                state.st_proc[pid].p_rip,
-                state.st_proc[pid].p_rsp);
+              "nb waiting %d\n"
+              "run proc %d : rip %h, rsp %h",
+              state.st_waiting_ps + 1, pid,
+              p->p_reg.rip,
+              p->p_reg.rsp);
 
-        eoi_iret_to_userspace(state.st_proc[pid].p_rip,
-                          state.st_proc[pid].p_rsp);
+        eoi_iret_to_userspace(p->p_reg.rip, p->p_reg.rsp);
     }
 }
 
+proc_t *switch_proc(pid_t pid) {
+    proc_t *p = &state.st_proc[state.st_curr_pid];
+
+    if (p->p_stat == RUN)
+        push_ps(state.st_curr_pid);
+
+    p = &state.st_proc[pid];
+    state.st_curr_pid = pid;
+    st_curr_reg = &p->p_reg;
+
+    pml4_to_cr3(p->p_pml4);
+
+    return p;
+}
 
 extern uint8_t dynamic_slot;
 
 uint8_t proc_ldr_alloc_pages(uint_ptr begin, uint_ptr end) {
-	uint8_t err;
+    uint8_t err;
     for(uint_ptr it = begin & PAGE_MASK; it < end; ++it) {
-		err = kmem_paging_alloc(it, PAGING_FLAG_U | PAGING_FLAG_R);
+        err = kmem_paging_alloc(it, PAGING_FLAG_U | PAGING_FLAG_R);
         if(err >= 2) return err;
-	}
-	return 0;
+    }
+    return 0;
 }
 
 void proc_ldr_fill0(void* err_pt, Elf64_Addr dst, uint64_t sz) {
     uint8_t err = proc_ldr_alloc_pages(dst, dst + sz);
-	if (err) *((uint8_t*)err_pt) = err;
+    if (err) *((uint8_t*)err_pt) = err;
     //TODO: use quad
     for (size_t i=0; i<sz; ++i)
         ((uint8_t*) dst)[i] = 0;
@@ -176,7 +175,7 @@ void proc_ldr_fill0(void* err_pt, Elf64_Addr dst, uint64_t sz) {
 
 void proc_ldr_copy(void* err_pt, Elf64_Addr dst, void* src, uint64_t sz) {
     uint8_t err = proc_ldr_alloc_pages(dst, dst + sz);
-	if (err) *((uint8_t*)err_pt) = err;
+    if (err) *((uint8_t*)err_pt) = err;
     for (size_t i=0; i<sz; ++i)
         ((uint8_t*) dst)[i] = ((uint8_t*) src)[i];
 }
@@ -186,7 +185,7 @@ uint8_t proc_create_userspace(void* prg_elf, proc_t *proc) {
         .fill0 = &proc_ldr_fill0,
         .copy  = &proc_ldr_copy
     };
-	uint8_t err = 0;
+    uint8_t err = 0;
 
     volatile phy_addr pml4_loc = kmem_alloc_page(); //TODO crash sans volatile
     if(paging_force_map_to((uint_ptr)&dynamic_slot, pml4_loc))
@@ -201,11 +200,11 @@ uint8_t proc_create_userspace(void* prg_elf, proc_t *proc) {
     err = 0;
     proc_ldr_alloc_pages(USER_STACK_TOP - USER_STACK_SIZE,
                          USER_STACK_TOP);
-    proc->p_rip = (void*)elf_load(proc_ldr, &err, prg_elf);
-	if (err) return 2;
+    proc->p_reg.rip = elf_load(proc_ldr, &err, prg_elf);
+    if (err) return 2;
 
-    proc->p_rsp   = (void*)USER_STACK_TOP;
-    proc->p_pml4  = pml4_loc;
+    proc->p_reg.rsp = USER_STACK_TOP;
+    proc->p_pml4    = pml4_loc;
 
     return 0;
 }

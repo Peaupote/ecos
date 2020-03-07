@@ -1,19 +1,17 @@
 export TRG=64
 export CC=x86_64-elf-gcc
-export INCLUDES=-I ../libc/include
 export FLAGS=-O1 -Wall -Wextra -std=gnu99 -nostdlib \
 			 -mcmodel=large -ffreestanding -mno-red-zone
 AS=x86_64-elf-as
-include ../libc/list.Makefile
 CFILES=main.c kmem.c idt.c gdt.c keyboard.c tty.c tests.c \
 		syscalls/sleep.c syscalls/sys.c proc.c kutil.c
-ASFILES=entry.S idt_as.S data.S sys.S
+ASFILES=entry.S idt_as.S data.S
 SRCDEP=$(foreach file,$(ASFILES),"-MT $(file:.S=.s) $(file)") $(CFILES)
 OBJ=$(ASFILES:.S=.o) $(CFILES:.c=.o)
 KBMAP=gawk -f ../../tools/keyboard_map.awk
 UDEP=vga.o string.o elf64.o
 
-.PHONY: all re clean util libc tests_prg aux_prg
+.PHONY: all re clean util tests_prg aux_prg
 
 all: kernel.bin
 
@@ -36,9 +34,6 @@ keyboard_layout.s: ../../data/keyboard_azerty.txt ../../data/keyboard_qwerty.txt
 
 data.o:data.s tests_prg aux_prg
 
-libc: util
-	$(MAKE) -C ../libc all
-
 UDEP_FROM_HERE=$(patsubst %,../util/64/%,$(UDEP))
 UDEP_FROM_UTIL=$(patsubst %,64/%,$(UDEP))
 
@@ -51,9 +46,8 @@ aux_prg:
 tests_prg:
 	$(MAKE) -C ../../tests/prg all
 
-kernel.bin:linker.ld ../boot/boot_data.ld $(OBJ) util libc
+kernel.bin:linker.ld ../boot/boot_data.ld $(OBJ) util
 	$(CC) -T linker.ld -o kernel.bin $(FLAGS) $(OBJ) $(UDEP_FROM_HERE) \
-		$(patsubst %,../libc/%,$(LIBC_OBJ)) \
 		$(INCLUDES) -lgcc
 
 .depends:
@@ -63,6 +57,7 @@ include .depends
 
 clean:
 	@echo "Clean trash files"
+	$(MAKE) -C aux_prg clean
 	rm -f *.o *.bin .depends *.s
 
 re: clean $(NAME)

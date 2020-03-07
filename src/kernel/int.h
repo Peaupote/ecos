@@ -73,10 +73,6 @@ static inline void halt(void) {
     asm volatile ("hlt");
 }
 
-static inline void int_syscall(int code) {
-    asm volatile ("mov %0, %%rax; int $0x80" :: "dN"(code) : "rax", "memory");
-}
-
 #endif
 
 #endif

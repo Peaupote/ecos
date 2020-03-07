@@ -1,8 +1,6 @@
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
-#include <string.h>
-#include <stdio.h>
 
 #if defined(__linux__)
 #error "You are not using a cross-compiler"
@@ -34,8 +32,8 @@ void kernel_main(void) {
     kernel_init();
 
     klog(Log_info, "statut", "64 bits kernel launched.");
-    
-	tty_afficher_buffer_all();
+
+    tty_afficher_buffer_all();
 
     tty_new_prompt();
 

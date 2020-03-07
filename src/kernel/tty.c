@@ -1,7 +1,6 @@
 #include "tty.h"
 
 #include <stddef.h>
-#include <string.h>
 
 #include "../util/vga.h"
 #include "../util/string.h"
@@ -114,7 +113,7 @@ size_t built_in_exec(size_t in_begin, size_t in_len) {
         if (!rt) {
             ib_size = ib_printed = 0;
             write_eoi();
-            iret_to_userspace(proc->p_rip, proc->p_rsp);
+            iret_to_userspace(proc->p_reg.rip, proc->p_reg.rsp);
         }
     }
 

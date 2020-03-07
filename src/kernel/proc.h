@@ -23,21 +23,26 @@ enum proc_state {
     STOP   // ...
 };
 
+// offset to access in structure
+#define RFL 0
+#define RIP 8
+#define RSP 16
+
 struct reg {
-    uint64_t rax, rcx, rdx, rsi,
-        rdi, r8, r9, r10, r11;
-};
+    uint64_t rflags, rip, rsp,
+        rax, rbx, rcx, rdx, rsi,
+        rdi, rbp, r8, r9, r10, r11,
+        r12, r13, r14, r15;
+} __attribute__((packed));
 
 typedef struct proc {
     pid_t            p_pid;
     pid_t            p_ppid;     // parent pid
     enum proc_state  p_stat;     // current status of the processus
     priority_t       p_pri;      // priority of the process in the heap
-    struct reg       p_reg;      // saved registers
     int              p_fds[NFD]; // table of file descriptors
     phy_addr         p_pml4;     // paging
-    void*            p_rip;      // rip
-    void*            p_rsp;      //
+    struct reg       p_reg;      // saved registers
 } proc_t;
 
 /**
@@ -64,13 +69,16 @@ typedef struct channel {
  */
 
 struct {
-    pid_t      st_curr_pid;          // pid of current running process
-    pid_t      st_runqueues[NHEAP];  // queue of processes to run
-	uint8_t    st_runqueues_lpr[(NHEAP + 7)/8];
-    size_t     st_waiting_ps;        // number of processes in queue
-    proc_t     st_proc[NPROC];       // table containing all processes
-    chann_t    st_chann[NCHAN];      // table containing all channels
+    pid_t       st_curr_pid;          // pid of current running process
+    pid_t       st_runqueues[NHEAP];  // queue of processes to run
+    uint8_t     st_runqueues_lpr[(NHEAP + 7)/8];
+    size_t      st_waiting_ps;        // number of processes in queue
+    proc_t      st_proc[NPROC];       // table containing all processes
+    chann_t     st_chann[NCHAN];      // table containing all channels
 } state;
+
+// pointer to current proc registers
+struct reg *st_curr_reg;
 
 /**
  * Initialize state of the machine
@@ -82,10 +90,12 @@ pid_t push_ps(pid_t pid);
 
 //! change le paging vers celui du processus
 //  les objets doivent se trouver dans l'espace du kernel
-uint8_t    proc_create_userspace(void* prg_elf, proc_t *proc);
+uint8_t proc_create_userspace(void* prg_elf, proc_t *proc);
 
 //! ne retournent pas à l'appelant
-extern void iret_to_userspace(void* rip, void* rsp);
-extern void eoi_iret_to_userspace(void* rip, void* rsp);
+extern void iret_to_userspace(uint64_t rip, uint64_t rsp);
+extern void eoi_iret_to_userspace(uint64_t rip, uint64_t rsp);
+
+proc_t *switch_proc(pid_t pid);
 
 #endif

@@ -1,3 +1,0 @@
-void syscall_hdl() {
-
-}

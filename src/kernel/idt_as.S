@@ -3,16 +3,16 @@
 #include "sys.h"
 
     .section .data
-.global int_handlers
+    .global int_handlers
+    .global proc_reg
 .align 0x20
 int_handlers:
 #include "int_handlers_tab.s"
 
-.extern sleep
-
 syscall_tab:
-    .quad sleep_hdl
+    .quad sleep
     .quad fork
+    .quad kexit
 
     .section .text
 .global irq_sys
@@ -20,11 +20,69 @@ syscall_tab:
 .global irq_pit
 .global iret_to_userspace
 .global eoi_iret_to_userspace
+.global pml4_to_cr3
 
+.extern st_curr_reg
 .extern common_hdl
 .extern keyboard_hdl
 .extern syscall_hdl
 .extern sleep_hdl
+.extern kexit
+
+// Save all registers to be easily accessible in C code
+.macro save_curr_proc_reg
+    pushq  %r15
+    movabs $st_curr_reg, %r15
+    movq   (%r15), %r15
+    movq   %rax, 24(%r15)
+    movq   %rbx, 32(%r15)
+    movq   %rcx, 40(%r15)
+    movq   %rdx, 48(%r15)
+    movq   %rsi, 56(%r15)
+    movq   %rdi, 64(%r15)
+    movq   %rbp, 72(%r15)
+    movq   %r8,  80(%r15)
+    movq   %r9,  88(%r15)
+    movq   %r10, 96(%r15)
+    movq   %r11, 104(%r15)
+    movq   %r12, 112(%r15)
+    movq   %r13, 120(%r15)
+    movq   %r14, 128(%r15)
+    movq   %r15, %rcx
+    popq   %r15
+    movq   %r15, 136(%rcx)
+
+    pushfq // RFLAGS
+    movq   (%rsp), %rbx
+    movq   %rbx, (%rcx)
+    popq   %rbx
+    movq   (%rsp), %rbx // save rip
+    movq   %rbx, 8(%rcx)
+    movq   %rsp, 16(%rcx) // save rsp
+.endm
+
+.macro restore_curr_proc_reg
+    movabs $st_curr_reg, %r15
+    movq   (%r15), %r15
+    movq   24(%r15), %rax
+    movq   32(%r15), %rbx
+    movq   40(%r15), %rcx
+    movq   48(%r15), %rdx
+    movq   56(%r15), %rsi
+    movq   64(%r15), %rdi
+    movq   72(%r15), %rbp
+    movq   80(%r15), %r8
+    movq   88(%r15), %r9
+    movq   96(%r15), %r10
+    movq   104(%r15), %r11
+    movq   112(%r15), %r12
+    movq   120(%r15), %r13
+    movq   128(%r15), %r14
+    pushq  %rax
+    movq   %r15, %rax
+    movq   136(%rax), %r15
+    popq   %rax
+.endm
 
 //Sauvegarde des registres pouvant être modifiés par un appel à une
 //fonction C. Place 9*8 octets sur la pile
@@ -82,6 +140,7 @@ irq_pit:
 
 irq_sys:
     cli
+    save_curr_proc_reg
     save_c_reg
     mov   %ds, %bx
     pushq %rbx
@@ -89,17 +148,18 @@ irq_sys:
     set_data_segments
 
     movabs $syscall_tab, %rbx
-    lea   (%rbx, %rax, 8), %rax
-    movq  (%rax), %rax
-    callq *%rax
+    lea    (%rbx, %rax, 8), %rax
+    movq   (%rax), %rax
+    callq  *%rax
 
     popq %rbx
     set_data_segments
     restore_c_reg
+    restore_curr_proc_reg
     sti
     iretq
 
-//TODO: restore registers
+//TODO: restore registers from global struct st_curr_reg
 //arg: RIP, RSP
 iret_to_userspace:
     mov   $0x23, %bx
@@ -117,13 +177,17 @@ eoi_iret_to_userspace:
     pushq $0x23 //SS
     pushq %rsi  //RSP
     pushfq      //RFLAGS
-	popq  %rsi
-	btsq  $9, %rsi //IF: interrupt flag
-	pushq %rsi
+    popq  %rsi
+    btsq  $9, %rsi //IF: interrupt flag
+    pushq %rsi
     pushq $0x1B //CS
     pushq %rdi  //RIP
-   
-	movb $PIC_EOI_CODE, %al
-	outb %al, $PIC1_PORT
-	
-	iretq
+
+    movb $PIC_EOI_CODE, %al
+    outb %al, $PIC1_PORT
+
+    iretq
+
+pml4_to_cr3:
+    movq %rdi, %cr3
+    ret
