@@ -1,7 +1,7 @@
 export TRG=test
 export CC=gcc
 export FLAGS=-O2 -Wall -Wextra -std=gnu99
-SRCDEP=elf_info.o
+SRCDEP=elf_info.c
 UDEP=elf64.o string.o
 
 .PHONY: all util clean
@@ -26,5 +26,6 @@ elf_info.out:elf_info.o util
 include .depends
 
 clean:
-	rm -f *.out *.o
+	rm -f *.out *.o .depends
 	$(MAKE) -C prg clean
+	$(MAKE) -C unit clean

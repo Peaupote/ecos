@@ -21,6 +21,7 @@ $(ISO): src/grub.cfg src/boot/boot.bin src/kernel/kernel.bin
 tests:
 	@echo "Testing"
 	$(MAKE) -C tests all
+	$(MAKE) -C tests/unit run
 
 start: $(ISO)
 	qemu-system-x86_64 -cdrom $(ISO)

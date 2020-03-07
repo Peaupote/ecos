@@ -5,7 +5,6 @@
 #include "file.h"
 #include "kmem.h"
 
-typedef unsigned long size_t;
 typedef int32_t  pid_t;
 typedef int32_t  priority_t;
 
@@ -33,7 +32,7 @@ typedef struct proc {
     pid_t            p_pid;
     pid_t            p_ppid;     // parent pid
     enum proc_state  p_stat;     // current status of the processus
-    uint32_t         p_pri;      // priority of the process in the heap
+    priority_t       p_pri;      // priority of the process in the heap
     struct reg       p_reg;      // saved registers
     int              p_fds[NFD]; // table of file descriptors
     phy_addr         p_pml4;     // paging
@@ -68,7 +67,7 @@ struct {
     pid_t      st_curr_pid;          // pid of current running process
     pid_t      st_runqueues[NHEAP];  // queue of processes to run
 	uint8_t    st_runqueues_lpr[(NHEAP + 7)/8];
-    int        st_waiting_ps;        // number of processes in queue
+    size_t     st_waiting_ps;        // number of processes in queue
     proc_t     st_proc[NPROC];       // table containing all processes
     chann_t    st_chann[NCHAN];      // table containing all channels
 } state;
