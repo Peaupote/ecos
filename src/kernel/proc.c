@@ -55,7 +55,7 @@ pid_t pop_ps() {
     rq1[1]     = rq1[state.st_waiting_ps--];
 
     // down heap
-	// sort imédiatement si st_waiting_ps <= 1
+    // sort imédiatement si st_waiting_ps <= 1
     for (size_t i = 1; (i<<1) <= state.st_waiting_ps;) {
         size_t  win = i, l = i<<1, r = (i<<1) + 1;
         size_t  lpr_index = i - 1;
@@ -119,12 +119,12 @@ void init() {
     for (pid_t pid = 2; pid < NPROC; pid++)
         state.st_proc[pid].p_stat = FREE;
 
+    klog(Log_info, "init", "Start");
     iret_to_userspace(one->p_reg.rip, one->p_reg.rsp);
 }
 
 
 void schedule_proc(uint8_t loop) {
-start:
     clear_interrupt_flag();
     if (state.st_waiting_ps > 0) {
         // pick a new process to run
@@ -142,15 +142,14 @@ start:
     } else if (loop && state.st_proc[state.st_curr_pid].p_stat != RUN) {
         // no process to take hand
         set_interrupt_flag();
-        halt();
-        goto start;
+        while(1) halt();
     }
 }
 
 proc_t *switch_proc(pid_t pid) {
     proc_t *p = &state.st_proc[state.st_curr_pid];
 
-    if (p->p_stat == RUN)
+    if (p->p_pid != pid && p->p_stat == RUN)
         push_ps(state.st_curr_pid);
 
     p = &state.st_proc[pid];

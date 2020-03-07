@@ -33,7 +33,7 @@ void kexit() {
         }
     }
 
-    schedule_proc();
+    schedule_proc(1);
 }
 
 void getpid() {
@@ -53,7 +53,7 @@ void wait() {
     if (p->p_nchd > 0) {
         p->p_stat = WAIT;
         klogf(Log_info, "syscall", "process %d wait %d", p->p_pid, p->p_nchd);
-        schedule_proc();
+        schedule_proc(1);
     } else {
         klogf(Log_info, "syscall",
               "process %d has no child. dont wait", p->p_pid);

@@ -14,6 +14,10 @@ void sleep() {
     size_t i = 0;
     uint64_t time = p->p_reg.rdi;
 
+    if (p->p_stat == SLEEP) {
+        kpanic("try to make sleep a sleeping process");
+    }
+
     // look for first empty spot
     while(i < NSLEEP && state.st_proc[sleeps[i].pid].p_stat == SLEEP) i++;
     if (i == NSLEEP) {
@@ -35,11 +39,10 @@ void sleep() {
 void lookup_end_sleep(void) {
     for (size_t i = 0; i < NSLEEP; i++) {
         pid_t pid = sleeps[i].pid;
-        if (state.st_proc[pid].p_stat == SLEEP) {
-            if (--sleeps[i].sleep_counter == 0) {
-                state.st_proc[pid].p_stat = RUN;
-                push_ps(pid);
-            }
+        if (state.st_proc[pid].p_stat == SLEEP &&
+            --sleeps[i].sleep_counter == 0) {
+            state.st_proc[pid].p_stat = RUN;
+            push_ps(pid);
         }
     }
 }
