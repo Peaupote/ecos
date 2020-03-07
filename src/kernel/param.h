@@ -9,6 +9,12 @@
 #define INODE 100  // number of inodes
 #define NHEAP 10   // number of enqued processes
 
+#define NSLEEP 128 // number of parralled sleep allowed
+
+// how often the scheduler kicks in
+// careful ! it's a modulo implemented with a bitwise &
+#define SCHED_FREQ 0x3
+
 /**
  * priorities (the less the better)
  */
@@ -19,6 +25,7 @@
 #define PIDLE  -1
 #define PZOMB  -10
 #define PSTOP  1
+
 
 /**
  * Dont touch too much here

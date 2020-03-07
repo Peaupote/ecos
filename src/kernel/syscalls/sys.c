@@ -14,23 +14,53 @@ void kexit() {
         *pp = &state.st_proc[p->p_ppid];
 
     int status = p->p_reg.rdi;
-    klogf(Log_info, "sys", "kill pid %d with status %d", p->p_pid, status);
+    klogf(Log_info, "syscall",
+          "kill pid %d with status %d", p->p_pid, status);
 
     if (pp->p_stat == WAIT) {
         pp->p_stat    = RUN;
         pp->p_reg.rax = status;
     }
 
+    pp->p_nchd--; // one child less
+
     p->p_stat = FREE;
     for (pid_t pid = 2; pid < NPROC; pid++) {
         pp = &state.st_proc[pid];
         if (pp->p_ppid == state.st_curr_pid) {
             pp->p_ppid = 1;
+            state.st_proc[1].p_nchd++;
         }
+    }
+
+    schedule_proc();
+}
+
+void getpid() {
+    proc_t *p = &state.st_proc[state.st_curr_pid];
+    p->p_reg.rax = p->p_pid;
+    klogf(Log_info, "syscall", "getpid %d", p->p_pid);
+}
+
+void getppid() {
+    proc_t *p = &state.st_proc[state.st_curr_pid];
+    p->p_reg.rax = p->p_ppid;
+    klogf(Log_info, "syscall", "getppid %d", p->p_ppid);
+}
+
+void wait() {
+    proc_t *p = &state.st_proc[state.st_curr_pid];
+    if (p->p_nchd > 0) {
+        p->p_stat = WAIT;
+        klogf(Log_info, "syscall", "process %d wait %d", p->p_pid, p->p_nchd);
+        schedule_proc();
+    } else {
+        klogf(Log_info, "syscall",
+              "process %d has no child. dont wait", p->p_pid);
     }
 }
 
-void wait(void) {
+void waitpid() {
     // TODO
 }
 
@@ -58,6 +88,8 @@ void fork() {
     fp->p_ppid  = state.st_curr_pid;
     fp->p_stat  = RUN;
     fp->p_pri   = p->p_pri;
+    fp->p_nchd  = 0;
+    p->p_nchd++; // one more child
 
     // TODO clean
     uint64_t *a = (uint64_t*)&fp->p_reg;
@@ -66,7 +98,7 @@ void fork() {
     for (size_t i = 0; i < 18; i++)
         a[i] = b[i];
 
-    fp->p_pml4  = kmem_alloc_page();
+    fp->p_pml4 = kmem_alloc_page();
     kmem_copy_paging(fp->p_pml4);
 
     // copy file descriptors
@@ -77,7 +109,7 @@ void fork() {
     fp->p_reg.rax = 0;
 
     switch_proc(fp->p_pid);
-    klogf(Log_info, "sys", "fork %d into %d", p->p_pid, fp->p_pid);
+    klogf(Log_info, "syscall", "fork %d into %d", p->p_pid, fp->p_pid);
 }
 
 int open() {
@@ -116,4 +148,10 @@ int close() {
 
     if (--c->chann_acc == 0) { c->chann_mode = UNUSED; }
     return 0;
+}
+
+
+void invalid_syscall() {
+    proc_t *p = &state.st_proc[state.st_curr_pid];
+    klogf(Log_error, "syscall", "invalid syscall code %d", p->p_reg.rax);
 }

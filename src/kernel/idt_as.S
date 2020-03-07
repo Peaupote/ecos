@@ -13,6 +13,10 @@ syscall_tab:
     .quad sleep
     .quad fork
     .quad kexit
+    .quad wait
+    .quad waitpid
+    .quad getpid
+    .quad getppid
 
     .section .text
 .global irq_sys
@@ -28,6 +32,7 @@ syscall_tab:
 .extern syscall_hdl
 .extern sleep_hdl
 .extern kexit
+.extern invalid_syscall
 
 // Save all registers to be easily accessible in C code
 .macro save_curr_proc_reg
@@ -147,11 +152,19 @@ irq_sys:
     mov   $0x10, %bx
     set_data_segments
 
+    cmpq   $NSYSCALL, %rax
+    jns    incorrect_rax
+
     movabs $syscall_tab, %rbx
     lea    (%rbx, %rax, 8), %rax
     movq   (%rax), %rax
     callq  *%rax
+    jmp   func_end
 
+incorrect_rax:
+    call invalid_syscall
+
+func_end:
     popq %rbx
     set_data_segments
     restore_c_reg

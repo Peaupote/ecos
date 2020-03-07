@@ -107,6 +107,7 @@ void init() {
     one->p_ppid  = 0;
     one->p_stat  = RUN;
     one->p_pml4  = 0;
+    one->p_nchd  = 0;
 
     proc_create_userspace(proc_init, one);
 
@@ -122,7 +123,9 @@ void init() {
 }
 
 
-void schedule_proc(void) {
+void schedule_proc(uint8_t loop) {
+start:
+    clear_interrupt_flag();
     if (state.st_waiting_ps > 0) {
         // pick a new process to run
         pid_t pid = pop_ps();
@@ -136,6 +139,11 @@ void schedule_proc(void) {
               p->p_reg.rsp);
 
         eoi_iret_to_userspace(p->p_reg.rip, p->p_reg.rsp);
+    } else if (loop && state.st_proc[state.st_curr_pid].p_stat != RUN) {
+        // no process to take hand
+        set_interrupt_flag();
+        halt();
+        goto start;
     }
 }
 

@@ -1,10 +1,8 @@
 #include "../int.h"
 #include "../sys.h"
 #include "../proc.h"
-
+#include "../kutil.h"
 #include "../tty.h"
-
-#define NSLEEP 128
 
 struct {
     uint32_t sleep_counter;
@@ -14,12 +12,14 @@ struct {
 void sleep() {
     proc_t *p = &state.st_proc[state.st_curr_pid];
     size_t i = 0;
-    uint32_t time = p->p_reg.rdi;
+    uint64_t time = p->p_reg.rdi;
 
     // look for first empty spot
     while(i < NSLEEP && state.st_proc[sleeps[i].pid].p_stat == SLEEP) i++;
     if (i == NSLEEP) {
         // TODO handle error
+        klogf(Log_error, "syscall",
+              "can't have more than %d processus sleeping", NSLEEP);
         return;
     }
 
@@ -28,6 +28,8 @@ void sleep() {
 
     // probably not correct here
     sleeps[i].sleep_counter = time * (1193180 / (1L << 16));
+    klogf(Log_info, "syscall", "process %d sleep for %d sec", p->p_pid, time);
+    schedule_proc(1);
 }
 
 void lookup_end_sleep(void) {

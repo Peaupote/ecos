@@ -19,8 +19,6 @@ extern void irq_pit(void);
 
 extern const idt_handler int_handlers[NEXCEPTION_VEC];
 
-/* static int count = 0; */
-
 struct gate_desc idt[IDT_ENTRIES] = { 0 };
 
 void keyboard_hdl(void){
@@ -39,14 +37,14 @@ void keyboard_hdl(void){
 
 
 void common_hdl(uint8_t num, uint64_t errcode) {
-    klogf(Log_info, "error", "id %d, code %d", num, errcode);
+    klogf(Log_error, "error", "id %d, code %d", num, errcode);
     while(1) halt();
     // TODO : something
 }
 
 void pit_hdl(void) {
     static uint8_t clock = 0;
-    if ((clock++ & 3) == 0) schedule_proc();
+    if ((clock++ & SCHED_FREQ) == 0) schedule_proc(0);
 
     lookup_end_sleep();
     write_eoi();

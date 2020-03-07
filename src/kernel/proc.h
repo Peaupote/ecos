@@ -38,6 +38,7 @@ struct reg {
 typedef struct proc {
     pid_t            p_pid;
     pid_t            p_ppid;     // parent pid
+    uint64_t         p_nchd;     // number of child processus
     enum proc_state  p_stat;     // current status of the processus
     priority_t       p_pri;      // priority of the process in the heap
     int              p_fds[NFD]; // table of file descriptors
@@ -85,7 +86,7 @@ struct reg *st_curr_reg;
  * and create process one
  */
 void init(void);
-void schedule_proc(void);
+void schedule_proc(uint8_t loop);
 pid_t push_ps(pid_t pid);
 
 //! change le paging vers celui du processus
