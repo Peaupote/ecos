@@ -11,9 +11,10 @@ struct {
     pid_t    pid;
 } sleeps[NSLEEP];
 
-void sleep_hdl(uint32_t time) {
-    pid_t pid = state.st_curr_pid;
+void sleep() {
+    proc_t *p = &state.st_proc[state.st_curr_pid];
     size_t i = 0;
+    uint32_t time = p->p_reg.rdi;
 
     // look for first empty spot
     while(i < NSLEEP && state.st_proc[sleeps[i].pid].p_stat == SLEEP) i++;
@@ -22,8 +23,8 @@ void sleep_hdl(uint32_t time) {
         return;
     }
 
-    state.st_proc[pid].p_stat = SLEEP;
-    sleeps[i].pid = pid;
+    p->p_stat = SLEEP;
+    sleeps[i].pid = p->p_pid;
 
     // probably not correct here
     sleeps[i].sleep_counter = time * (1193180 / (1L << 16));

@@ -39,13 +39,8 @@ void keyboard_hdl(void){
 
 
 void common_hdl(uint8_t num, uint64_t errcode) {
-	char str[]="____....____....\n";
-	int64_to_str_hexa(str, num);
-	tty_writestring(str);
-	int64_to_str_hexa(str, errcode);
-	tty_writestring(str);
-	tty_afficher_buffer_all();
-	while(1) halt();
+    klogf(Log_info, "error", "id %d, code %d", num, errcode);
+    while(1) halt();
     // TODO : something
 }
 
