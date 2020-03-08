@@ -3,7 +3,7 @@
 #include <stddef.h>
 
 #include "../util/gdt.h"
-#include "kmem.h"
+#include "memory/kmem.h"
 
 struct TSS tss = {0};
 

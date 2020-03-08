@@ -3,7 +3,7 @@
 
 #include "param.h"
 #include "file.h"
-#include "kmem.h"
+#include "memory/kmem.h"
 
 typedef int32_t  pid_t;
 typedef int32_t  priority_t;

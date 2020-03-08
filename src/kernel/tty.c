@@ -6,7 +6,7 @@
 #include "../util/string.h"
 #include "../util/elf64.h"
 
-#include "kmem.h"
+#include "memory/kmem.h"
 #include "proc.h"
 #include "int.h"
 

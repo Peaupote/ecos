@@ -3,13 +3,16 @@
 
 #include <stdint.h>
 
-#include "../util/paging.h"
+#include "../../util/paging.h"
 
 #define KERNEL_PDPT_LADDR 0x100
 #define PML4_COPY_RES      0xfe
+#define PML4_MAX_USPACE   (PML4_KERNEL_VIRT_ADDR-1)
 
 extern uint32_t end_kernel;
+
 extern uint8_t  low_addr[];
+extern uint8_t  dynamic_slot[];
 
 void kmem_init();
 phy_addr kmem_alloc_page();

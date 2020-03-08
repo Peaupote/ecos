@@ -6,7 +6,7 @@
 #include "../util/vga.h"
 #include "tty.h"
 #include "int.h"
-#include "kmem.h" //low_addr
+#include "memory/kmem.h" //low_addr
 
 // kprintf
 

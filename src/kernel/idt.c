@@ -7,7 +7,7 @@
 #include "sys.h"
 #include "../util/vga.h"
 #include "../util/string.h"
-#include "kmem.h"
+#include "memory/kmem.h"
 #include "keyboard.h"
 #include "tty.h"
 #include "proc.h"

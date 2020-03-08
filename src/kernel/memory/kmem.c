@@ -2,7 +2,7 @@
 
 #include<stddef.h>
 
-#include "../def.h"
+#include "../../def.h"
 
 uint64_t laddr_pd[512] __attribute__ ((aligned (PAGE_SIZE)));
 

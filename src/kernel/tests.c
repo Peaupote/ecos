@@ -7,7 +7,7 @@
 #include "../util/vga.h"
 #include "../util/string.h"
 
-#include "kmem.h"
+#include "memory/kmem.h"
 #include "keyboard.h"
 #include "idt.h"
 #include "gdt.h"
