@@ -119,8 +119,15 @@ void fork() {
     kmem_copy_paging(fp->p_pml4);
 
     // copy file descriptors
-    for (int i = 0; i < NFD; i++)
-        fp->p_fds[i] = p->p_fds[i];
+    for (int i = 0; i < NFD; i++) {
+        cid_t cid = p->p_fds[i];
+        fp->p_fds[i] = cid;
+        if (cid >= 0 && cid < NCHAN &&
+            state.st_chann[cid].chann_mode != UNUSED) {
+            // one more process is referencing the channel
+            state.st_chann[cid].chann_acc++;
+        }
+    }
 
     p->p_reg.rax  = pid;
     fp->p_reg.rax = 0;
@@ -129,17 +136,21 @@ void fork() {
     klogf(Log_info, "syscall", "fork %d into %d", p->p_pid, fp->p_pid);
 }
 
-int open() {
+void open() {
     proc_t *p = &state.st_proc[state.st_curr_pid];
     char *fname = (char*)p->p_reg.rdi;
     enum chann_mode mode = p->p_reg.rsi;
 
     // TODO : find file on disc
-
     // TODO : more efficient
-    int cid;
+    cid_t cid;
     for (cid = 0; cid < NCHAN; cid++)
         if (state.st_chann[cid].chann_mode == UNUSED) break;
+
+    if (cid == NCHAN) {
+        p->p_reg.rax = -1;
+        return;
+    }
 
     chann_t *c = &state.st_chann[cid];
     c->chann_acc  = 1;
@@ -149,24 +160,69 @@ int open() {
     for (int fd = 0; fd < NFD; fd++)
         if (p->p_fds[fd] == -1) {
             p->p_fds[fd] = cid;
-            return fd;
+            p->p_reg.rax = fd;
+            return;
         }
 
-    return -1;
+    p->p_reg.rax = -1;
 }
 
-int close() {
+void close() {
     proc_t *p = &state.st_proc[state.st_curr_pid];
     int filedes = p->p_reg.rdi;
 
-    // file descriptor reference no channel
-    if (p->p_fds[filedes] == -1) return -1;
-    chann_t *c = &state.st_chann[p->p_fds[filedes]];
+    // invalid file descriptor
+    if (filedes < 0 || filedes > NFD) {
+        p->p_reg.rax = -1;
+        return;
+    }
 
-    if (--c->chann_acc == 0) { c->chann_mode = UNUSED; }
-    return 0;
+    // file descriptor reference no channel
+    if (p->p_fds[filedes] == -1) {
+        p->p_reg.rax = -1;
+        return;
+    }
+
+    chann_t *c = &state.st_chann[p->p_fds[filedes]];
+    if (c->chann_mode != UNUSED && --c->chann_acc == 0) {
+        c->chann_mode = UNUSED;
+    }
+
+    p->p_reg.rax = 0;
 }
 
+void dup() {}
+
+void pipe() {}
+
+void read() {}
+
+void write() {
+    proc_t *p = &state.st_proc[state.st_curr_pid];
+
+    // for now write has type
+    // int write(int fd, int v)
+    // and print the value of v
+
+    int fd = p->p_reg.rdi;
+    int v  = p->p_reg.rsi;
+
+    if (p->p_fds[fd] == -1) {
+        // file descriptor not allocated
+        p->p_reg.rax = -1;
+        return;
+    }
+
+    chann_t *chann = &state.st_chann[p->p_fds[fd]];
+    if (chann->chann_mode != STREAM_OUT) {
+        // dont handle other modes for now
+        p->p_reg.rax = -1;
+        return;
+    }
+
+    klogf(Log_info, "syscall", "process %d write on %d", p->p_pid, fd);
+    kprintf("%d\n", v);
+}
 
 void invalid_syscall() {
     proc_t *p = &state.st_proc[state.st_curr_pid];

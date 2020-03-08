@@ -109,11 +109,28 @@ void init() {
     one->p_pml4  = 0;
     one->p_nchd  = 0;
 
-    proc_create_userspace(proc_init, one);
+    // set file descriptors
+    // stdin
+    one->p_fds[0] = 0;
+    state.st_chann[0].chann_mode = STREAM_IN;
+    state.st_chann[0].chann_acc  = 1;
 
-    state.st_curr_pid   = 1;
-    state.st_waiting_ps = 0;
-    st_curr_reg = &one->p_reg;
+    // stdout
+    one->p_fds[1] = 1;
+    state.st_chann[1].chann_mode = STREAM_OUT;
+    state.st_chann[1].chann_acc  = 1;
+
+    // stderr
+    one->p_fds[1] = 2;
+    state.st_chann[2].chann_mode = STREAM_OUT;
+    state.st_chann[2].chann_acc  = 1;
+
+    // set unused file desc
+    for (size_t i = 3; i < NFD; i++) one->p_fds[i] = -1;
+
+    // set chann to free
+    for (cid_t cid = 3; cid < NCHAN; cid++)
+        state.st_chann[cid].chann_mode = UNUSED;
 
     // set all remaining slots to free processus
     for (pid_t pid = 2; pid < NPROC; pid++) {
@@ -121,7 +138,13 @@ void init() {
         state.st_proc[pid].p_ppid = 0;
     }
 
-    klog(Log_info, "init", "Start");
+    proc_create_userspace(proc_init, one);
+
+    state.st_curr_pid   = 1;
+    state.st_waiting_ps = 0;
+    st_curr_reg = &one->p_reg;
+
+    klog(Log_info, "init", "Process 1 loaded. Start process 1");
     iret_to_userspace(one->p_reg.rip, one->p_reg.rsp);
 }
 
@@ -157,7 +180,6 @@ proc_t *switch_proc(pid_t pid) {
     p = &state.st_proc[pid];
     state.st_curr_pid = pid;
     st_curr_reg = &p->p_reg;
-
     pml4_to_cr3(p->p_pml4);
 
     return p;

@@ -7,6 +7,7 @@
 
 typedef int32_t  pid_t;
 typedef int32_t  priority_t;
+typedef int32_t  cid_t;
 
 /**
  * Processus
@@ -50,20 +51,21 @@ typedef struct proc {
  * Channels
  */
 
-// TODO : could be encoded by 2 bits
 enum chann_mode {
     UNUSED,
     READ,
     WRITE,
-    RDWR
+    RDWR,
+    STREAM_IN,
+    STREAM_OUT,
+    PIPE
 };
 
 typedef struct channel {
     ino_t           chann_file; // file referenced by the channel
     enum chann_mode chann_mode; // kind of operations channel allow to perform
-    unsigned int    chann_acc;  // number of times the channel is referenced
+    uint64_t        chann_acc;  // number of times the channel is referenced
 } chann_t;
-
 
 /**
  * Global state of the machine

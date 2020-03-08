@@ -35,9 +35,35 @@ void keyboard_hdl(void){
     write_eoi();
 }
 
+#define NEXCEPTION 22
+const char *error_desc[NEXCEPTION + 1] = {
+    "Division by zero",
+    "Debug exception",
+    "NMI interrupt",
+    "Breakpoint exception",
+    "Overflow exception",
+    "Bound range exception overflow",
+    "Invalid opcode exception",
+    "Device not available exception",
+    "Double fault exception",
+    "Coprocessor segment overrun",
+    "Invalid TSS exception",
+    "Segment not present",
+    "Stack fault exception",
+    "General protection exception",
+    "Page fault exception",
+    "Floating point error",
+    "Alignment check exception",
+    "Machine check exception",
+    "SIMD Foating point exception",
+    "Virtualization exception",
+    "Control protection exception",
+    "Unknown exception"
+};
 
 void common_hdl(uint8_t num, uint64_t errcode) {
-    klogf(Log_error, "error", "id %d, code %d", num, errcode);
+    const char *desc = error_desc[num < NEXCEPTION ? num : NEXCEPTION];
+    klogf(Log_error, "error", "%s: error code %d", desc, errcode);
     while(1) halt();
     // TODO : something
 }
