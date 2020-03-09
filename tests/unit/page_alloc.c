@@ -1,11 +1,22 @@
 #include "tutil.h"
 
+typedef uint64_t phy_addr;
+
 #include "../../src/kernel/memory/page_alloc.c"
 
 void test_find_8(uint64_t v, uint8_t sz) {
 	uint8_t rt = find_in_8(v, sz);
 	if(v && !((v>>(sz*rt)) & ((1<<sz)-1))) texit("find 8");
 }
+void sq_test_find_8() {
+	test_find_8(1L<<47, 8);
+	test_find_8(1L<<12, 4);
+	test_find_8(1L<<2,  1);
+	test_find_8(rand64(), 8);
+	test_find_8((uint32_t)rand64(), 4);
+	test_find_8((uint8_t)rand64(),  1);
+}
+
 
 struct MemBlock mb;
 uint16_t exp_free = 512;
@@ -21,16 +32,8 @@ void mb_check_nb() {
 		texit("mb check sum");
 }
 
-int main() {
-	test_init("page_alloc");
-	test_find_8(1L<<47, 8);
-	test_find_8(1L<<12, 4);
-	test_find_8(1L<<2,  1);
-	test_find_8(rand64(), 8);
-	test_find_8((uint32_t)rand64(), 4);
-	test_find_8((uint8_t)rand64(),  1);
-
-	mblock_init(&mb);
+void sq_test_mblock() {
+	mblock_init(&mb, 0);
 	mb_check_nb();
 	uint16_t addr1 = mblock_alloc_page(&mb);
 	--exp_free;
@@ -68,5 +71,57 @@ int main() {
 		}
 	}
 
+}
+
+struct   MemBlockTree mbt;
+uint64_t space_mbt[100];
+uint8_t  set_elem[512] = {0};
+size_t   nb_elem = 0;
+
+void sq_test_mbt() {
+	size_t sz    = rand_rng(100, 512);
+	size_t h     = mbtree_height_for(sz);
+	size_t intn  = mbtree_intn_for(h);
+	size_t space = mbtree_space_for(intn, sz);
+	if(space > 100) texit("mbt space");
+	mbtree_init(&mbt, h, intn, space, space_mbt);
+	test_infoi("\tmbt--sz=%d ",     sz);
+	test_infoi("h=%d ",      h);
+	test_infoi("intn=%d ",   intn);
+	test_infoi("space=%d\n",  space);
+	for(size_t i=0;i<1000;++i) {
+		uint64_t idx = rand_rng(0, sz+50);
+		if (idx >= sz) {
+			if (nb_elem) {
+				if (!mbtree_non_empty(&mbt))
+					texit("false mbt non empty (expect 1)");
+				size_t e = mbtree_find(&mbt);
+				if (e >= sz || !set_elem[e])
+					texit("echec mbt_find");
+			} else if (mbtree_non_empty(&mbt))
+				texit("false mbt non empty (expect 0)");
+		} else if(rand_rng(0,1)) {
+			if (set_elem[idx]) {
+				--nb_elem;
+				set_elem[idx] = 0;
+			}
+			mbtree_rem(&mbt, idx);
+			if (mbtree_get(&mbt, idx)) texit("mbt_rem");
+		} else {
+			if (!set_elem[idx]) {
+				++nb_elem;
+				set_elem[idx] = 1;
+			}
+			mbtree_add(&mbt, idx);
+			if (!mbtree_get(&mbt, idx)) texit("mbt_add");
+		}
+	}
+}
+
+int main() {
+	test_init("page_alloc");
+	sq_test_find_8();
+	sq_test_mblock();
+	sq_test_mbt();
 	return 0;
 }

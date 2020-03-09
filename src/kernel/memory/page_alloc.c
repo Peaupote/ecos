@@ -3,24 +3,28 @@
 #define QD_0111_MASK 0x77777777
 #define QD_1000_MASK 0x88888888
 
-void mblock_init(struct MemBlock* b) {
+void mblock_init(struct MemBlock* b, phy_addr a) {
 	for(uint64_t* it = (uint64_t*)b; 
 			it != ((uint64_t*)b) + sizeof(struct MemBlock) / 8; ++it)
 		*it = 0;
 	b->nb_at_lvl[3] = 1;
+	b->addr = a;
 }
 
-static inline uint8_t find_in_8(uint64_t p, uint8_t sz) {
+static inline uint8_t find_bit(uint64_t p, uint8_t sz, uint8_t step) {
 	uint64_t p2;
 	uint8_t  i = 0;
 
-	for (uint8_t j = 3; j--;) {
+	for (uint8_t j = step; j--;) {
 		p2 = p >> (sz << j);
 		i |= p2 ? (1<<j) : 0;
 		p  = p2 ? p2     : p;
 	}
 
 	return i;
+}
+static inline uint8_t find_in_8(uint64_t p, uint8_t sz) {
+	return find_bit(p, sz, 3);
 }
 
 static inline void decr_qd(uint32_t* s, uint8_t i) {
@@ -190,4 +194,72 @@ uint16_t mblock_alloc_page(struct MemBlock* b) {
 		mblock_split_lvl_1(b, rt, 1);
 	} else rt = mblock_alloc_lvl_0(b);
 	return rt;
+}
+
+
+size_t mbtree_height_for(size_t nb_blocks) {
+	size_t h = 0;
+	for(size_t span=1; span < nb_blocks; span *= 64)
+		++h;
+	return h;
+}
+
+size_t mbtree_intn_for(size_t h) {
+	return ((1<<(6*h))-1) / 63;
+}
+
+size_t mbtree_space_for(size_t intn, size_t nb_blocks) {
+	return (63 + intn + nb_blocks  +63)/64;
+}
+
+void mbtree_init(struct MemBlockTree* t, size_t height, size_t intn,
+		size_t space, uint64_t *cnt) {
+	t->cnt     = cnt;
+	t->lvs     = intn  + 63;
+	t->lvs_lim = space * 8;
+	t->height  = height;
+
+	for(size_t i=0; i<space; ++i) cnt[i] = 0;
+}
+
+static inline void mbt_set(uint64_t* c, size_t i) {
+	c[i>>6] |= ((uint64_t)1)<<(i&0x3f);
+}
+static inline void mbt_clear(uint64_t* c, size_t i) {
+	c[i>>6] &= ~(((uint64_t)1)<<(i&0x3f));
+}
+static inline uint64_t mbt_get(uint64_t* c, size_t i) {
+	return c[i>>6] & (((uint64_t)1)<<(i&0x3f));
+}
+static inline size_t mbt_child(size_t i) {
+	return (i-62)<<6;
+}
+static inline size_t mbt_parent(size_t i) {
+	return (i>>6) + 62;
+}
+static inline uint64_t mbt_get_childs(uint64_t* c, size_t i) {
+	return c[i - 62];
+}
+void mbtree_add(struct MemBlockTree* t, size_t i) {
+	for(i += t->lvs; i>62; i = mbt_parent(i))
+		mbt_set(t->cnt, i);
+}
+void mbtree_rem(struct MemBlockTree* t, size_t i) {
+	i += t->lvs;
+	mbt_clear(t->cnt, i);
+	for(i = mbt_parent(i); i>62 && !mbt_get_childs(t->cnt, i);
+			i = mbt_parent(i))
+		mbt_clear(t->cnt, i);
+}
+uint8_t mbtree_get(struct MemBlockTree* t, size_t i) {
+	return mbt_get(t->cnt, t->lvs + i) ? 1 : 0;
+}
+uint8_t mbtree_non_empty(struct MemBlockTree* t) {
+	return (t->cnt[0]>>63) & 1;
+}
+size_t mbtree_find(struct MemBlockTree* t) {
+	size_t i = 63;
+	for(size_t h = 0; h < t->height; ++h)
+		i = mbt_child(i) + find_bit(mbt_get_childs(t->cnt, i), 1, 6);
+	return i - t->lvs;
 }

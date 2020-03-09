@@ -14,8 +14,9 @@ extern uint32_t end_kernel;
 extern uint8_t  low_addr[];
 extern uint8_t  dynamic_slot[];
 
-void kmem_init();
+void     kmem_init();
 phy_addr kmem_alloc_page();
+void     kmem_free_page(phy_addr);
 
 //retourne:
 //	0   si la page a bien été affectée

@@ -3,30 +3,80 @@
 #include<stddef.h>
 
 #include "../../def.h"
+#include "page_alloc.h"
+#include "../kutil.h"
 
+// Accès aux 2MB d'adresses basses
 uint64_t laddr_pd[512] __attribute__ ((aligned (PAGE_SIZE)));
 
-phy_addr next_page;
+phy_addr first_bloc;
+struct MemBlock     mblocks[10];
+struct MemBlockTree mbt_part;
+struct MemBlockTree mbt_full;
+uint64_t mbt_cnt[5 * 2];
+
+
+//TODO: detection
+void kmem_init_alloc() {
+	// On cherche le prochain bloc disponible
+	first_bloc = (phy_addr) end_kernel;
+	if (first_bloc & MBLOC_OFS_MASK)
+		first_bloc = (first_bloc & MBLOC_MASK) + MBLOC_SIZE;
+
+	{
+		size_t h    = mbtree_height_for(10);
+		size_t intn = mbtree_intn_for(h);
+		size_t spac = mbtree_space_for(intn, 10);// < 5
+		mbtree_init(&mbt_part,  h, intn, spac, mbt_cnt);
+		mbtree_init(&mbt_full, h, intn, spac, mbt_cnt + 5);
+	}
+
+	for(size_t i=0; i < 10; ++i) {
+		mblock_init(mblocks + i, first_bloc + i * MBLOC_SIZE);
+		mbtree_add(&mbt_full, i);
+	}
+}
 
 void kmem_init() {
-	// On cherche la prochaine page disponible
-	next_page = (phy_addr) end_kernel;
-	if (next_page & PAGE_OFS_MASK)
-		next_page = (next_page & PAGE_MASK) + PAGE_SIZE;
-
-	// Accès aux 2MB d'adresses basses
 	laddr_pd[0] = 0 | PAGING_FLAG_S | PAGING_FLAG_R | PAGING_FLAG_P;
 	for(uint16_t i=1; i<512; ++i)
 		laddr_pd[i] = PAGING_FLAG_R;
 	*paging_acc_pdpt(PML4_KERNEL_VIRT_ADDR, KERNEL_PDPT_LADDR)
 		= paging_phy_addr_page((uint_ptr)laddr_pd)
 		| PAGING_FLAG_R | PAGING_FLAG_P;
+
+	kmem_init_alloc();
 }
 
 phy_addr kmem_alloc_page() {
-	phy_addr pa = next_page;
-	next_page += PAGE_SIZE;
-	return pa;
+	size_t b;
+	if (mbtree_non_empty(&mbt_part))
+		b = mbtree_find(&mbt_part);
+	else if(mbtree_non_empty(&mbt_full))
+		b = mbtree_find(&mbt_full);
+	else {
+		kpanic("Out of memory");
+		return 0; //Non atteint
+	}
+	uint16_t prev_3  = mblocks[b].nb_at_lvl[3];
+	uint16_t p_rel   = mblock_alloc_page(mblocks+b);
+	if(prev_3) {
+		mbtree_add(&mbt_part,  b);
+		mbtree_rem(&mbt_full, b);
+	} else if(! *((uint64_t*)mblocks[b].nb_at_lvl))
+		mbtree_rem(&mbt_part,  b);
+	return mblocks[b].addr | (p_rel<<PAGE_SHIFT);
+}
+
+void kmem_free_page(phy_addr p) {
+	phy_addr ofs = p - first_bloc;
+	size_t   b   = ofs >> MBLOC_SHIFT;
+	mblock_free_lvl_0(mblocks + b, ((p & MBLOC_OFS_MASK) >> PAGE_SHIFT));
+	if(mblocks[b].nb_at_lvl[3]) {
+		mbtree_add(&mbt_full, b);
+		mbtree_rem(&mbt_part,  b);
+	} else
+		mbtree_add(&mbt_part,  b);
 }
 
 uint64_t* acc_pt_entry(uint_ptr v_addr, uint16_t flags) {

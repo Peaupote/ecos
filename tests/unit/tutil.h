@@ -1,6 +1,8 @@
 #ifndef _TUTIL_H
 #define _TUTIL_H
 
+#define TEST_UNIT
+
 #include <stddef.h>
 #include <stdint.h>
 
