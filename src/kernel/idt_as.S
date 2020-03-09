@@ -17,6 +17,12 @@ syscall_tab:
     .quad waitpid
     .quad getpid
     .quad getppid
+    .quad open
+    .quad close
+    .quad dup
+    .quad pipe
+    .quad write
+    .quad read
 
     .section .text
 .global irq_sys
@@ -198,6 +204,8 @@ eoi_iret_to_userspace:
 
     movb $PIC_EOI_CODE, %al
     outb %al, $PIC1_PORT
+
+    restore_curr_proc_reg
 
     iretq
 

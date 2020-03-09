@@ -10,28 +10,32 @@ _start:
     cmp     $0, %rax
     jne     1f
 
-    movq    $SYS_FORK, %rax
+    // print return value from fork
+    movq    $1, %rdi
+    movq    %rax, %rsi
+    movq    $SYS_WRITE, %rax
+    int     $0x80
+3:  jmp     3b
+
+
+//    movq    $0, %rdi
+//    movq    $SYS_EXIT, %rax
+//    int     $0x80
+
+1:
+//    // print return value from fork
+    movq    $1, %rdi
+    movq    %rax, %rsi
+    movq    $SYS_WRITE, %rax
     int     $0x80
 
-    movq    $SYS_GETPID, %rax
-    int     $0x80
+//    movq    $1, %rdi
+//    movq    $SYS_SLEEP, %rax
+//    int     $0x80
 
-    movq    $SYS_GETPPID, %rax
-    int     $0x80
-
-    movq    $42, %rax
-    int     $0x80
-
+2:
+    // init wait for all its childrens
     movq    $SYS_WAIT, %rax
     int     $0x80
 
-    movq    $0, %rdi
-    movq    $SYS_EXIT, %rax
-    int     $0x80
-
-1:
-    movq    $1, %rdi
-    movq    $SYS_SLEEP, %rax
-    int     $0x80
-
-    jmp     1b
+    jmp     2b
