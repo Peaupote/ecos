@@ -1,4 +1,5 @@
 #include "file.h"
+#include "proc.h"
 
 /**
  * Red-black tree implementation for file system
@@ -134,4 +135,24 @@ node_t* insert(node_t* root, node_t* n) {
 
     for (root = n; root->parent; root = root->parent);
     return root;
+}
+
+
+buf_t *load_buffer(ino_t file, pos_t offset) {
+    bid_t id;
+    for (id = 0; id < NBUF && state.st_buf[id].buf_size > 0; id++);
+    if (id == NBUF) return 0;
+
+    buf_t *buf = &state.st_buf[id];
+
+    // for now fill buffer with 'a'
+    for (size_t i = 0; i < BUFSIZE; i++)
+        buf->buf_content[i] = 'a';
+
+    buf->buf_inode = file;
+    buf->buf_offset = offset;
+    buf->buf_pv = 0;
+    buf->buf_nx = 0;
+    buf->buf_size = BUFSIZE;
+    return buf;
 }

@@ -3,13 +3,16 @@
  * values can be updated if ever needed
  */
 
-#define NPROC 100  // number of processes
+#define NPROC 1024 // number of processes
 #define NFD   128  // number of file descriptors
-#define NCHAN 1000 // number of channels
-#define INODE 100  // number of inodes
-#define NHEAP 10   // number of enqued processes
+#define NCHAN 1024 // number of channels
+#define INODE 1024 // number of inodes
+#define NHEAP 16   // number of enqued processes
+#define NBUF  1024 // number of file buffers
 
 #define NSLEEP 128 // number of parralled sleep allowed
+
+#define BUFSIZE 1024 // size of a standard file buffer
 
 // how often the scheduler kicks in
 // careful ! it's a modulo implemented with a bitwise &

@@ -1,7 +1,7 @@
 export CC=x86_64-elf-gcc
 export FLAGS=-O2 -Wall -Wextra -std=gnu99 -nostdlib\
 			 -ffreestanding -mno-red-zone
-OUT=init.out
+OUT=init.out loop_sleep.out
 
 .PHONY: all clean
 

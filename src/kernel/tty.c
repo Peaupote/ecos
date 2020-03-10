@@ -102,20 +102,6 @@ size_t built_in_exec(size_t in_begin, size_t in_len) {
         use_azerty = 1;
     else if(!ustrcmp(cmd_decomp + cmd_decomp_idx[0], "q"))
         use_azerty = 0;
-    else if(!ustrcmp(cmd_decomp + cmd_decomp_idx[0], "t0_info")) {
-        size_t shift = 0;
-        elf_readinfo(&tty_writer, &shift, t0_data);
-        return shift;
-    }
-    else if(!ustrcmp(cmd_decomp + cmd_decomp_idx[0], "t0_exec")) {
-        proc_t *proc = &state.st_proc[state.st_curr_pid];
-        uint8_t rt = proc_create_userspace(t0_data, proc);
-        if (!rt) {
-            ib_size = ib_printed = 0;
-            write_eoi();
-            iret_to_userspace(proc->p_reg.rip, proc->p_reg.rsp);
-        }
-    }
 
     return 0;
 }

@@ -5,13 +5,13 @@
 #include "keyboard_layout.s"
 
     .section .rodata
-    .global t0_data
     .global proc_init
+    .global proc_sleep
 
-.align 0x20
-t0_data:
-    .incbin "../../tests/prg/t0.out"
 .align 0x20
 proc_init:
     .incbin "./aux_prg/init.out"
+.align 0x20
+proc_sleep:
+    .incbin "./aux_prg/loop_sleep.out"
 .align 0x20
