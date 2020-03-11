@@ -1,6 +1,7 @@
 #ifndef _H_PROC
 #define _H_PROC
 
+#include <stddef.h>
 #include "param.h"
 #include "file.h"
 #include "memory/kmem.h"
@@ -57,12 +58,17 @@ enum chann_mode {
     WRITE,
     RDWR,
     STREAM_IN,
-    STREAM_OUT,
-    PIPE
+    STREAM_OUT
 };
 
 typedef struct channel {
-    ino_t           chann_file; // file referenced by the channel
+    cid_t           chann_id;
+
+    // pointer to mem storage
+    // and current writing/reading position in the buffer
+    struct buffer  *chann_buf;
+    pos_t           chann_pos;
+
     enum chann_mode chann_mode; // kind of operations channel allow to perform
     uint64_t        chann_acc;  // number of times the channel is referenced
 } chann_t;
@@ -78,6 +84,7 @@ struct {
     size_t      st_waiting_ps;        // number of processes in queue
     proc_t      st_proc[NPROC];       // table containing all processes
     chann_t     st_chann[NCHAN];      // table containing all channels
+    buf_t       st_buf[NBUF];         // table containing all buffers
 } state;
 
 // pointer to current proc registers
@@ -96,8 +103,8 @@ pid_t push_ps(pid_t pid);
 uint8_t proc_create_userspace(void* prg_elf, proc_t *proc);
 
 //! ne retournent pas à l'appelant
-extern void iret_to_userspace(uint64_t rip, uint64_t rsp);
-extern void eoi_iret_to_userspace(uint64_t rip, uint64_t rsp);
+extern void iret_to_userspace();
+extern void eoi_iret_to_userspace();
 
 proc_t *switch_proc(pid_t pid);
 

@@ -1,7 +1,7 @@
 #ifndef _H_SYS
 #define _H_SYS
 
-#define NSYSCALL 13
+#define NSYSCALL 14
 
 #define SYS_SLEEP    0
 #define SYS_FORK     1
@@ -16,6 +16,7 @@
 #define SYS_PIPE    10
 #define SYS_WRITE   11
 #define SYS_READ    12
+#define SYS_LSEEK   13
 
 #ifndef ASM_FILE
 
@@ -36,6 +37,7 @@ void dup(void);
 void pipe(void);
 void write(void);
 void read(void);
+void lseek(void);
 
 void invalid_syscall();
 

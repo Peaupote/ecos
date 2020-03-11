@@ -23,6 +23,7 @@ syscall_tab:
     .quad pipe
     .quad write
     .quad read
+    .quad lseek
 
     .section .text
 .global irq_sys
@@ -179,35 +180,31 @@ func_end:
     sti
     iretq
 
-//TODO: restore registers from global struct st_curr_reg
-//arg: RIP, RSP
-iret_to_userspace:
+// restore registers from global struct st_curr_reg
+.macro setup_iret
+    movabs $st_curr_reg, %rax
+    movq  (%rax), %rax
     mov   $0x23, %bx
     set_data_segments
-    pushq $0x23 //SS
-    pushq %rsi  //RSP
-    pushfq      //RFLAGS
-    pushq $0x1B //CS
-    pushq %rdi  //RIP
-    iretq
-
-eoi_iret_to_userspace:
-    mov   $0x23, %bx
-    set_data_segments
-    pushq $0x23 //SS
-    pushq %rsi  //RSP
-    pushfq      //RFLAGS
+    pushq $0x23    //SS
+    pushq 16(%rax) //RSP
+    pushq (%rax)   //RFLAGS
     popq  %rsi
     btsq  $9, %rsi //IF: interrupt flag
     pushq %rsi
-    pushq $0x1B //CS
-    pushq %rdi  //RIP
+    pushq $0x1B    //CS
+    pushq 8(%rax)  //RIP
+.endm
 
+iret_to_userspace:
+    setup_iret
+    iretq
+
+eoi_iret_to_userspace:
+    setup_iret
     movb $PIC_EOI_CODE, %al
     outb %al, $PIC1_PORT
-
     restore_curr_proc_reg
-
     iretq
 
 pml4_to_cr3:

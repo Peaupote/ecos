@@ -129,13 +129,16 @@ void init() {
     for (size_t i = 3; i < NFD; i++) one->p_fds[i] = -1;
 
     // set chann to free
-    for (cid_t cid = 3; cid < NCHAN; cid++)
+    for (cid_t cid = 3; cid < NCHAN; cid++) {
+        state.st_chann[cid].chann_id   = cid;
         state.st_chann[cid].chann_mode = UNUSED;
+    }
 
     // set all remaining slots to free processus
     for (pid_t pid = 2; pid < NPROC; pid++) {
         state.st_proc[pid].p_stat = FREE;
         state.st_proc[pid].p_ppid = 0;
+        state.st_proc[pid].p_pid  = pid;
     }
 
     proc_create_userspace(proc_init, one);
@@ -145,7 +148,7 @@ void init() {
     st_curr_reg = &one->p_reg;
 
     klog(Log_info, "init", "Process 1 loaded. Start process 1");
-    iret_to_userspace(one->p_reg.rip, one->p_reg.rsp);
+    iret_to_userspace();
 }
 
 
@@ -163,7 +166,7 @@ void schedule_proc(uint8_t loop) {
               p->p_reg.rip,
               p->p_reg.rsp);
 
-        eoi_iret_to_userspace(p->p_reg.rip, p->p_reg.rsp);
+        eoi_iret_to_userspace();
     } else if (loop && state.st_proc[state.st_curr_pid].p_stat != RUN) {
         // no process to take hand
         set_interrupt_flag();

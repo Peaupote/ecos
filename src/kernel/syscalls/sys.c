@@ -152,15 +152,18 @@ void open() {
         return;
     }
 
-    chann_t *c = &state.st_chann[cid];
+    chann_t *c   = &state.st_chann[cid];
     c->chann_acc  = 1;
     c->chann_mode = mode;
-    c->chann_file = 0;
+    c->chann_buf  = load_buffer(1, 0);
+    c->chann_pos  = 0;
 
     for (int fd = 0; fd < NFD; fd++)
         if (p->p_fds[fd] == -1) {
             p->p_fds[fd] = cid;
             p->p_reg.rax = fd;
+            klogf(Log_info, "syscall",
+                  "process %d open %s on %d", p->p_pid, fname, fd);
             return;
         }
 
@@ -191,37 +194,167 @@ void close() {
     p->p_reg.rax = 0;
 }
 
-void dup() {}
-
-void pipe() {}
-
-void read() {}
-
-void write() {
+void dup() {
     proc_t *p = &state.st_proc[state.st_curr_pid];
+    int i, fd = p->p_reg.rdi;
 
-    // for now write has type
-    // int write(int fd, int v)
-    // and print the value of v
+    if (fd < 0 || fd > NFD || p->p_fds[fd] == -1) {
+        p->p_reg.rax = -1;
+        return;
+    }
 
-    int fd = p->p_reg.rdi;
-    int v  = p->p_reg.rsi;
+    for (i = 0; i < NFD && p->p_fds[i] != -1; i++);
 
-    if (p->p_fds[fd] == -1) {
-        // file descriptor not allocated
+    if (i == NFD) {
+        // no file free descriptor
+        p->p_reg.rax = -1;
+        return;
+    }
+
+    p->p_fds[i] = p->p_fds[fd];
+}
+
+void pipe() {
+    proc_t *p = &state.st_proc[state.st_curr_pid];
+    int *fd   = (int*)p->p_reg.rdi;
+
+    if (!fd) goto error;
+
+    int fdin, fdout;
+
+    for (fdin = 0; fdin < NFD && p->p_fds[fdin] != -1; fdin++);
+    if (fd[0] == NFD) goto error;
+
+    for (fdout = fdin; fdout < NFD && p->p_fds[fdout] != -1; fdout++);
+    if (fd[0] == NFD) goto error;
+
+    cid_t in, out;
+    for (in = 0; in < NCHAN && state.st_chann[in].chann_mode != UNUSED; in++);
+    if (in == NCHAN) goto error;
+
+    for (out = in; out < NCHAN && state.st_chann[out].chann_mode != UNUSED; out++);
+    if (out == NCHAN) goto error;
+
+    chann_t *cin = &state.st_chann[in],
+        *cout = &state.st_chann[out];
+
+    fd[fdin] = in;
+    fd[fdout] = out;
+
+    cin->chann_acc   = 1;
+    cin->chann_mode  = STREAM_IN;
+    cout->chann_acc  = 1;
+    cout->chann_mode = STREAM_OUT;
+
+    // TODO : finish
+
+    return;
+error:
+    p->p_reg.rax = -1;
+    return;
+}
+
+void read() {
+    proc_t *p  = &state.st_proc[state.st_curr_pid];;
+    int fd     = p->p_reg.rdi;
+    uint8_t *v = (uint8_t*)p->p_reg.rsi;
+    size_t len = p->p_reg.rdx;
+
+    if (!v || fd < 0 || fd > NFD || p->p_fds[fd] == -1) {
         p->p_reg.rax = -1;
         return;
     }
 
     chann_t *chann = &state.st_chann[p->p_fds[fd]];
-    if (chann->chann_mode != STREAM_OUT) {
-        // dont handle other modes for now
+    klogf(Log_info, "syscall", "process %d read on %d", p->p_pid, fd);
+
+    buf_t *buf = chann->chann_buf;
+    size_t i;
+
+    switch (chann->chann_mode) {
+    case READ:
+    case RDWR:
+        for (i = 0; i < len; i++) {
+            if (chann->chann_pos >= buf->buf_size) {
+                if (buf->buf_nx) {
+                    chann->chann_buf = buf->buf_nx;
+                    chann->chann_pos = 0;
+                    buf = buf->buf_nx;
+                } else break;
+            }
+
+            v[i] = buf->buf_content[chann->chann_pos++];
+        }
+
+        p->p_reg.rax = i; // return number of read chars
+        break;
+
+    case STREAM_IN:
+        // TODO
+    default:
+        p->p_reg.rax = -1;
+        return;
+    }
+}
+
+void write() {
+    proc_t *p  = &state.st_proc[state.st_curr_pid];;
+    int fd     = p->p_reg.rdi;
+    uint8_t *v = (uint8_t*)p->p_reg.rsi;
+    size_t len = p->p_reg.rdx;
+
+    if (!v || fd < 0 || fd > NFD || p->p_fds[fd] == -1) {
         p->p_reg.rax = -1;
         return;
     }
 
+    chann_t *chann = &state.st_chann[p->p_fds[fd]];
+    buf_t   *buf   = chann->chann_buf;
     klogf(Log_info, "syscall", "process %d write on %d", p->p_pid, fd);
-    kprintf("%d\n", v);
+
+    size_t c = 0;
+    switch (chann->chann_mode) {
+    case WRITE:
+    case RDWR:
+        for (c = 0; c < len; c++) {
+            if (chann->chann_pos >= buf->buf_size) {
+                if (buf->buf_nx) {
+                    chann->chann_buf = buf->buf_nx;
+                    chann->chann_pos = 0;
+                    buf = buf->buf_nx;
+                } else break;
+            }
+
+            buf->buf_content[chann->chann_pos++] = *v++;
+        }
+
+        p->p_reg.rax = c;
+        break;
+
+    case STREAM_OUT:
+        // TODO : more efficient
+        for (c = 0; c < len; c++)
+            kprintf("%c", *v++);
+        p->p_reg.rax = c;
+        break;
+
+    default:
+        p->p_reg.rax = -1;
+        break;
+    }
+}
+
+void lseek(void) {
+    proc_t *p = &state.st_proc[state.st_curr_pid];
+    int fd = p->p_reg.rdi;
+    pos_t off = p->p_reg.rsi;
+
+    // TODO : checks
+    klogf(Log_info, "syscall",
+          "process %d lseek %d at %d", p->p_pid, fd, off);
+
+    // TODO : complete
+    state.st_chann[p->p_fds[fd]].chann_pos = off;
 }
 
 void invalid_syscall() {
