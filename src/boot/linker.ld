@@ -44,4 +44,5 @@ gd_table   = KPA + kba_gdt;
 gdt_desc   = KPA + kba_gdtd;
 stack_top  = KPA + kba_stk_tp;
 end_kernel = KPA + kba_end_krn;
+bgn_kernel = KPA + kba_bgn_krn;
 

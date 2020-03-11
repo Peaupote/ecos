@@ -17,7 +17,7 @@
 #define SYS_WRITE   11
 #define SYS_READ    12
 
-#ifndef ASSEMBLY
+#ifndef ASM_FILE
 
 #include "proc.h"
 #include "syscalls/sleep.h"

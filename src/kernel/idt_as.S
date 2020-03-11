@@ -1,4 +1,4 @@
-#define ASSEMBLY
+#define ASM_FILE
 #include "int.h"
 #include "sys.h"
 
@@ -31,6 +31,7 @@ syscall_tab:
 .global iret_to_userspace
 .global eoi_iret_to_userspace
 .global pml4_to_cr3
+.global invalide_page
 
 .extern st_curr_reg
 .extern common_hdl
@@ -212,3 +213,7 @@ eoi_iret_to_userspace:
 pml4_to_cr3:
     movq %rdi, %cr3
     ret
+
+invalide_page:
+	invlpg (%rdi)
+	ret

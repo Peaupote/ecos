@@ -5,7 +5,7 @@
 #include <stddef.h>
 #include <stdint.h>
 
-#define VGA_BUFFER 0xB8000
+#include "hdw.h" //VGA_BUFFER
 
 /* Hardware text mode color constants. */
 enum vga_color {

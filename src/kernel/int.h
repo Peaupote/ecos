@@ -37,7 +37,7 @@
 #define PIT_CONF_PORT  0x43
 #define PIT_MODE       0b00110110
 
-#ifndef ASSEMBLY
+#ifndef ASM_FILE
 
 #include <stddef.h>
 #include <stdint.h>

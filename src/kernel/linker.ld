@@ -13,10 +13,10 @@ KVA = 0x80 << 39;
 stack_top  = KVA + kba_stk_tp;
 gd_table   = KVA + kba_gdt;
 gdt_desc   = KVA + kba_gdtd;
+bgn_kernel = KVA + kba_bgn_krn;
 end_kernel = KVA + kba_end_krn;
 
-low_addr     = KVA + (0x100 << 30);
-dynamic_slot = KVA + (0x180 << 30);
+low_addr   = KVA + (0x100 << 30);
 
 SECTIONS
 {

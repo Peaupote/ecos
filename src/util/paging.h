@@ -30,8 +30,11 @@
 //page Size: si 1 dans le PD utilise une page de 2MB (si PAE)
 //à la place d'une PT requiert PSE (ou PAE)
 #define PAGING_FLAG_S		(1<<7)
+//désactive la mise à jour du TLB lors d'un changement de CR3
+//requiert PGE
+#define PAGING_FLAG_G		(1<<8)
 
-#define PAGING_FLAGS PAGING_FLAG_P|PAGING_FLAG_R|PAGING_FLAG_U|PAGING_FLAG_S
+#define PAGING_FLAGS PAGING_FLAG_P|PAGING_FLAG_R|PAGING_FLAG_U|PAGING_FLAG_S|PAGING_FLAG_G
 
 typedef uint64_t phy_addr;//adresse physique
 typedef uint64_t uint_ptr;//adresse virtuelle
@@ -75,6 +78,15 @@ static inline uint64_t* paging_pts_acc(uint16_t j0, uint16_t j1,
       | paging_set_pt  (j3)
       | (((uint_ptr)num)<<3) );
 }
+static inline uint64_t* paging_adr_acc(uint16_t j0, uint16_t j1,
+        uint16_t j2, uint16_t j3, uint16_t ofs) {
+    return (uint64_t*)(
+        paging_set_pml4(j0)
+      | paging_set_pdpt(j1)
+      | paging_set_pd  (j2)
+      | paging_set_pt  (j3)
+      | ((uint_ptr)ofs) );
+}
 
 static inline uint64_t* paging_acc_pml4(uint16_t pml4_e) {
     return paging_pts_acc(
@@ -110,9 +122,5 @@ static inline phy_addr paging_phy_addr(uint_ptr v_addr) {
 }
 
 #endif
-
-static inline void paging_refresh() {
-    asm volatile("movq %%cr3,%%rax; movq %%rax,%%cr3;" : : : "memory");
-}
 
 #endif

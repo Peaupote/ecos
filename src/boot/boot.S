@@ -1,5 +1,6 @@
-#define ASSEMBLY
+#define ASM_FILE
 #include "../util/gdt.h"
+#include "../util/hdw.h"
 
 /* From https://wiki.osdev.org/Bare_Bones */
 /* Declare constants for the multiboot header. */
@@ -43,21 +44,21 @@ forced to be within the first 8 KiB of the kernel file.
 //Structures pour le mapping identité sur les 4 premiers MB
 .balign 0x1000
 page_dpt_0: #PDPT
-.skip 0x1000 # 512 * 64 bits
+.skip   0x1000 # 512 * 64 bits
 
 .balign 0x1000
 page_d_0:
-.skip 0x1000 # 512 * 64 bits
+.skip   0x1000 # 512 * 64 bits
 
 .balign 4
 mb_info:
-.skip 4
+.skip   4
 kernel_entry_addr: //adresse physique
-.skip 4
+.skip   4
 
 #ifdef BDI
 boot_debug_out:
-.skip 0x100 # 256 octets de debug
+.skip   0x100 # 256 octets de debug
 #endif
 
 //espace pour le kernel
@@ -79,7 +80,8 @@ _start:
 	//Ligne A20 activée
 
 	//On récupère les informations de multiboot
-	movl %ebx, mb_info
+	//https://www.gnu.org/software/grub/manual/multiboot/html_node/Boot-information-format.html
+	movl %ebx, (mb_info)
 
 #ifdef BDI
 	//initial CR0
@@ -128,9 +130,9 @@ reload_seg:
 	/* --Paging-- */
 	call init_paging_directory
 
-	//On active le PAE - Physical Address Extension
+	//On active le PAE et le PGE
 	movl %cr4, %eax
-	btsl $5,   %eax
+	orl  $((1<<CR4_PAE) | (1<<CR4_PGE)), %eax
 	movl %eax, %cr4
 
 	//On place l'adresse du PML4 dans CR3
@@ -138,15 +140,15 @@ reload_seg:
 	movl %eax, %cr3
 
 	//On active le long-mode
-	movl $0xC0000080, %ecx //adresse du MSR EFER
+	movl  $MSR_EFER, %ecx
 	rdmsr
-	btsl  $8, %eax
+	btsl  $MSR_EFER_LME, %eax
 	wrmsr
 	
-	//On active le paging: bit 31 de CR0
-	movl %cr0, %eax
-	btsl $31,  %eax
-	movl %eax, %cr0
+	//On active le paging
+	movl %cr0,   %eax
+	btsl $CR0_PG,%eax
+	movl %eax,   %cr0
 
 	/*
 	Long-mode (sous-mode de compatibilité 32 bits)
@@ -169,9 +171,11 @@ reload_seg2:
 	mov %ax, %fs
 	mov %ax, %gs
 
-   	mov (kernel_entry_addr), %ebx
+	movl  $KPA, (bgn_kernel)
+	movl  (mb_info), %edi
+   	mov   (kernel_entry_addr), %eax
 	pushl $0x8 //CS
-	pushl %ebx //IP
+	pushl %eax //IP
 	retf       //Far ret
 
 /*

@@ -34,3 +34,18 @@ void texit(const char *n) {
 void test_infoi(const char *fmt, int i) {
 	printf(fmt, i);
 }
+
+void kpanic(const char *p) {
+	texit(p);
+}
+void kpanic_ct(const char *p) {
+	texit(p);
+}
+void klog (enum klog_level lvl __attribute__((unused)),
+		const char *head __attribute__((unused)),
+		const char *msg __attribute__((unused))) {
+}
+void klogf(enum klog_level lvl __attribute__((unused)),
+		const char *head __attribute__((unused)),
+		const char *msgf __attribute__((unused)), ...) {
+}

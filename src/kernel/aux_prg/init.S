@@ -1,4 +1,4 @@
-#define ASSEMBLY
+#define ASM_FILE
 #include "../sys.h"
 
     .section .text

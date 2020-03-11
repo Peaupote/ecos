@@ -23,6 +23,27 @@ itoa(int x, const char *digits, size_t base) {
     }
 
     size_t i;
+	uint8_t sign = 0;
+	if (x < 0) {
+		sign = 1;
+		x = -x;
+	}
+    for (i = 0; i < 256 && x > 0; i++, x /= base)
+        buf[256 - i - 1] = digits[x % base];
+
+    buf[256] = 0;
+	if (sign) buf[256 - i++ - 1] = '-';
+    return i;
+}
+static size_t
+ultoa(uint64_t x, const char *digits, size_t base) {
+    if (x == 0) {
+        buf[255] = *digits;
+        buf[256] = 0;
+        return 1;
+    }
+
+    size_t i;
     for (i = 0; i < 256 && x > 0; i++, x /= base)
         buf[256 - i - 1] = digits[x % base];
 
@@ -74,6 +95,11 @@ int vprintf(const char *format, va_list params) {
             size_t len = itoa(x, hex_digits, 16);
             shift += tty_writestring(buf + 256 - len);
             count += len;
+        } else if (format[1] == 'p') {
+            uint64_t x = va_arg(params, uint64_t);
+            size_t len = ultoa(x, hex_digits, 16);
+            shift += tty_writestring(buf + 256 - len);
+            count += len;
         } else return -1;
 
         // works for now because all format is made of only one character
@@ -114,6 +140,11 @@ void klogf(enum klog_level lvl, const char *hd, const char *msgf, ...) {
 }
 
 void kpanic(const char *msg) {
+    kprintf("PANIC!\n");
+    kprintf("%s", msg);
+    while(1) halt();
+}
+void kpanic_ct(const char* msg) {
     vga_init((uint16_t*)(low_addr + VGA_BUFFER));
     vga_writestring("PANIC!\n");
     vga_writestring(msg);

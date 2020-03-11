@@ -217,10 +217,9 @@ uint8_t proc_create_userspace(void* prg_elf, proc_t *proc) {
     uint8_t err = 0;
 
     volatile phy_addr pml4_loc = kmem_alloc_page(); //TODO crash sans volatile
-    if(paging_force_map_to((uint_ptr)dynamic_slot, pml4_loc))
-        return 1;
+	kmem_bind_dynamic_slot(0, pml4_loc);
 
-    kmem_init_pml4((uint64_t*)dynamic_slot, pml4_loc);
+    kmem_init_pml4((uint64_t*)kmem_dynamic_slot(0), pml4_loc);
     clear_interrupt_flag();
     pml4_to_cr3(pml4_loc);
     set_interrupt_flag();

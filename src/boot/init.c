@@ -52,10 +52,11 @@ void init_paging_directory(void){
 			st0[s][i] = PAGING_FLAG_R;
 
 	//initialisation des tables:
-	//	PML4_KERNEL_VIRT_ADDR,0,0; PML4_KERNEL_VIRT_ADDR,0,0
+	//	PML4_KERNEL_VIRT_ADDR,0,0; PML4_KERNEL_VIRT_ADDR,0,1
 	//couvrant chacune 512 pages de 4KB
 	for(uint32_t i_pte=0; i_pte<1024; ++i_pte) {
-		page_t_23[2*i_pte]     = ((i_pte << 12) + (uint32_t)(&KPA))| F_PRS;
+		page_t_23[2*i_pte]     = ((i_pte << 12) + (uint32_t)(&KPA))
+		                       | F_PRS | PAGING_FLAG_G;
 		page_t_23[2*i_pte + 1] = 0;
 	}
 

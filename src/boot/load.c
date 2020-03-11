@@ -1,10 +1,8 @@
-#include "multiboot.h"
-
+#include "../util/multiboot.h"
 #include "../util/elf64.h"
 #include "../util/string.h"
 
 //Informations fournies par GRUB
-//https://www.gnu.org/software/grub/manual/multiboot/html_node/Boot-information-format.html
 extern multiboot_info_t* mb_info;
 
 extern void* kernel_entry_addr;

@@ -1,14 +1,24 @@
 #include "page_alloc.h"
 
+#include "../../util/paging.h"
+#ifndef TEST_UNIT
+#include "../kutil.h"
+#endif
+
 #define QD_0111_MASK 0x77777777
 #define QD_1000_MASK 0x88888888
 
-void mblock_init(struct MemBlock* b, phy_addr a) {
+void mblock_init1(struct MemBlock* b) {
 	for(uint64_t* it = (uint64_t*)b; 
 			it != ((uint64_t*)b) + sizeof(struct MemBlock) / 8; ++it)
 		*it = 0;
 	b->nb_at_lvl[3] = 1;
-	b->addr = a;
+}
+
+void mblock_init0(struct MemBlock* b) {
+	for(uint64_t* it = (uint64_t*)b; 
+			it != ((uint64_t*)b) + sizeof(struct MemBlock) / 8; ++it)
+		*it = 0;
 }
 
 static inline uint8_t find_bit(uint64_t p, uint8_t sz, uint8_t step) {
@@ -108,12 +118,24 @@ uint16_t mblock_alloc_lvl_2(struct MemBlock* b) {
 void mblock_alloc_lvl_3(struct MemBlock* b) {
 	--b->nb_at_lvl[3];
 }
+uint16_t mblock_alloc_lvl_3f(struct MemBlock* b) {
+	mblock_free_lvl_3(b);
+	return 0;
+}
+
+mblock_alloc_f mblock_alloc[4] = {
+	mblock_alloc_lvl_0, mblock_alloc_lvl_1,
+	mblock_alloc_lvl_2, mblock_alloc_lvl_3f
+};
 
 
 void mblock_free_lvl_3(struct MemBlock* b) {
 	++b->nb_at_lvl[3];
 }
-
+void mblock_free_lvl_3f(struct MemBlock* b, 
+		uint16_t none __attribute__((unused))) {
+	mblock_free_lvl_3(b);
+}
 
 void mblock_free_lvl_2(struct MemBlock* b, uint16_t n) {
 	if (++b->nb_at_lvl[2] == 8) {
@@ -155,6 +177,11 @@ void mblock_free_lvl_0(struct MemBlock* b, uint16_t n) {
 	}
 }
 
+mblock_free_f mblock_free[4] = {
+	mblock_free_lvl_0, mblock_free_lvl_1,
+	mblock_free_lvl_2, mblock_free_lvl_3f
+};
+
 //keep > 0
 //conserve les `keep` premiers sous-blocs
 void mblock_split_lvl_1(struct MemBlock* b, uint16_t n, uint8_t keep) {
@@ -178,6 +205,13 @@ void mblock_split_lvl_3(struct MemBlock* b, uint8_t keep) {
 	b->nb_at_lvl[2] += free;
 	b->lvl_2_21      = ((uint32_t)QD_1000_MASK) << (keep * 4);
 }
+void mblock_split_lvl_3f(struct MemBlock* b,
+		uint16_t n __attribute__((unused)), uint8_t keep) {
+	mblock_split_lvl_3(b, keep);
+}
+mblock_split_f mblock_split[3] = {
+	mblock_split_lvl_1, mblock_split_lvl_2, mblock_split_lvl_3f
+};
 
 
 uint16_t mblock_alloc_page(struct MemBlock* b) {
@@ -194,6 +228,33 @@ uint16_t mblock_alloc_page(struct MemBlock* b) {
 		mblock_split_lvl_1(b, rt, 1);
 	} else rt = mblock_alloc_lvl_0(b);
 	return rt;
+}
+
+uint8_t mblock_non_empty(struct MemBlock* b) {
+	return (*((uint64_t*)b->nb_at_lvl)) ? 1 : 0;
+}
+uint8_t mblock_full_free(struct MemBlock* b) {
+	return b->nb_at_lvl[3];
+}
+size_t mblock_nb_page_free(struct MemBlock* b) {
+	size_t rt = 0;
+	for (uint8_t l = 0; l < 4; ++l)
+		rt += b->nb_at_lvl[l] * mblock_page_size_lvl(l);
+	return rt;
+}
+
+void mblock_free_rng_aux(struct MemBlock* b, uint16_t bg, uint16_t ed,
+		uint8_t lvl, uint16_t n) {
+	uint16_t m = n + mblock_page_size_lvl(lvl);
+	if (bg <= n && ed >= m)
+		(*mblock_free[lvl])(b, n);
+	else if (bg < m && ed > n)
+		for (uint8_t i = 0; i < 8; ++i)
+			mblock_free_rng_aux(b, bg, ed, lvl-1,
+					n + i*mblock_page_size_lvl(lvl-1));
+}
+void mblock_free_rng(struct MemBlock* b, uint16_t begin, uint16_t end) {
+	mblock_free_rng_aux(b, begin, end, 3, 0);
 }
 
 
@@ -262,4 +323,117 @@ size_t mbtree_find(struct MemBlockTree* t) {
 	for(size_t h = 0; h < t->height; ++h)
 		i = mbt_child(i) + find_bit(mbt_get_childs(t->cnt, i), 1, 6);
 	return i - t->lvs;
+}
+
+
+void palloc_init(struct PageAllocator* a, struct MemBlock* mbs,
+		size_t h, size_t intn, size_t spac,
+		uint64_t* cnt0, uint64_t* cnt1) {
+
+	a->mblocks = mbs;
+	for (size_t i = 0; i < a->nb_blocks; ++i)
+		mblock_init0(mbs + i);
+
+	mbtree_init(&a->mbt_part,  h, intn, spac, cnt0);
+	mbtree_init(&a->mbt_full,  h, intn, spac, cnt1);
+}
+
+void palloc_add_zones(struct PageAllocator* a,
+		uint64_t lims[], size_t lims_sz) {
+	size_t sg[2] = {0, 0};
+	for (size_t i = 0; i < lims_sz - 1; ++i) {
+		if (lims[i]&1)
+			sg[(lims[i]>>1)&1]--;
+		else
+			sg[(lims[i]>>1)&1]++;
+
+		if (sg[0] && !sg[1]) {
+			phy_addr z_bg = lims[i]   & PAGE_MASK,
+			         z_ed = lims[i+1] & PAGE_MASK;
+			for (size_t mb = z_bg >> MBLOC_SHIFT;
+					(mb << MBLOC_SHIFT) < z_ed;
+					++mb) {
+				uint16_t zmb_bg = 0, zmb_ed = 512;
+				if (z_bg > (mb << MBLOC_SHIFT))
+					zmb_bg = ((z_bg & MBLOC_OFS_MASK) >> PAGE_SHIFT);
+				if (z_ed < ((mb+1) << MBLOC_SHIFT))
+					zmb_ed = ((z_ed & MBLOC_OFS_MASK) >> PAGE_SHIFT);
+				mblock_free_rng(a->mblocks+mb, zmb_bg, zmb_ed);
+			}
+		}
+	}
+
+	for (size_t mb = 0; mb < a->nb_blocks; ++mb){
+		if (mblock_full_free(a->mblocks + mb))
+			mbtree_add(&a->mbt_full, mb);
+		else if (mblock_non_empty(a->mblocks + mb))
+			mbtree_add(&a->mbt_part, mb);
+	}
+}
+
+static inline void a_swap(uint64_t* a, size_t i, size_t j) {
+	uint64_t t = a[i];
+	a[i] = a[j];
+	a[j] = t;
+}
+//Quick sort
+//|0  < p  |i   =p  |j  ?  |k   > p  |sz
+void sort_limits(uint64_t* a, size_t sz) {
+	if (sz <= 1) return;
+	uint64_t p = a[sz / 2];
+	size_t i = 0, j = 0, k = sz;
+	while (j < k) {
+		if (a[j] < p)
+			a_swap(a, i++, j++);
+		else if(a[j] > p)
+			a_swap(a, j, --k);
+		else
+			++j;
+	}
+	sort_limits(a,   i   );
+	sort_limits(a+k, sz-k);
+}
+
+phy_addr palloc_alloc_page(struct PageAllocator* a) {
+	size_t b;
+	if (mbtree_non_empty(&a->mbt_part))
+		b = mbtree_find(&a->mbt_part); 
+	else if(mbtree_non_empty(&a->mbt_full))
+		b = mbtree_find(&a->mbt_full);
+	else {
+		kpanic("Out of memory");
+		return 0; //Non atteint
+	}
+	
+	uint16_t prev_3 = mblock_full_free (a->mblocks + b);
+	uint16_t p_rel  = mblock_alloc_page(a->mblocks + b);
+	if (prev_3) {
+		mbtree_add(&a->mbt_part,  b);
+		mbtree_rem(&a->mbt_full, b);
+	} else if (!mblock_non_empty(a->mblocks+b))
+		mbtree_rem(&a->mbt_part,  b);
+
+	phy_addr rt = p_rel << PAGE_SHIFT;
+	rt |= ((phy_addr)b) << MBLOC_SHIFT;
+	rt += a->addr_begin;
+
+	klogf(Log_verb, "mem", "alloc %h", rt);
+
+	return rt;
+}
+void palloc_free_page(struct PageAllocator* a, phy_addr p) {
+	phy_addr ofs = p - a->addr_begin;
+	size_t   b   = ofs >> MBLOC_SHIFT;
+	mblock_free_lvl_0(a->mblocks + b, ((p & MBLOC_OFS_MASK) >> PAGE_SHIFT));
+	if (mblock_full_free(a->mblocks + b)) {
+		mbtree_add(&a->mbt_full, b);
+		mbtree_rem(&a->mbt_part,  b);
+	} else
+		mbtree_add(&a->mbt_part,  b);
+}
+size_t palloc_nb_free_page(struct PageAllocator* a) {
+	size_t rt = 0;
+	for (size_t b = 0; b < a->nb_blocks; ++b)
+		rt += mblock_nb_page_free(a->mblocks + b);
+	return rt;
 }

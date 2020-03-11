@@ -1,4 +1,4 @@
-#define ASSEMBLY
+#define ASM_FILE
 
     .section .text
 .global kernel_entry
@@ -6,6 +6,8 @@
 .extern kernel_main
 
 kernel_entry:
+	//%edi contient l'adresse physique des informations fournies par GRUB
+
 	//On passe %rip en adresse virtuelle
 	movabsq $kernel_entry_vrip, %rbx
 	jmp *%rbx

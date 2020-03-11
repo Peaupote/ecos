@@ -19,19 +19,22 @@
 
 #include "tests.h"
 
-void kernel_init(void) {
-    kmem_init();
+void kernel_init(uint32_t boot_info) {
+    gdt_init();
+    kmem_init_paging();
     vga_init((uint16_t*)(low_addr + VGA_BUFFER));
     tty_init();
-    gdt_init();
+	kmem_init_alloc(boot_info);
     tss_init();
     idt_init();
 }
 
-void kernel_main(void) {
-    kernel_init();
+void kernel_main(uint32_t boot_info) {
+    kernel_init(boot_info);
 
     klog(Log_info, "statut", "64 bits kernel launched.");
+    klogf(Log_info, "mem", "%d pages disponibles",
+			(int)kmem_nb_page_free());
 
     tty_afficher_buffer_all();
 

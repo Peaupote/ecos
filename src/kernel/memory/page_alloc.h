@@ -22,7 +22,6 @@ struct MemBlock {//Taille multiple de 8 octets
 	uint32_t lvl_2_21;     //8 * (1+3)
 	uint32_t lvl_1_10[8];  //8 * (1+3)
 	uint8_t  lvl_0_0 [64]; //8 * 1
-	phy_addr addr;
 };
 
 //Arbre d'arité 64, la racine est au bit 63
@@ -33,28 +32,54 @@ struct MemBlockTree {
 	uint64_t *cnt;
 };
 
+struct PageAllocator {
+	struct MemBlock*    mblocks;
+	struct MemBlockTree mbt_part;
+	struct MemBlockTree mbt_full;
+	size_t   nb_blocks;
+	phy_addr addr_begin;
+	phy_addr addr_end;
+};
+
 //Créé un bloc entièrement disponible
-void mblock_init(struct MemBlock* b, phy_addr a);
+void mblock_init1(struct MemBlock* b);
+//Créé un bloc entièrement non disponible
+void mblock_init0(struct MemBlock* b);
+
+static inline uint16_t mblock_page_size_lvl(uint8_t lvl) {
+	return 1 << (3 * lvl);
+}
 
 //Un sous-block du niveau demandé doit être libre
 //Retourne l'adresse relative en nombre de pages
+typedef uint16_t (*mblock_alloc_f)(struct MemBlock*);
 uint16_t mblock_alloc_lvl_0(struct MemBlock* b);
 uint16_t mblock_alloc_lvl_1(struct MemBlock* b);
 uint16_t mblock_alloc_lvl_2(struct MemBlock* b);
 void     mblock_alloc_lvl_3(struct MemBlock* b);
-
+extern mblock_alloc_f mblock_alloc[4];
 
 //On ne supose pas que n est la première adresse du sous-bloc
-void mblock_free_lvl_0(struct MemBlock* b, uint16_t n);
-void mblock_free_lvl_1(struct MemBlock* b, uint16_t n);
-void mblock_free_lvl_2(struct MemBlock* b, uint16_t n);
-void mblock_free_lvl_3(struct MemBlock* b);
+typedef void (*mblock_free_f)(struct MemBlock*, uint16_t);
+void   mblock_free_lvl_0(struct MemBlock* b, uint16_t n);
+void   mblock_free_lvl_1(struct MemBlock* b, uint16_t n);
+void   mblock_free_lvl_2(struct MemBlock* b, uint16_t n);
+void   mblock_free_lvl_3(struct MemBlock* b);
+extern mblock_free_f mblock_free[4];
 
 //keep > 0, le bloc doit être alloué
 //conserve les `keep` premiers sous-blocs
-void mblock_split_lvl_1(struct MemBlock* b, uint16_t n, uint8_t keep);
-void mblock_split_lvl_2(struct MemBlock* b, uint16_t n, uint8_t keep);
-void mblock_split_lvl_3(struct MemBlock* b, uint8_t keep);
+typedef void (*mblock_split_f)(struct MemBlock*, uint16_t, uint8_t);
+void   mblock_split_lvl_1(struct MemBlock* b, uint16_t n, uint8_t keep);
+void   mblock_split_lvl_2(struct MemBlock* b, uint16_t n, uint8_t keep);
+void   mblock_split_lvl_3(struct MemBlock* b, uint8_t keep);
+extern mblock_split_f mblock_split[3];
+
+uint8_t  mblock_non_empty(struct MemBlock* b);
+uint8_t  mblock_full_free(struct MemBlock* b);
+size_t   mblock_nb_page_free(struct MemBlock* b);
+
+void mblock_free_rng(struct MemBlock* b, uint16_t begin, uint16_t end);
 
 //Le bloc ne doit pas être completement alloué
 uint16_t mblock_alloc_page(struct MemBlock* b);
@@ -71,5 +96,17 @@ void    mbtree_rem(struct MemBlockTree* t, size_t i);
 uint8_t mbtree_get(struct MemBlockTree* t, size_t i);
 uint8_t mbtree_non_empty(struct MemBlockTree* t);
 size_t  mbtree_find(struct MemBlockTree* t);
+
+
+void palloc_init(struct PageAllocator*, struct MemBlock* mbs,
+		size_t height, size_t intn, size_t space,
+		uint64_t* cnt0, uint64_t* cnt1);
+void    palloc_add_zones(struct PageAllocator*,
+		uint64_t lims[], size_t lims_sz);
+void    sort_limits(uint64_t* a, size_t sz);
+
+phy_addr palloc_alloc_page(struct PageAllocator*);
+void     palloc_free_page (struct PageAllocator*, phy_addr);
+size_t   palloc_nb_free_page(struct PageAllocator*);
 
 #endif

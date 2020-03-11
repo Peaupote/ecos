@@ -17,6 +17,20 @@ void sq_test_find_8() {
 	test_find_8((uint8_t)rand64(),  1);
 }
 
+void sq_test_qsort() {
+	uint64_t a[100];
+	uint64_t cs = 0, cs2 = 0;
+	for (size_t i = 0; i < 100; ++i)
+		cs += (a[i] = rand64());
+	sort_limits(a, 100);
+	for (size_t i = 1; i < 100; ++i)
+		if (a[i-1] > a[i])
+			texit("sort");
+	for(size_t i = 0; i < 100; ++i)
+		cs2 += a[i];
+	if (cs2 != cs)
+		texit("sort cs");
+}
 
 struct MemBlock mb;
 uint16_t exp_free = 512;
@@ -27,13 +41,12 @@ void mb_check_nb() {
 		f_2_0 += (mb.lvl_2_0 >> (i*8)) & 0xff;
 	if (f_2_0 != mb.nb_at_lvl[0])
 		texit("mb check sum l_2_0");
-	if (mb.nb_at_lvl[0] + mb.nb_at_lvl[1]*8 + mb.nb_at_lvl[2]*64
-			+ mb.nb_at_lvl[3]*512 != exp_free)
+	if (mblock_nb_page_free(&mb) != exp_free)
 		texit("mb check sum");
 }
 
 void sq_test_mblock() {
-	mblock_init(&mb, 0);
+	mblock_init1(&mb);
 	mb_check_nb();
 	uint16_t addr1 = mblock_alloc_page(&mb);
 	--exp_free;
@@ -121,6 +134,7 @@ void sq_test_mbt() {
 int main() {
 	test_init("page_alloc");
 	sq_test_find_8();
+	sq_test_qsort();
 	sq_test_mblock();
 	sq_test_mbt();
 	return 0;
