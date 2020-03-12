@@ -17,6 +17,8 @@ void kexit() {
     klogf(Log_info, "syscall",
           "kill pid %d with status %d", p->p_pid, status);
 
+	kmem_free_paging(p->p_pml4, kernel_pml4);
+
     if (pp->p_stat == WAIT) {
         pp->p_stat    = RUN;
         pp->p_reg.rax = status;

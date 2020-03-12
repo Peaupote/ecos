@@ -13,6 +13,8 @@
 #include "proc.h"
 #include "kutil.h"
 
+#define INT_GATE (IDT_ATTR_P|IDT_ATTR_D|IDT_ATTR_INT)
+
 extern void irq_sys(void);
 extern void irq_keyboard(void);
 extern void irq_pit(void);
@@ -115,7 +117,8 @@ void idt_init(void) {
     for (uint8_t n = 0; n < NEXCEPTION_VEC; n++)
         idt_int_asgn(n, (uint64_t)int_handlers[n], INT_GATE);
 
-    idt_int_asgn(SYSCALL_VEC,  (uint64_t)irq_sys, INT_GATE | 0x60);
+    idt_int_asgn(SYSCALL_VEC,  (uint64_t)irq_sys,
+			IDT_ATTR_TRAP | IDT_ATTR_P | IDT_ATTR_D | IDT_ATTR_DPL(3));
     idt_int_asgn(PIT_VEC,      (uint64_t)irq_pit, INT_GATE);
     idt_int_asgn(KEYBOARD_VEC, (uint64_t)irq_keyboard, INT_GATE);
 

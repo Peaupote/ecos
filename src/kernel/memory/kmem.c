@@ -10,6 +10,9 @@
 #include "../tty.h"
 #include "../../util/vga.h"
 
+
+phy_addr kernel_pml4;
+
 // Accès aux 2MB d'adresses basses
 uint64_t laddr_pd[512] __attribute__ ((aligned (PAGE_SIZE)));
 
@@ -17,7 +20,7 @@ uint64_t laddr_pd[512] __attribute__ ((aligned (PAGE_SIZE)));
 uint64_t dslot_pt[512] __attribute__ ((aligned (PAGE_SIZE)));
 
 // Heap: stocke les structures du kernel de taille déterminiée à l'éxécution
-uint64_t heap_pd[512] __attribute__ ((aligned (PAGE_SIZE)));
+uint64_t heap_pd [512] __attribute__ ((aligned (PAGE_SIZE)));
 uint64_t heap_pt0[512] __attribute__ ((aligned (PAGE_SIZE)));
 size_t   heap_next_page;
 
@@ -40,12 +43,14 @@ void kmem_init_paging() {
 	*paging_acc_pdpt(PML4_KERNEL_VIRT_ADDR, KERNEL_PDPT_HEAP)
 		= paging_phy_addr_page((uint_ptr) heap_pd)
 		| PAGING_FLAG_R | PAGING_FLAG_P;
+
+	kernel_pml4 = (*paging_acc_pml4(PML4_LOOP)) & PAGE_MASK;
 }
 
 
 void kmem_init_alloc(uint32_t boot_info) {
 	//On récupère la carte de la mémoire fournie par GRUB
-	kmem_bind_dynamic_range(0, 
+	kmem_bind_dynamic_range(0,
 			boot_info, boot_info + sizeof(struct multiboot_header));
 	multiboot_info_t* mbh = (multiboot_info_t*)
 			kmem_dynamic_slot_at(0, boot_info);
@@ -54,7 +59,7 @@ void kmem_init_alloc(uint32_t boot_info) {
 	phy_addr mmap_addr = mbh->mmap_addr;
 	size_t mmap_length = mbh->mmap_length;
 	if (mmap_length > 511 * PAGE_SIZE) kpanic("mem map size");
-   
+
 	kmem_bind_dynamic_range(0, mmap_addr, mmap_addr + mmap_length);
 	uint8_t* mmap = (uint8_t*) kmem_dynamic_slot_at(0, mmap_addr);
 
@@ -104,7 +109,7 @@ void kmem_init_alloc(uint32_t boot_info) {
 			    | PAGING_FLAG_R | PAGING_FLAG_P | PAGING_FLAG_G;
 	uint8_t* s_space_bg = (uint8_t*) paging_pts_acc
 				(PML4_KERNEL_VIRT_ADDR, KERNEL_PDPT_HEAP, 0, 0, 0);
-	
+
 	palloc_init(&page_alloc,
 		(struct MemBlock*) s_space_bg, h, intn, t_spac1,
 		(uint64_t*)(s_space_bg + t_space_bg),
@@ -150,7 +155,7 @@ void kmem_init_alloc(uint32_t boot_info) {
 	lims[lims_sz++] = ek_pg | 3;
 	lims[lims_sz++] = s_pya | 2;
 	lims[lims_sz++] = align_to(s_pya + s_space, PAGE_SIZE) | 3;
-	
+
 	sort_limits(lims, lims_sz);
 	palloc_add_zones(&page_alloc, lims, lims_sz);
 }
@@ -167,9 +172,9 @@ uint16_t kmem_bind_dynamic_range(uint16_t num,
 }
 
 uint64_t* acc_pt_entry(uint_ptr v_addr, uint16_t flags) {
-	uint64_t query_addr = 
+	uint64_t query_addr =
 		(uint64_t) paging_acc_pml4(paging_get_pml4(v_addr));
-	
+
 	for(uint8_t i=0; i<3; i++) {
 		uint64_t* query = (uint64_t*) query_addr;
 		if(! ((*query) & PAGING_FLAG_P) ){
@@ -213,14 +218,14 @@ uint8_t kmem_paging_alloc(uint_ptr v_addr, uint16_t flags){
 void kmem_init_pml4(uint64_t* pml4, phy_addr p_loc) {
 	for(uint16_t i=0; i<512; ++i)
 		pml4[i] = PAGING_FLAG_R;
-	pml4[PML4_KERNEL_VIRT_ADDR] = *paging_acc_pml4(PML4_KERNEL_VIRT_ADDR) 
+	pml4[PML4_KERNEL_VIRT_ADDR] = *paging_acc_pml4(PML4_KERNEL_VIRT_ADDR)
 		& (PAGE_MASK | PAGING_FLAG_P | PAGING_FLAG_R);
 	pml4[PML4_LOOP] = p_loc | PAGING_FLAG_R | PAGING_FLAG_P;
 }
 
 void kmem_copy_pml4(uint64_t* pml4, phy_addr p_loc) {
 	for(uint16_t i=0; i<512; ++i)
-		pml4[i] = *paging_acc_pml4(i) 
+		pml4[i] = *paging_acc_pml4(i)
 			& (PAGE_MASK | PAGING_FLAGS);
 	pml4[PML4_LOOP] = p_loc | PAGING_FLAG_R | PAGING_FLAG_P;
 }
@@ -230,7 +235,7 @@ void kmem_copy_rec(uint64_t* dst_entry, uint64_t* src_page, uint8_t lvl) {
 	*dst_entry = ((*dst_entry) & PAGE_OFS_MASK) | pg_phy;
 	uint64_t* dst_page = (uint64_t*) paging_rm_loop((uint_ptr)dst_entry);
 	if (lvl)
-		for (size_t i = 0; i < 512; ++i) {
+		for (uint16_t i = 0; i < 512; ++i) {
 			dst_page[i] = src_page[i];
 			if (dst_page[i] & PAGING_FLAG_P)
 				kmem_copy_rec(
@@ -239,7 +244,7 @@ void kmem_copy_rec(uint64_t* dst_entry, uint64_t* src_page, uint8_t lvl) {
 						lvl - 1);
 		}
 	else
-		for (size_t i = 0; i < 512; ++i)
+		for (uint16_t i = 0; i < 512; ++i)
 			dst_page[i] = src_page[i];
 }
 
@@ -249,12 +254,34 @@ void kmem_copy_paging(volatile phy_addr new_pml4) {
 
 	pml4_to_cr3(new_pml4);
 
-	for (int i = 0; i < PML4_KERNEL_VIRT_ADDR; ++i)
-		if(*paging_acc_pml4(i) & PAGING_FLAG_P) {
-			*paging_acc_pml4(PML4_COPY_RES) 
+	for (int i = 0; i <= PML4_MAX_USPACE; ++i)
+		if (*paging_acc_pml4(i) & PAGING_FLAG_P) {
+			*paging_acc_pml4(PML4_COPY_RES)
 				= *paging_acc_pml4(i) & ~PAGING_FLAG_U;
 			paging_refresh();
 			kmem_copy_rec(paging_acc_pml4(i),
 					paging_acc_pdpt(PML4_COPY_RES,0), 3);
 		}
+}
+
+void kmem_free_rec(uint64_t* entry, uint8_t lvl) {
+	if (lvl) {
+		uint64_t* page_bg = (uint64_t*) paging_rm_loop((uint_ptr)entry);
+		for (uint16_t i = 0; i < 512; ++i)
+			if (page_bg[i] & PAGING_FLAG_P)
+				kmem_free_rec(page_bg + i, lvl-1);
+	}
+	kmem_free_page((*entry) & PAGE_MASK);
+}
+void kmem_free_paging(phy_addr old_pml4, phy_addr new_pml4) {
+	for (int i = 0; i <= PML4_MAX_USPACE; ++i)
+		if (*paging_acc_pml4(i) & PAGING_FLAG_P)
+			kmem_free_rec(paging_acc_pml4(i), 3);
+
+	pml4_to_cr3(new_pml4);
+
+	kmem_free_page(old_pml4);
+
+	klogf(Log_verb, "mem", "%lld pages disponibles",
+			(long long int)kmem_nb_page_free());
 }

@@ -7,12 +7,18 @@
 // number of vector numbers considered as exceptions raised by CPU
 #define NEXCEPTION_VEC 32
 
-// each IDT entry is 8 bytes long
-#define IDT_HANDLER_SZ 9
-
-// magic numbers
 #define KERNEL_SEGMENT_OFFSET 0x08
-#define INT_GATE              0x8e
+
+//Interrupt
+#define IDT_ATTR_INT          0x06
+//Trap
+#define IDT_ATTR_TRAP         0x07
+//Gate size
+#define IDT_ATTR_D            0x08
+//DPL
+#define IDT_ATTR_DPL(R)       ((R)<<5)
+//Present
+#define IDT_ATTR_P            0x80
 
 // special interrupt vectors
 #define SYSCALL_VEC           0x80
