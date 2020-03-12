@@ -106,19 +106,6 @@ size_t built_in_exec(size_t in_begin, size_t in_len) {
     return 0;
 }
 
-void tty_test_prg_rt(uint64_t rdi, uint64_t rsi) {
-    char str[]   = "__..__..__..__..\n";
-    size_t idx_b = tty_buffer_cur_idx();
-    size_t shift;
-    int64_to_str_hexa(str, rdi);
-    shift = tty_writestring(str);
-    int64_to_str_hexa(str, rsi);
-    shift += tty_writestring(str);
-    if (shift) tty_afficher_buffer_all();
-    else tty_afficher_buffer_range(idx_b, tty_buffer_next_idx());
-    tty_new_prompt();
-}
-
 void tty_input(scancode_byte s, key_event ev) {
     size_t  shift  = 0;
     size_t  idx_b  = tty_buffer_cur_idx();
@@ -365,18 +352,35 @@ size_t tty_writestring(const char* str) {
     char c = *str;
     size_t x = cur_ln_x;
     size_t ln_index = (sb_ashift + sb_nb_lines - 1) & SB_MASK;
-    for(; x < VGA_WIDTH && c; ++x, c = *(++str)) {
-        if(c == '\n') {
-            for(;x < VGA_WIDTH; ++x)
-                sbuffer[ln_index][x] = vga_entry(' ', back_color);
-            c = *(++str);
-            break;
-        }
-        sbuffer[ln_index][x] = vga_entry(c, back_color);
-    }
-    while (c) {
+	goto loop_enter; while (c) {
         rt += tty_new_buffer_line(&ln_index);
-        for(x=0; x < VGA_WIDTH && c; ++x, c = *(++str)) {
+		x = 0;
+loop_enter:
+		for(; x < VGA_WIDTH && c; ++x, c = *(++str)) {
+            if(c == '\n') {
+                for(;x < VGA_WIDTH; ++x)
+                    sbuffer[ln_index][x] = vga_entry(' ', back_color);
+                c = *(++str);
+                break;
+            }
+            sbuffer[ln_index][x] = vga_entry(c, back_color);
+        }
+    }
+    cur_ln_x = x;
+    return rt;
+}
+
+size_t tty_writestringl(const char* str, size_t len) {
+	const char* end = str + len;
+    size_t rt = 0;
+    char c = *str;
+    size_t x = cur_ln_x;
+    size_t ln_index = (sb_ashift + sb_nb_lines - 1) & SB_MASK;
+	goto loop_enter; while (str != end) {
+        rt += tty_new_buffer_line(&ln_index);
+		x = 0;
+loop_enter:
+		for(; x < VGA_WIDTH && str!=end; ++x, c = *(++str)) {
             if(c == '\n') {
                 for(;x < VGA_WIDTH; ++x)
                     sbuffer[ln_index][x] = vga_entry(' ', back_color);
@@ -392,4 +396,7 @@ size_t tty_writestring(const char* str) {
 
 void tty_writer(void* shift, const char *str) {
     *((size_t*)shift) = tty_writestring(str);
+}
+void tty_seq_write(void* seq, const char* s, size_t len) {
+	((tty_seq_t*)seq)->shift += tty_writestringl(s, len);
 }

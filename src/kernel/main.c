@@ -33,8 +33,8 @@ void kernel_main(uint32_t boot_info) {
     kernel_init(boot_info);
 
     klog(Log_info, "statut", "64 bits kernel launched.");
-    klogf(Log_info, "mem", "%d pages disponibles",
-			(int)kmem_nb_page_free());
+    klogf(Log_info, "mem", "%lld pages disponibles",
+			(long long int)kmem_nb_page_free());
 
     tty_afficher_buffer_all();
 

@@ -1,0 +1,9 @@
+FORMATS
+	c	char
+	s	string
+	d	entier
+	x	entier hexadécimal
+	p	pointeur
+MODIFICATEURS
+	l	long
+	ll	long long

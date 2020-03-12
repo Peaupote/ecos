@@ -1,7 +1,5 @@
 #include "kutil.h"
 
-#include <stdarg.h>
-
 #include "../util/string.h"
 #include "../util/vga.h"
 #include "tty.h"
@@ -15,7 +13,7 @@ static const char *decimal_digits = "0123456789";
 static const char *hex_digits     = "0123456789ABCDEF";
 
 static size_t
-itoa(int x, const char *digits, size_t base) {
+itoa(long long int x, const char *digits, size_t base) {
     if (x == 0) {
         buf[255] = *digits;
         buf[256] = 0;
@@ -51,65 +49,91 @@ ultoa(uint64_t x, const char *digits, size_t base) {
     return i;
 }
 
-static void cpy(const void *src, void *dst, size_t len) {
-    uint8_t *s = (uint8_t*)src;
-    uint8_t *d = (uint8_t*)dst;
-    for (size_t i = 0; i < len; i++) *d++ = *s++;
+static inline
+int64_t arg_int(uint8_t mod, va_list ps) {
+	switch (mod) {
+		case 1:
+			return va_arg(ps, long int);
+		case 2:
+			return va_arg(ps, long long int);
+		default:
+			break;
+	}
+	return va_arg(ps, int);
 }
 
-int vprintf(const char *format, va_list params) {
-    size_t idx_b = tty_buffer_cur_idx();
+int fpprintf(stringl_writer w, void* wi, const char* fmt, va_list ps) {
     int count = 0;
-    int shift = 0;
-    while (*format) {
-        if (format[0] != '%' || format[1] == '%') {
+    while (*fmt) {
+        if (fmt[0] != '%' || fmt[1] == '%') {
             size_t len = 1;
-            if (format[0] == '%') format++;
-            while(format[len] && format[len] != '%') len++;
-            cpy(format, buf, len);
-            buf[len] = 0;
-            shift += tty_writestring(buf);
+            if (fmt[0] == '%') fmt++;
+            while(fmt[len] && fmt[len] != '%') len++;
+			(*w)(wi, fmt, len);
             count += len;
-            format += len;
+            fmt += len;
             continue;
         }
-
+		
         // TODO : more format
-        if (format[1] == 'c') {
-            char c = (char)va_arg(params, int);
-            buf[0] = c; buf[1] = 0;
-            shift += tty_writestring(buf);
-            count += 1;
-        } else if (format[1] == 's') {
-            const char *s = va_arg(params, const char*);
-            size_t len = ustrlen(s);
-            count += len;
-            shift += tty_writestring(s);
-        } else if (format[1] == 'd') {
-            int x = va_arg(params, int);
-            size_t len = itoa(x, decimal_digits, 10);
-            shift += tty_writestring(buf + 256 - len);
-            count += len;
-        } else if (format[1] == 'h') {
-            int x = va_arg(params, int);
-            size_t len = itoa(x, hex_digits, 16);
-            shift += tty_writestring(buf + 256 - len);
-            count += len;
-        } else if (format[1] == 'p') {
-            uint64_t x = va_arg(params, uint64_t);
-            size_t len = ultoa(x, hex_digits, 16);
-            shift += tty_writestring(buf + 256 - len);
-            count += len;
-        } else return -1;
-
-        // works for now because all format is made of only one character
-        format += 2;
+		//Modifiers
+		uint8_t mod = 0;
+		switch(* ++fmt) {
+			case 'l':
+				switch(* ++fmt) {
+					case 'l':
+						mod = 2;
+						++fmt;
+						break;
+					default:
+						mod = 1;
+				}
+				break;
+			default:
+				break;
+		}
+	
+		size_t len;
+		switch(*fmt) {
+			case 'c':
+				buf[0] = (char)va_arg(ps, int);
+				buf[1] = 0;
+				(*w)(wi, buf, 1);
+				count += 1;
+			break;
+			case 's':{
+				const char *s = va_arg(ps, const char*);
+				len = ustrlen(s);
+				(*w)(wi, s, len);
+				count += len;
+			}break;
+			case 'd':
+				len = itoa(arg_int(mod, ps), decimal_digits, 10);
+			goto print_buf;
+			case 'x':
+				len = itoa(arg_int(mod, ps), hex_digits, 16);
+			goto print_buf;
+			case 'p':
+				len = ultoa(va_arg(ps, uint64_t), hex_digits, 16);
+			print_buf:
+				(*w)(wi, buf + 256 - len, len);
+				count += len;
+			break;
+			default:
+				return -1;
+		}
+        ++fmt;
     }
+    
+	return count;
+}
 
-    if (shift) tty_afficher_buffer_all();
-    else tty_afficher_buffer_range(idx_b, tty_buffer_next_idx());
-
-    return count;
+int vprintf(const char *fmt, va_list ps) {
+	tty_seq_t sq;
+	tty_seq_init(&sq);
+	int cnt = fpprintf(&tty_seq_write, &sq, fmt, ps);
+	tty_seq_commit(&sq);
+	return cnt;
 }
 
 int kprintf(const char *format, ...) {

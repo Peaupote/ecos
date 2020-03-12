@@ -5,7 +5,7 @@
 #include<stdint.h>
 
 #ifndef TEST_UNIT
-#include "kmem.h"
+#include "../../util/paging.h"
 #endif
 
 #define MBLOC_SIZE     0x200000

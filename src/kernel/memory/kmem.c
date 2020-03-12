@@ -166,16 +166,6 @@ uint16_t kmem_bind_dynamic_range(uint16_t num,
 	return num;
 }
 
-phy_addr kmem_alloc_page() {
-	return palloc_alloc_page(&page_alloc);
-}
-void kmem_free_page(phy_addr p) {
-	palloc_free_page(&page_alloc, p);
-}
-size_t kmem_nb_page_free() {
-	return palloc_nb_free_page(&page_alloc);
-}
-
 uint64_t* acc_pt_entry(uint_ptr v_addr, uint16_t flags) {
 	uint64_t query_addr = 
 		(uint64_t) paging_acc_pml4(paging_get_pml4(v_addr));

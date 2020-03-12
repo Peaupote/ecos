@@ -2,6 +2,11 @@
 #define _KUTIL_H
 
 #include <stddef.h>
+#include <stdarg.h>
+
+#include "../util/string.h"
+
+int  wprintf(stringl_writer, void*, const char* fmt, va_list params);
 
 int  kprintf(const char *format, ...);
 

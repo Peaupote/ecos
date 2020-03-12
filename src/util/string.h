@@ -6,6 +6,8 @@
 #include <stdint.h>
 
 typedef void (*string_writer)(void*, const char*);
+//str[sz] doit être accessible mais pas nécessairement égal à '\0'
+typedef void (*stringl_writer)(void*, const char*, size_t);
 
 size_t ustrlen(const char* str);
 int ustrcmp(const char *lhs, const char *rhs);
@@ -15,7 +17,7 @@ size_t str_find_first(const char* s, char trg);
 void int64_to_str_hexa(char* out, uint64_t v);
 void int32_to_str_hexa(char* out, uint32_t v);
 void int8_to_str_hexa(char* out, uint8_t v);
-inline void ptr_to_str(char *out, void *ptr){
+static inline void ptr_to_str(char *out, void *ptr){
 #ifdef __i686__
     int32_to_str_hexa(out, (uint32_t)ptr);
 #else
