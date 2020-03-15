@@ -1,0 +1,23 @@
+Les appels systèmes sont déclenchés à partir de l'interruption 0x80.
+On précise l'appel système que l'on souhaite déclencher en plançant son identifiant dans rax avant de lancer l'interruption.
+Les arguments sont passés selon les conventions d'appel C, c'est à dire dans les registres rdi, rsi, rdx, rcx, r8, r9 et dans cet ordre. La valeur de retour est renvoyée dans rax. Pour éviter les complications, on s'arrangera pour ne jamais utiliser plus de 6 arguments.
+
+Les identifiants associés à chaque appel système sont décrit dans le fichier src/kernel/sys.h
+
+Liste des appels systèmes (implémentés ou à implémenter) avec le type des arguments:
+
+[x] uint32_t sleep(uint32_t time);
+[x] pid_t    fork();
+[x] void     exit(int status);
+[x] pid_t    wait();
+[x] pid_t    waitpid(pid_t pid);
+[x] pid_t    getpid();
+[x] pid_t    getppid();
+[ ] int      open(char *fname, int mode);
+[ ] int      close(int fd);
+[ ] int      dup(int fd);
+[ ] int      pipe(int fds[2]);
+[ ] int      write(int fd, void *buf, size_t len);
+[ ] int      read(int fd, void *buf, size_t len);
+[ ] int      lseek(int offset);
+[ ] int      execv(char *fname, char **argv, char **env);
