@@ -11,6 +11,7 @@
 #include "keyboard.h"
 #include "idt.h"
 #include "gdt.h"
+#include "kutil.h"
 
 char nb_str[17];
 
@@ -60,4 +61,12 @@ uint8_t test_struct_layout() {
 		sizeof(struct      GDT) == 0x38
 	 && sizeof(struct GDT_desc) == 0xa
 	 && sizeof(struct      TSS) == 0x68;
+}
+
+void test_print_statut(void) {
+	uint64_t rsp;
+	uint16_t ss;
+	asm("movq %%rsp, %0" : "=r"(rsp));
+	asm("movw %%ss, %0" : "=r"(ss));
+	klogf(Log_info, "test", "rsp=%p ss=%x", rsp, (unsigned int)ss);
 }

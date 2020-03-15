@@ -41,6 +41,7 @@ syscall_tab:
 .extern sleep_hdl
 .extern kexit
 .extern invalid_syscall
+.extern exception_PF_hdl
 
 // Save all registers to be easily accessible in C code
 .macro save_curr_proc_reg
@@ -110,6 +111,19 @@ syscall_tab:
     pushq %r10
     pushq %r11
 .endm
+//Récupère le code d'erreur (8 byte) dans %rsi
+.macro save_c_reg_err
+	pushq %rcx
+    pushq %rdx
+    pushq %rsi
+	movq  24(%rsp), %rsi
+	movq  %rax, 24(%rsp)
+    pushq %rdi
+    pushq %r8
+    pushq %r9
+    pushq %r10
+    pushq %r11
+.endm
 .macro restore_c_reg
     popq  %r11
     popq  %r10
@@ -132,27 +146,22 @@ syscall_tab:
 #include "int_handlers.s"
 
 irq_keyboard:
-    cli
     save_c_reg
     leaq -8(%rsp), %rsp //Alignement 16 octets
     call keyboard_hdl
     leaq 8(%rsp), %rsp
     restore_c_reg
-    sti
     iretq
 
 irq_pit:
-    cli
     save_c_reg
     leaq -8(%rsp), %rsp //Alignement 16 octets
     call pit_hdl
     leaq 8(%rsp), %rsp
     restore_c_reg
-    sti
     iretq
 
 irq_sys:
-    cli
     save_curr_proc_reg
     save_c_reg
     mov   %ds, %bx
@@ -169,6 +178,15 @@ irq_sys:
     callq  *%rax
     jmp   func_end
 
+irq14://#PF: Page Fault
+	save_c_reg_err
+	leaq   -8(%rsp), %rsp
+	movq   %cr2, %rdi //Adresse provoquant le PF
+	call   exception_PF_hdl
+	leaq   8(%rsp), %rsp
+	restore_c_reg
+	iretq
+
 incorrect_rax:
     call invalid_syscall
 
@@ -177,7 +195,6 @@ func_end:
     set_data_segments
     restore_c_reg
     restore_curr_proc_reg
-    sti
     iretq
 
 // restore registers from global struct st_curr_reg

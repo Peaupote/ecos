@@ -7,13 +7,23 @@
 
 #include "int.h"
 
+//Interrupt
+#define IDT_TYPE_INT          0x0e
+//Trap
+#define IDT_TYPE_TRAP         0x0f
+//DPL
+#define IDT_ATTR_DPL(R)       ((R)<<5)
+//Present
+#define IDT_ATTR_P            0x80
+
+
 /**
  * IDT gate description
  */
 struct gate_desc {
     uint16_t  offset_low;   // offset 0..15
     uint16_t  segment;      // code segment in GDT or LDT
-    uint8_t   ist;
+    uint8_t   ist;			// [0..2] entry in IST
     uint8_t   type_attr;    // type and attributes
     uint16_t  offset_mid;   // offset 16..31
     uint32_t  offset_high;  // offset 32..64

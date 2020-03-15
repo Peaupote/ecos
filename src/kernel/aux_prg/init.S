@@ -54,11 +54,21 @@ _start:
     movq    $SYS_WRITE, %rax
     int     $0x80
 
-2:  jmp     2b
+    movq    $SYS_FORK, %rax
+    int     $0x80
+    testq   %rax, %rax
+    jne     2f
 
+	//#PF
+	movq	$42, %rax
+	movq	$0, (%rax)
+
+	//Exit
     movq    $0, %rdi
     movq    $SYS_EXIT, %rax
     int     $0x80
+	
+2:  jmp     2b
 
 1:
     // init wait for all its childrens

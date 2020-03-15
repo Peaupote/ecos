@@ -17,6 +17,8 @@ void kexit() {
     klogf(Log_info, "syscall",
           "kill pid %d with status %d", p->p_pid, status);
 
+    klogf(Log_verb, "mem", "pre_free: %lld pages disponibles",
+			(long long int)kmem_nb_page_free());
 	kmem_free_paging(p->p_pml4, kernel_pml4);
 
     if (pp->p_stat == WAIT) {

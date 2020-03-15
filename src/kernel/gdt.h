@@ -22,7 +22,7 @@ struct TSS {//size = 0x68
 	uint32_t : 32;
 	void*    rsp[3];
 	uint64_t : 64;
-	void*    ist[7]; //IST1 - IST7
+	void*    ist[7]; //Interrupt Stack Table: IST1 - IST7
 	uint64_t : 64;
 	uint16_t : 16;
 	uint16_t iomap_base;

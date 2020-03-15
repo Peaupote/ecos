@@ -48,6 +48,11 @@ ultoa(uint64_t x, const char *digits, size_t base) {
     buf[256] = 0;
     return i;
 }
+static size_t complete_buf(size_t clen, size_t objlen, char c) {
+	for(;clen < objlen; ++clen)
+		buf[255 - clen] = c;
+	return clen;
+}
 
 static inline
 int64_t arg_int(uint8_t mod, va_list ps) {
@@ -111,10 +116,12 @@ int fpprintf(stringl_writer w, void* wi, const char* fmt, va_list ps) {
 				len = itoa(arg_int(mod, ps), decimal_digits, 10);
 			goto print_buf;
 			case 'x':
-				len = itoa(arg_int(mod, ps), hex_digits, 16);
+				len = ultoa(arg_int(mod, ps), hex_digits, 16);
 			goto print_buf;
 			case 'p':
-				len = ultoa(va_arg(ps, uint64_t), hex_digits, 16);
+				len = complete_buf(
+						ultoa(va_arg(ps, uint64_t), hex_digits, 16),
+						16, '0');
 			print_buf:
 				(*w)(wi, buf + 256 - len, len);
 				count += len;
