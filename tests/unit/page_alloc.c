@@ -96,7 +96,7 @@ void sq_test_mbt() {
 	size_t h     = mbtree_height_for(sz);
 	size_t intn  = mbtree_intn_for(h);
 	size_t space = mbtree_space_for(intn, sz);
-	if(space > 100) texit("mbt space");
+	if(space > 800) texit("mbt space");
 	mbtree_init(&mbt, h, intn, space, space_mbt);
 	test_infoi("\tmbt--sz=%d ",     sz);
 	test_infoi("h=%d ",      h);

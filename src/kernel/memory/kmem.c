@@ -10,6 +10,9 @@
 #include "../tty.h"
 #include "../../util/vga.h"
 
+//Taille maximale du tas de kernel (nombre de pages)
+#define KHEAP_SZ 0x40000
+
 
 phy_addr kernel_pml4;
 
@@ -19,11 +22,13 @@ uint64_t laddr_pd[512] __attribute__ ((aligned (PAGE_SIZE)));
 // Emplacements dynamiques
 uint64_t dslot_pt[512] __attribute__ ((aligned (PAGE_SIZE)));
 
-// Heap: stocke les structures du kernel de taille déterminiée à l'éxécution
+// Heap: stocke les structures du kernel
+// de tailles déterminiées à l'éxécution
 uint64_t heap_pd [512] __attribute__ ((aligned (PAGE_SIZE)));
 uint64_t heap_pt0[512] __attribute__ ((aligned (PAGE_SIZE)));
-size_t   heap_next_page;
-
+// Allocation des adresses virtuelles du tas
+struct MemBlockTree  khep_alloc;
+// Allocation des pages physiques
 struct PageAllocator page_alloc;
 
 
@@ -86,13 +91,18 @@ void kmem_init_alloc(uint32_t boot_info) {
 							      / MBLOC_SIZE;
 
 	// Calcul l'espace nécessaire pour les structures d'allocation
-	size_t s_space = page_alloc.nb_blocks * sizeof(struct MemBlock);
-	size_t h       = mbtree_height_for(page_alloc.nb_blocks);
-	size_t intn    = mbtree_intn_for(h);
-	size_t t_spac1 = mbtree_space_for(intn, page_alloc.nb_blocks);
-	size_t t_space = 2 * t_spac1;
-	size_t t_space_bg = align_to(s_space, 8);
-	s_space = t_space_bg + t_space;
+	size_t s_space     = page_alloc.nb_blocks * sizeof(struct MemBlock);
+	size_t h           = mbtree_height_for(page_alloc.nb_blocks);
+	size_t intn        = mbtree_intn_for(h);
+	size_t t_spac1     = mbtree_space_for(intn, page_alloc.nb_blocks);
+	size_t t_space_bg  = align_to(s_space, 8);
+	size_t t_space     = 2 * t_spac1;
+	s_space            = t_space_bg + t_space;
+	size_t hp_space_bg = align_to(s_space, 8);
+	size_t hp_h        = mbtree_height_for(KHEAP_SZ);
+	size_t hp_intn     = mbtree_intn_for(hp_h);
+	size_t hp_space    = mbtree_space_for(hp_intn, KHEAP_SZ);
+	s_space = hp_space_bg + hp_space;
 
 	if (s_space > 512 * PAGE_SIZE) kpanic("s_space");
 
@@ -103,17 +113,22 @@ void kmem_init_alloc(uint32_t boot_info) {
 		: ek_pg;
 
 	// On map cet emplacement sur le tas
-	for (heap_next_page = 0; heap_next_page * PAGE_SIZE < s_space;
+	size_t heap_next_page = 0;
+	for (; heap_next_page * PAGE_SIZE < s_space;
 			++heap_next_page)
 		heap_pt0[heap_next_page] = (s_pya + heap_next_page * PAGE_SIZE)
 			    | PAGING_FLAG_R | PAGING_FLAG_P | PAGING_FLAG_G;
-	uint8_t* s_space_bg = (uint8_t*) paging_pts_acc
+	
+	uint8_t* s_space_bg  = (uint8_t*) paging_pts_acc
 				(PML4_KERNEL_VIRT_ADDR, KERNEL_PDPT_HEAP, 0, 0, 0);
 
 	palloc_init(&page_alloc,
 		(struct MemBlock*) s_space_bg, h, intn, t_spac1,
 		(uint64_t*)(s_space_bg + t_space_bg),
 		(uint64_t*)(s_space_bg + t_space_bg + t_spac1));
+	mbtree_init(&khep_alloc, hp_h, hp_intn, hp_space,
+		(uint64_t*)(s_space_bg + hp_space_bg));
+	mbtree_add_rng(&khep_alloc, heap_next_page, KHEAP_SZ);
 
 	// Initialisation des MemBlocks
 	//sizeof(multiboot_memory_map_t) + sizeof(e.size) >= 20 + 4 = 24
@@ -213,6 +228,27 @@ uint8_t kmem_paging_alloc(uint_ptr v_addr, uint16_t flags){
 	}
 	*query = kmem_alloc_page() | flags | PAGING_FLAG_P;
 	return 0;
+}
+
+uint8_t kmem_paging_unmap(uint_ptr v_addr) {
+	//TODO
+	*paging_page_entry(v_addr) = 0;
+	return 0;
+}
+
+void* kalloc_page() {
+	uint_ptr v_addr = kheap_alloc_vpage();
+	phy_addr p_addr = kmem_alloc_page();
+	kassert(!paging_map_to(v_addr, p_addr), "kheap bind");
+	return (void*)v_addr;
+}
+
+void  kfree_page(void* a) {
+	uint_ptr v_addr = (uint_ptr) a;
+	phy_addr p_addr = (*paging_page_entry(v_addr)) & PAGE_MASK;
+	kmem_free_page(p_addr);
+	kheap_free_vpage(v_addr);
+	kmem_paging_unmap(v_addr);
 }
 
 void kmem_init_pml4(uint64_t* pml4, phy_addr p_loc) {

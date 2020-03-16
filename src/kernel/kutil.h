@@ -19,6 +19,7 @@ void klogf(enum klog_level lvl, const char *head, const char *msgf, ...);
 
 void kpanic(const char *msg);
 void kpanic_ct(const char *msg);
+void kassert(uint8_t, const char *msg);
 
 void memcpy(void *dst, const void *src, size_t len);
 

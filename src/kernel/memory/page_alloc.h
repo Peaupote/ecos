@@ -87,6 +87,7 @@ uint16_t mblock_alloc_page(struct MemBlock* b);
 
 size_t  mbtree_height_for(size_t nb_blocks);
 size_t  mbtree_intn_for(size_t h);
+//Espace nécessaire (byte), multiple de 8
 size_t  mbtree_space_for(size_t intn, size_t nb_blocks);
 //Créé un arbre vide
 void    mbtree_init(struct MemBlockTree* t, size_t height, size_t intn,
@@ -96,6 +97,7 @@ void    mbtree_rem(struct MemBlockTree* t, size_t i);
 uint8_t mbtree_get(struct MemBlockTree* t, size_t i);
 uint8_t mbtree_non_empty(struct MemBlockTree* t);
 size_t  mbtree_find(struct MemBlockTree* t);
+void    mbtree_add_rng(struct MemBlockTree* t, size_t begin, size_t end);
 
 
 void palloc_init(struct PageAllocator*, struct MemBlock* mbs,

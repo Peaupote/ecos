@@ -70,3 +70,15 @@ void test_print_statut(void) {
 	asm("movw %%ss, %0" : "=r"(ss));
 	klogf(Log_info, "test", "rsp=%p ss=%x", rsp, (unsigned int)ss);
 }
+
+void test_kheap(void) {
+	void* addr[3];
+	for (uint8_t i = 0; i < 3; ++i) {
+		addr[i] = kalloc_page();
+		kprintf("kalloc %p\n", addr[i]);
+	}
+	for (uint8_t i = 0; i < 3; ++i) {
+		kfree_page(addr[i]);
+		kprintf("kfree  %p\n", addr[i]);
+	}
+}

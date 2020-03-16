@@ -48,17 +48,26 @@ static inline uint16_t paging_get_pml4(uint_ptr v) {
 static inline uint_ptr paging_set_pdpt(uint16_t e) {
     return ((uint_ptr) e) << 30;
 }
+static inline uint_ptr paging_add_pdpt(uint_ptr e) {
+    return e << 30;
+}
 static inline uint16_t paging_get_pdpt(uint_ptr v) {
     return (uint16_t)((v >> 30) & 0x1ff);
 }
 static inline uint_ptr paging_set_pd  (uint16_t e) {
     return ((uint_ptr) e) << 21;
 }
+static inline uint_ptr paging_add_pd  (uint_ptr e) {
+    return e << 21;
+}
 static inline uint16_t paging_get_pd  (uint_ptr v) {
     return (uint16_t)((v >> 21) & 0x1ff);
 }
 static inline uint_ptr paging_set_pt  (uint16_t e) {
     return ((uint_ptr) e) << 12;
+}
+static inline uint_ptr paging_add_pt  (uint_ptr e) {
+    return e << 12;
 }
 static inline uint16_t paging_get_pt  (uint_ptr v) {
     return (uint16_t)((v >> 12) & 0x1ff);
@@ -78,14 +87,14 @@ static inline uint64_t* paging_pts_acc(uint16_t j0, uint16_t j1,
       | paging_set_pt  (j3)
       | (((uint_ptr)num)<<3) );
 }
-static inline uint64_t* paging_adr_acc(uint16_t j0, uint16_t j1,
-        uint16_t j2, uint16_t j3, uint16_t ofs) {
+static inline uint64_t* paging_adr_acc(uint16_t j0, uint_ptr j1,
+        uint_ptr j2, uint_ptr j3, uint_ptr ofs) {
     return (uint64_t*)(
         paging_set_pml4(j0)
-      | paging_set_pdpt(j1)
-      | paging_set_pd  (j2)
-      | paging_set_pt  (j3)
-      | ((uint_ptr)ofs) );
+      | paging_add_pdpt(j1)
+      | paging_add_pd  (j2)
+      | paging_add_pt  (j3)
+      | ofs );
 }
 
 static inline uint64_t* paging_acc_pml4(uint16_t pml4_e) {
