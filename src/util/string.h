@@ -11,6 +11,10 @@ typedef void (*stringl_writer)(void*, const char*, size_t);
 
 size_t ustrlen(const char* str);
 int ustrcmp(const char *lhs, const char *rhs);
+int ustrncmp(const char *lhs, const char *rhs, size_t len);
+void ustrncpy(char *dst, const char *src, size_t len);
+int uis_prefix(const char *s, const char *p);
+char *uindex(const char *src, char c);
 
 size_t str_find_first(const char* s, char trg);
 

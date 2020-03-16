@@ -1,15 +1,18 @@
 ISO=ecos.iso
 
 .PHONY: all clean tests start re src/kernel/kernel.bin src/boot/boot.bin \
-	depends
+	fs depends
 
 all: $(ISO)
 
-src/kernel/kernel.bin:
+src/kernel/kernel.bin: fs
 	$(MAKE) -C src/kernel kernel.bin
 
 src/boot/boot.bin:
 	$(MAKE) -C src/boot boot.bin
+
+fs:
+	$(MAKE) -C src/fs
 
 $(ISO): src/grub.cfg src/boot/boot.bin src/kernel/kernel.bin
 	mkdir -p isodir/boot/grub
@@ -37,6 +40,7 @@ clean:
 	$(MAKE) -C src/kernel clean
 	$(MAKE) -C src/boot   clean
 	$(MAKE) -C src/util   clean
+	$(MAKE) -C src/fs     clean
 	$(MAKE) -C src/libc   clean
 	$(MAKE) -C tests      clean
 	rm -rf *.o *.iso *.bin isodir

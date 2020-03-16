@@ -64,12 +64,12 @@ enum chann_mode {
 typedef struct channel {
     cid_t           chann_id;
 
-    // pointer to mem storage
+    // pointer to virtual file
     // and current writing/reading position in the buffer
-    struct buffer  *chann_buf;
-    pos_t           chann_pos;
+    vfile_t        *chann_vfile;
+    off_t           chann_pos;
 
-    enum chann_mode chann_mode; // kind of operations channel allow to perform
+    enum chann_mode chann_mode; // kind of operations channel allowed
     uint64_t        chann_acc;  // number of times the channel is referenced
 } chann_t;
 
@@ -84,7 +84,7 @@ struct {
     size_t      st_waiting_ps;        // number of processes in queue
     proc_t      st_proc[NPROC];       // table containing all processes
     chann_t     st_chann[NCHAN];      // table containing all channels
-    buf_t       st_buf[NBUF];         // table containing all buffers
+    vfile_t     st_files[NFILE];     // table containing all opened files
 } state;
 
 // pointer to current proc registers

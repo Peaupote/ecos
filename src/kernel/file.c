@@ -1,158 +1,122 @@
+#include "kutil.h"
 #include "file.h"
 #include "proc.h"
 
-/**
- * Red-black tree implementation for file system
- */
+#include "../fs/dummy/dummy.h"
 
-enum color_t { BLACK, RED };
+void vfs_init() {
+    klogf(Log_info, "vfs", "Initialize");
 
-typedef struct node {
-    struct file f;
-
-    // red-black tree structure
-    struct node *parent, *left, *right;
-    enum color_t color;
-} node_t;
-
-node_t *grandparent(node_t *node) {
-    node_t *parent = node ? node : node->parent;
-    return parent ? parent : parent->parent;
-}
-
-node_t *sibling(node_t *node) {
-    // no parent means no sibling
-    if (!node || !node->parent) return 0;
-
-    node_t *p = node->parent;
-    return p->left == node ? p->right : p->left;
-}
-
-node_t *uncle(node_t *node) {
-    if (!node || !node->parent) return 0;
-    return sibling(node->parent);
-}
-
-void rot_left(node_t *n) {
-    node_t *nnew = n->right;
-    node_t *p = n->parent;
-
-    n->right = nnew->left;
-    nnew->left = n;
-    n->parent = nnew;
-
-    if (n->right) n->right->parent = n;
-
-    if (p) {
-        if (n == p->left) p->left = nnew;
-        else p->right = nnew;
+    for (size_t i = 0; i < NDEV; i++) {
+        devices[i].dev_id = i;
+        devices[i].dev_mnt[0] = 0;
     }
 
-    nnew->parent = p;
-}
+    klogf(Log_info, "vfs", "setup dumb file system");
+    memcpy(fst[DUMMY_FS].fs_name, "dumb", 4);
+    fst[DUMMY_FS].fs_mnt     = dummy_mount;
+    fst[DUMMY_FS].fs_load    = dummy_load;
+    fst[DUMMY_FS].fs_create  = dummy_create;
+    fst[DUMMY_FS].fs_read    = dummy_read;
+    fst[DUMMY_FS].fs_write   = dummy_write;
+    fst[DUMMY_FS].fs_readdir = dummy_readdir;
+    fst[DUMMY_FS].fs_seek    = dummy_seek;
 
-void rot_right(node_t* n) {
-    node_t* nnew = n->left;
-    node_t* p = n->parent;
-
-    n->left = nnew->right;
-    nnew->right = n;
-    n->parent = nnew;
-
-    if (n->left) n->left->parent = n;
-
-    if (p) {
-        if (n == p->left) p->left = nnew;
-        else p->right = nnew;
+    void *spblk = fst[DUMMY_FS].fs_mnt();
+    if (!spblk) {
+        kpanic("Failed to mount /tmp");
     }
 
-    nnew->parent = p;
+    memcpy(devices[0].dev_mnt, "/tmp", 5);
+    devices[0].dev_fs = DUMMY_FS;
+    devices[0].dev_spblk = spblk;
+
+    klogf(Log_info, "vfs", "/tmp sucessfully mounted");
 }
 
-void insert_rec(node_t* root, node_t* n) {
-    if (root) {
-        if (n->f.f_inode < root->f.f_inode) {
-            if (root->left) {
-                insert_rec(root->left, n);
-                return;
-            }
+static struct device *find_device(char *fname) {
+    // if mnt_pt is empty the mount point is unused
+    // if more than one mount point is prefix of the file name
+    // return the longest of the two prefix
 
-            root->left = n;
-        } else {
-            if (root->right) {
-                insert_rec(root->right, n);
-                return;
+    size_t i, mnt, len = 0;
+    for (i = 0; i < NDEV; i++) {
+        if (*devices[i].dev_mnt && !uis_prefix(fname, devices[i].dev_mnt)) {
+            size_t l = ustrlen(devices[i].dev_mnt);
+            if (l > len) {
+                mnt = i;
+                len = l;
             }
-
-            root->right = n;
         }
     }
 
-    n->parent = root;
-    n->left = 0;
-    n->right = 0;
-    n->color = RED;
+    return len > 0 ? devices + mnt : 0;
 }
 
-void insert_fix_tree(node_t* n) {
-    if (!n) return;
-    if (!n->parent) n->color = BLACK;
-    else if (n->parent->color == BLACK) return;
-    else if (!uncle(n) && uncle(n)->color == RED) {
-        n->parent->color = BLACK;
-        uncle(n)->color = BLACK;
+vfile_t *vfs_load(char *filename, uint32_t create) {
+    struct device *dev = find_device(filename);
+    if (!dev) {
+        klogf(Log_info, "vfs", "no mount point %s", filename);
+        return 0;
+    }
 
-        node_t *gparent = grandparent(n);
-        gparent->color = RED;
-        insert_fix_tree(gparent);
-    } else {
-        node_t* p = n->parent;
-        node_t* g = p->parent;
+    klogf(Log_info, "vfs", "load %s from %s (device id %d)",
+          filename, dev->dev_mnt, dev->dev_id);
 
-        if (n == p->right && p == g->left) {
-            rot_left(p);
-            n = n->left;
-        } else if (n == p->left && p == g->right) {
-            rot_right(p);
-            n = n->right;
+    struct fs *fs = &fst[dev->dev_fs];
+    struct stat st;
+    char *fname = filename + ustrlen(dev->dev_mnt);
+    int rc = fs->fs_load(dev->dev_spblk, fname, &st, &fname);
+
+    if (rc < 0) {
+        if (!create || *uindex(fname, '/')) {
+            klogf(Log_error, "vfs", "file %s dont exists", filename);
+            return 0;
         }
 
-        p = n->parent;
-        g = p->parent;
+        // TODO : fill stat
+        rc = fs->fs_create(dev->dev_spblk, st.st_ino, fname);
+        if (rc < 0) {
+            return 0;
+        }
 
-        if (n == p->left) rot_right(g);
-        else rot_left(g);
-
-        p->color = BLACK;
-        g->color = RED;
+        klogf(Log_info, "vfs", "create file %s", filename);
     }
+
+    size_t free = 0;
+    for (size_t i = 0; i < NFILE; i++) {
+        if (state.st_files[i].vf_stat.st_ino == st.st_ino) {
+            klogf(Log_info, "vfs", "file %s is already open", fname);
+            return state.st_files + i;
+        }
+
+        if (!free && !state.st_files[i].vf_cnt) free = i;
+    }
+
+    if (free == NFILE) {
+        klogf(Log_info, "vfs", "can't find a free virtual file slot");
+        return 0;
+    }
+
+    memcpy(&state.st_files[free].vf_stat, &st, sizeof(struct stat));
+    state.st_files[free].vf_stat.st_dev = dev->dev_id;
+    state.st_files[free].vf_cnt = 0;
+    return state.st_files + free;
 }
 
-
-node_t* insert(node_t* root, node_t* n) {
-    insert_rec(root, n);
-    insert_fix_tree(n);
-
-    for (root = n; root->parent; root = root->parent);
-    return root;
+int vfs_seek(vfile_t *vfile, off_t pos) {
+    struct device *dev = devices + vfile->vf_stat.st_dev;
+    return fst[dev->dev_fs].fs_seek(dev->dev_spblk, vfile->vf_stat.st_ino, pos);
 }
 
+int vfs_read(vfile_t *vfile, void *buf, size_t len) {
+    struct device *dev = devices + vfile->vf_stat.st_dev;
+    return fst[dev->dev_fs].fs_read(dev->dev_spblk, vfile->vf_stat.st_ino,
+                                   buf, len);
+}
 
-buf_t *load_buffer(ino_t file, pos_t offset) {
-    bid_t id;
-    for (id = 0; id < NBUF && state.st_buf[id].buf_size > 0; id++);
-    if (id == NBUF) return 0;
-
-    buf_t *buf = &state.st_buf[id];
-
-    // for now fill buffer with 'a'
-    for (size_t i = 0; i < BUFSIZE; i++)
-        buf->buf_content[i] = 'a';
-
-    buf->buf_inode = file;
-    buf->buf_offset = offset;
-    buf->buf_pv = 0;
-    buf->buf_nx = 0;
-    buf->buf_size = BUFSIZE;
-    return buf;
+int vfs_write(vfile_t *vfile, void *buf, size_t len) {
+    struct device *dev = devices + vfile->vf_stat.st_dev;
+    return fst[dev->dev_fs].fs_write(dev->dev_spblk, vfile->vf_stat.st_ino,
+                                    buf, len);
 }

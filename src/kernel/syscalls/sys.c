@@ -17,7 +17,7 @@ void kexit() {
     klogf(Log_info, "syscall",
           "kill pid %d with status %d", p->p_pid, status);
 
-	kmem_free_paging(p->p_pml4, kernel_pml4);
+    kmem_free_paging(p->p_pml4, kernel_pml4);
 
     if (pp->p_stat == WAIT) {
         pp->p_stat    = RUN;
@@ -143,8 +143,6 @@ void open() {
     char *fname = (char*)p->p_reg.rdi;
     enum chann_mode mode = p->p_reg.rsi;
 
-    // TODO : find file on disc
-    // TODO : more efficient
     cid_t cid;
     for (cid = 0; cid < NCHAN; cid++)
         if (state.st_chann[cid].chann_mode == UNUSED) break;
@@ -157,8 +155,16 @@ void open() {
     chann_t *c   = &state.st_chann[cid];
     c->chann_acc  = 1;
     c->chann_mode = mode;
-    c->chann_buf  = load_buffer(1, 0);
-    c->chann_pos  = 0;
+
+    c->chann_vfile = vfs_load(fname, 1);
+    if (!c->chann_vfile) {
+        klogf(Log_error, "sys",
+              "process %d couldn't open %s", p->p_pid, fname);
+        p->p_reg.rax = -1;
+        return;
+    }
+
+    c->chann_pos   = 0;
 
     for (int fd = 0; fd < NFD; fd++)
         if (p->p_fds[fd] == -1) {
@@ -259,10 +265,10 @@ error:
 void read() {
     proc_t *p  = &state.st_proc[state.st_curr_pid];;
     int fd     = p->p_reg.rdi;
-    uint8_t *v = (uint8_t*)p->p_reg.rsi;
+    uint8_t *d = (uint8_t*)p->p_reg.rsi;
     size_t len = p->p_reg.rdx;
 
-    if (!v || fd < 0 || fd > NFD || p->p_fds[fd] == -1) {
+    if (!d || fd < 0 || fd > NFD || p->p_fds[fd] == -1) {
         p->p_reg.rax = -1;
         return;
     }
@@ -270,25 +276,13 @@ void read() {
     chann_t *chann = &state.st_chann[p->p_fds[fd]];
     klogf(Log_info, "syscall", "process %d read on %d", p->p_pid, fd);
 
-    buf_t *buf = chann->chann_buf;
-    size_t i;
+    vfile_t *vfile = chann->chann_vfile;
 
     switch (chann->chann_mode) {
     case READ:
     case RDWR:
-        for (i = 0; i < len; i++) {
-            if (chann->chann_pos >= buf->buf_size) {
-                if (buf->buf_nx) {
-                    chann->chann_buf = buf->buf_nx;
-                    chann->chann_pos = 0;
-                    buf = buf->buf_nx;
-                } else break;
-            }
-
-            v[i] = buf->buf_content[chann->chann_pos++];
-        }
-
-        p->p_reg.rax = i; // return number of read chars
+        vfs_seek(vfile, chann->chann_pos);
+        p->p_reg.rax = vfs_read(vfile, d, len);
         break;
 
     case STREAM_IN:
@@ -302,41 +296,30 @@ void read() {
 void write() {
     proc_t *p  = &state.st_proc[state.st_curr_pid];;
     int fd     = p->p_reg.rdi;
-    uint8_t *v = (uint8_t*)p->p_reg.rsi;
+    uint8_t *s = (uint8_t*)p->p_reg.rsi;
     size_t len = p->p_reg.rdx;
 
-    if (!v || fd < 0 || fd > NFD || p->p_fds[fd] == -1) {
+    if (!s || fd < 0 || fd > NFD || p->p_fds[fd] == -1) {
         p->p_reg.rax = -1;
         return;
     }
 
     chann_t *chann = &state.st_chann[p->p_fds[fd]];
-    buf_t   *buf   = chann->chann_buf;
+    vfile_t *vfile = chann->chann_vfile;
     klogf(Log_info, "syscall", "process %d write on %d", p->p_pid, fd);
 
     size_t c = 0;
     switch (chann->chann_mode) {
     case WRITE:
     case RDWR:
-        for (c = 0; c < len; c++) {
-            if (chann->chann_pos >= buf->buf_size) {
-                if (buf->buf_nx) {
-                    chann->chann_buf = buf->buf_nx;
-                    chann->chann_pos = 0;
-                    buf = buf->buf_nx;
-                } else break;
-            }
-
-            buf->buf_content[chann->chann_pos++] = *v++;
-        }
-
-        p->p_reg.rax = c;
+        vfs_seek(vfile, chann->chann_pos);
+        p->p_reg.rax = vfs_write(vfile, s, len);
         break;
 
     case STREAM_OUT:
         // TODO : more efficient
         for (c = 0; c < len; c++)
-            kprintf("%c", *v++);
+            kprintf("%c", *s++);
         p->p_reg.rax = c;
         break;
 
@@ -349,13 +332,18 @@ void write() {
 void lseek(void) {
     proc_t *p = &state.st_proc[state.st_curr_pid];
     int fd = p->p_reg.rdi;
-    pos_t off = p->p_reg.rsi;
+    off_t off = p->p_reg.rsi;
 
-    // TODO : checks
+    if (fd < 0 || fd > NFD) {
+        klogf(Log_error, "syscall",
+              "process %d lseek on invalid file descriptor %d", p->p_pid, fd);
+        p->p_reg.rax = -1;
+        return;
+    }
+
     klogf(Log_info, "syscall",
           "process %d lseek %d at %d", p->p_pid, fd, off);
 
-    // TODO : complete
     state.st_chann[p->p_fds[fd]].chann_pos = off;
 }
 

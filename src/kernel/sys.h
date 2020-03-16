@@ -29,7 +29,7 @@ void fork(void);
 void kexit(void);
 void getpid(void);
 void getppid(void);
-void wait(void);
+void waitpid(void);
 
 void open(void);
 void close(void);
