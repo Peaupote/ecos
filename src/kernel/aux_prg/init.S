@@ -28,31 +28,31 @@ _start:
     movq    %rax, %r15
 
     // write hello world onto the file
-//    movq    %r15, %rdi  // fd
-//    movq    $text, %rsi // src
-//    movq    $14, %rdx   // len
-//    movq    $SYS_WRITE, %rax
-//    int     $0x80
+    movq    %r15, %rdi  // fd
+    movq    $text, %rsi // src
+    movq    $14, %rdx   // len
+    movq    $SYS_WRITE, %rax
+    int     $0x80
 
     // go back at beginning of file
-//    movq    %r15, %rdi // fd
-//    movq    $0, %rsi   // offset
-//    movq    $SYS_LSEEK, %rax
-//    int     $0x80
+    movq    %r15, %rdi // fd
+    movq    $0, %rsi   // offset
+    movq    $SYS_LSEEK, %rax
+    int     $0x80
 
     // read file into string
-//    movq    %r15, %rdi    // fd
-//    movq    $string, %rsi // dst
-//    movq    $14, %rdx     // len
-//    movq    $SYS_READ, %rax
-//    int     $0x80
+    movq    %r15, %rdi    // fd
+    movq    $string, %rsi // dst
+    movq    $14, %rdx     // len
+    movq    $SYS_READ, %rax
+    int     $0x80
 
     // print on stdout
-//    movq    $1, %rdi  // fd
-//    movq    $string, %rsi // src
-//    movq    $14, %rdx   // len
-//    movq    $SYS_WRITE, %rax
-//    int     $0x80
+    movq    $1, %rdi  // fd
+    movq    $string, %rsi // src
+    movq    $14, %rdx   // len
+    movq    $SYS_WRITE, %rax
+    int     $0x80
 
 2:  jmp     2b
 

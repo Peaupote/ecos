@@ -114,25 +114,25 @@ int dummy_create(void *super, ino_t parent, char *fname) {
 
     p->blk_ino.ino_kind = KD_USED;
     p->blk_ino.ino_size = 0;
-    return 0;
+    return ino;
 }
 
 int dummy_read(void *super, ino_t ino, void *buf, size_t len) {
-    void *start_sector = ((uint8_t*)super + sizeof(struct super_block));
+    block_t *start_sector = (block_t*)super;
     block_t *b = start_sector + ino;
-    if (b->blk_ino.ino_kind) return -1;
+    if (b->blk_ino.ino_kind != KD_USED) return -1;
 
-    char *src = (char*)buf;
+    char *dst = (char*)buf;
     size_t c;
     for (c = 0; c < len && b->blk_pos < BUFSIZE; c++)
-        b->blk_content[b->blk_pos++] = *src++;
+        *dst++ = b->blk_content[b->blk_pos++];
     return c;
 }
 
 int dummy_write(void *super, ino_t ino, void *buf, size_t len) {
-    void *start_sector = ((uint8_t*)super + sizeof(struct super_block));
+    block_t *start_sector = (block_t*)super;
     block_t *b = start_sector + ino;
-    if (b->blk_ino.ino_kind) return -1;
+    if (b->blk_ino.ino_kind != KD_USED) return -1;
 
     char *src = (char*)buf;
     size_t c;
@@ -142,9 +142,9 @@ int dummy_write(void *super, ino_t ino, void *buf, size_t len) {
 }
 
 int dummy_seek(void *super, ino_t ino, off_t pos) {
-    void *start_sector = ((uint8_t*)super + sizeof(struct super_block));
+    block_t *start_sector = (block_t*)super;
     block_t *b = start_sector + ino;
-    if (b->blk_ino.ino_kind) return -1;
+    if (b->blk_ino.ino_kind != KD_USED) return -1;
 
     b->blk_pos = pos;
     return 0;

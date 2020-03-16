@@ -80,7 +80,9 @@ vfile_t *vfs_load(char *filename, uint32_t create) {
             return 0;
         }
 
-        klogf(Log_info, "vfs", "create file %s", filename);
+        st.st_ino = rc;
+
+        klogf(Log_info, "vfs", "create file %s inode %d", filename, rc);
     }
 
     size_t free = 0;
