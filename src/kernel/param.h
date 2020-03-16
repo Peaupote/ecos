@@ -8,11 +8,10 @@
 #define NCHAN 1024 // number of channels
 #define INODE 1024 // number of inodes
 #define NHEAP 16   // number of enqued processes
-#define NBUF  1024 // number of file buffers
+#define NFILE 1024 // number of virtual files
+#define NDEV  32   // number of devices mounted
 
 #define NSLEEP 128 // number of parralled sleep allowed
-
-#define BUFSIZE 1024 // size of a standard file buffer
 
 // how often the scheduler kicks in
 // careful ! it's a modulo implemented with a bitwise &

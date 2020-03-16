@@ -141,6 +141,8 @@ void init() {
         state.st_proc[pid].p_pid  = pid;
     }
 
+    vfs_init();
+
     proc_create_userspace(proc_init, one);
 
     state.st_curr_pid   = 1;
@@ -220,7 +222,7 @@ uint8_t proc_create_userspace(void* prg_elf, proc_t *proc) {
     uint8_t err = 0;
 
     volatile phy_addr pml4_loc = kmem_alloc_page(); //TODO crash sans volatile
-	kmem_bind_dynamic_slot(0, pml4_loc);
+    kmem_bind_dynamic_slot(0, pml4_loc);
 
     kmem_init_pml4((uint64_t*)kmem_dynamic_slot(0), pml4_loc);
     clear_interrupt_flag();
