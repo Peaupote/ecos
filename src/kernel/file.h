@@ -6,7 +6,7 @@
 #include "param.h"
 #include "user.h"
 
-typedef uint64_t ino_t;
+typedef int32_t  ino_t;
 typedef uint32_t dev_t;
 typedef uint32_t mode_t;
 typedef uint16_t nlink_t;
