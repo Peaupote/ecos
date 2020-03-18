@@ -53,8 +53,9 @@ struct device {
 } devices[NDEV];
 
 // File system table
-#define NFST 1
+#define NFST 2
 #define DUMMY_FS 0
+#define PROC_FS  1
 
 struct fs {
     char             fs_name[4];

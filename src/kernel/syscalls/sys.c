@@ -150,6 +150,7 @@ void open() {
         if (state.st_chann[cid].chann_mode == UNUSED) break;
 
     if (cid == NCHAN) {
+        klogf(Log_error, "sys", "no channel available");
         p->p_reg.rax = -1;
         return;
     }

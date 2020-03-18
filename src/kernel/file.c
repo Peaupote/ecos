@@ -3,6 +3,7 @@
 #include <kernel/proc.h>
 
 #include <fs/dummy.h>
+#include <fs/proc.h>
 
 void vfs_init() {
     klogf(Log_info, "vfs", "Initialize");
@@ -22,16 +23,31 @@ void vfs_init() {
     fst[DUMMY_FS].fs_readdir = dummy_readdir;
     fst[DUMMY_FS].fs_seek    = dummy_seek;
 
+    klogf(Log_info, "vfs", "setup proc file system");
+    memcpy(fst[PROC_FS].fs_name, "proc", 4);
+    fst[PROC_FS].fs_mnt     = proc_mount;
+    fst[PROC_FS].fs_load    = proc_load;
+    fst[PROC_FS].fs_create  = proc_create;
+    fst[PROC_FS].fs_read    = proc_read;
+    fst[PROC_FS].fs_write   = proc_write;
+    fst[PROC_FS].fs_readdir = proc_readdir;
+    fst[PROC_FS].fs_seek    = proc_seek;
+
     void *spblk = fst[DUMMY_FS].fs_mnt();
     if (!spblk) {
         kpanic("Failed to mount /tmp");
     }
 
-    memcpy(devices[0].dev_mnt, "/tmp", 5);
+    memcpy(devices[0].dev_mnt, "/tmp", 6);
     devices[0].dev_fs = DUMMY_FS;
     devices[0].dev_spblk = spblk;
 
     klogf(Log_info, "vfs", "/tmp sucessfully mounted");
+
+    memcpy(devices[1].dev_mnt, "/proc", 6);
+    devices[1].dev_fs = PROC_FS;
+    devices[1].dev_spblk = 0;
+    klogf(Log_info, "vfs", "/proc sucessfully mounted");
 }
 
 static struct device *find_device(char *fname) {
@@ -87,7 +103,8 @@ vfile_t *vfs_load(char *filename, uint32_t create) {
 
     size_t free = 0;
     for (size_t i = 0; i < NFILE; i++) {
-        if (state.st_files[i].vf_stat.st_ino == st.st_ino) {
+        if (state.st_files[i].vf_stat.st_ino == st.st_ino &&
+            state.st_files[i].vf_stat.st_dev == dev->dev_id) {
             klogf(Log_info, "vfs", "file %s is already open", fname);
             return state.st_files + i;
         }

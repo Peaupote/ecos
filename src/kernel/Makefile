@@ -1,11 +1,11 @@
 export TRG=64
 export CC=x86_64-elf-gcc
 export FLAGS=-O1 -Wall -Wextra -std=gnu99 -nostdlib \
-			 -mcmodel=large -ffreestanding -mno-red-zone
+			 -mcmodel=large -ffreestanding -mno-red-zone -Wno-unused-parameter
 AS=x86_64-elf-as
 CFILES=main.c memory/kmem.c idt.c gdt.c keyboard.c tty.c tests.c \
 		syscalls/sleep.c syscalls/sys.c proc.c kutil.c \
-		memory/page_alloc.c file.c ../fs/dummy/dummy.c
+		memory/page_alloc.c file.c ../fs/dummy/dummy.c ../fs/proc/proc.c
 ASFILES=entry.S idt_as.S data.S
 SRCDEP=$(foreach file,$(ASFILES),"-MT $(file:.S=.s) $(file)") $(CFILES)
 OBJ=$(ASFILES:.S=.o) $(CFILES:.c=.o)

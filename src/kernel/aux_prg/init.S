@@ -1,9 +1,9 @@
 #define ASM_FILE
-#include "../sys.h"
+#include <kernel/sys.h>
 
     .section .data
 fname:
-    .string "/tmp/file"
+    .string "/proc/1/stat"
 string:
     .skip 256
 text:
@@ -19,32 +19,35 @@ _start:
     cmp     $0, %rax
     jne     1f
 
-   movq    $fname, %rdi
-   movq    $3, %rsi // chann mode WRITE
-   movq    $SYS_OPEN, %rax
-   int     $0x80
+    movq    $fname, %rdi
+    movq    $3, %rsi // chann mode WRITE
+    movq    $SYS_OPEN, %rax
+    int     $0x80
 
     // put file descriptor in safe place
     movq    %rax, %r15
 
     // write hello world onto the file
-    movq    %r15, %rdi  // fd
-    movq    $text, %rsi // src
-    movq    $14, %rdx   // len
-    movq    $SYS_WRITE, %rax
-    int     $0x80
+//    movq    %r15, %rdi  // fd
+//    movq    $text, %rsi // src
+//    movq    $14, %rdx   // len
+//    movq    $SYS_WRITE, %rax
+//    int     $0x80
 
     // go back at beginning of file
-    movq    %r15, %rdi // fd
-    movq    $0, %rsi   // offset
-    movq    $SYS_LSEEK, %rax
-    int     $0x80
+//    movq    %r15, %rdi // fd
+//    movq    $0, %rsi   // offset
+//    movq    $SYS_LSEEK, %rax
+//    int     $0x80
 
     // read file into string
     movq    %r15, %rdi    // fd
     movq    $string, %rsi // dst
     movq    $14, %rdx     // len
     movq    $SYS_READ, %rax
+    int     $0x80
+
+    movq    (string), %rax
     int     $0x80
 
     // print on stdout
@@ -54,20 +57,20 @@ _start:
     movq    $SYS_WRITE, %rax
     int     $0x80
 
-    movq    $SYS_FORK, %rax
-    int     $0x80
-    testq   %rax, %rax
-    jne     2f
+//    movq    $SYS_FORK, %rax
+//    int     $0x80
+//    testq   %rax, %rax
+//    jne     2f
 
-	//#PF
-	movq	$42, %rax
-	movq	$0, (%rax)
+    //#PF
+//    movq	$42, %rax
+//    movq	$0, (%rax)
 
-	//Exit
-    movq    $0, %rdi
-    movq    $SYS_EXIT, %rax
-    int     $0x80
-	
+    //Exit
+//    movq    $0, %rdi
+//    movq    $SYS_EXIT, %rax
+//    int     $0x80
+
 2:  jmp     2b
 
 1:
