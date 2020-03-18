@@ -13,7 +13,7 @@
 #define PML4_MAX_USPACE   (PML4_KERNEL_VIRT_ADDR-1)
 
 #include <kernel/kutil.h>
-#include <kernel/page_alloc.h>
+#include "page_alloc.h"
 
 extern phy_addr kernel_pml4;
 extern uint32_t bgn_kernel;

@@ -2,7 +2,7 @@
 #define _H_DUMMY
 
 #include <stdint.h>
-#include "../../kernel/file.h"
+#include <kernel/file.h>
 
 #define BUFSIZE   1024
 

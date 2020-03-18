@@ -1,15 +1,15 @@
 #include <stddef.h>
 #include <stdint.h>
 
-#include "int.h"
-#include "sys.h"
-#include "proc.h"
+#include <kernel/int.h>
+#include <kernel/sys.h>
+#include <kernel/proc.h>
 
-#include "memory/kmem.h"
-#include "int.h"
-#include "tty.h"
-#include "../util/elf64.h"
-#include "kutil.h"
+#include <util/elf64.h>
+#include <kernel/memory/kmem.h>
+#include <kernel/int.h>
+#include <kernel/tty.h>
+#include <kernel/kutil.h>
 
 #define USER_STACK_TOP  0x57AC3000
 #define USER_STACK_SIZE 0x4000

@@ -1,6 +1,6 @@
-#include "dummy.h"
-#include "../../util/string.h"
-#include "../../kernel/kutil.h"
+#include <fs/dummy.h>
+#include <util/string.h>
+#include <kernel/kutil.h>
 
 #define INO_NB 128
 #define SZ (sizeof(block_t) * 1024)

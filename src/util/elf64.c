@@ -1,4 +1,4 @@
-#include "elf64.h"
+#include <util/elf64.h>
 
 void elf_readinfo(string_writer wt, void* wt_i, void* elf_begin){
     Elf64_Ehdr* ehdr = (Elf64_Ehdr*) elf_begin;

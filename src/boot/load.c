@@ -1,6 +1,6 @@
-#include "../util/multiboot.h"
-#include "../util/elf64.h"
-#include "../util/string.h"
+#include <util/multiboot.h>
+#include <util/elf64.h>
+#include <util/string.h>
 
 //Informations fournies par GRUB
 extern multiboot_info_t* mb_info;
@@ -21,9 +21,9 @@ static inline void* virt2phys(Elf64_Addr a){
 
 unsigned char* virt2phys_section(Elf64_Addr a, uint64_t sz){
     unsigned char* p_dst = (unsigned char*) virt2phys(a);
-	uint32_t end_s = ((uint32_t) p_dst) + sz;
-	if (end_s > end_kernel) end_kernel = end_s;
-	return p_dst;
+    uint32_t end_s = ((uint32_t) p_dst) + sz;
+    if (end_s > end_kernel) end_kernel = end_s;
+    return p_dst;
 }
 
 void simp_fill0(void* none __attribute__((unused)), Elf64_Addr dst,
@@ -31,7 +31,7 @@ void simp_fill0(void* none __attribute__((unused)), Elf64_Addr dst,
     unsigned char* p_dst = virt2phys_section(dst, sz);
     for(uint64_t i=0; i<sz; ++i)
         p_dst[i] = 0;
-	
+
 }
 void simp_copy(void* none __attribute__((unused)), Elf64_Addr dst,
         void* src, uint64_t sz){
@@ -43,7 +43,7 @@ void simp_copy(void* none __attribute__((unused)), Elf64_Addr dst,
 void load_kernel64(void){
     struct elf_loader el_v = {.fill0=&simp_fill0, .copy=&simp_copy};
     kernel_entry_addr = NULL;
-	end_kernel = 0;
+    end_kernel = 0;
 
     multiboot_uint32_t flags = mb_info->flags;
     if(flags & MULTIBOOT_INFO_MODS){

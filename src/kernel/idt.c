@@ -1,18 +1,19 @@
-#include "idt.h"
+#include <kernel/idt.h>
 
 #include <stddef.h>
 #include <stdint.h>
 
-#include "int.h"
-#include "gdt.h"
-#include "sys.h"
-#include "../util/vga.h"
-#include "../util/string.h"
-#include "memory/kmem.h"
-#include "keyboard.h"
-#include "tty.h"
-#include "proc.h"
-#include "kutil.h"
+#include <kernel/int.h>
+#include <kernel/gdt.h>
+#include <kernel/sys.h>
+#include <kernel/memory/kmem.h>
+#include <kernel/keyboard.h>
+#include <kernel/tty.h>
+#include <kernel/proc.h>
+#include <kernel/kutil.h>
+
+#include <util/vga.h>
+#include <util/string.h>
 
 #define GATE_INT  (IDT_ATTR_P|IDT_TYPE_INT)
 
@@ -67,7 +68,7 @@ const char *error_desc[NEXCEPTION + 1] = {
 void common_hdl(uint8_t num, uint64_t errcode) {
     const char *desc = error_desc[num < NEXCEPTION ? num : NEXCEPTION];
     klogf(Log_error, "error", "%s: error code %llx", desc, errcode);
-	clear_interrupt_flag();
+    clear_interrupt_flag();
     while(1) halt();
     // TODO : something
 }
@@ -89,16 +90,16 @@ void pit_hdl(void) {
 #define EXC_PF_ERC_U 2
 
 void exception_PF_hdl(uint_ptr fault_vaddr, uint64_t errcode) {
-	//TODO
-	klogf(Log_verb, "exc", "#PF on %p, errcode=%llx",
-			fault_vaddr, errcode);
-	if (errcode & EXC_PF_ERC_U)
-		kmem_paging_alloc(fault_vaddr & PAGE_MASK,
-				PAGING_FLAG_U | PAGING_FLAG_R);
+    //TODO
+    klogf(Log_verb, "exc", "#PF on %p, errcode=%llx",
+            fault_vaddr, errcode);
+    if (errcode & EXC_PF_ERC_U)
+        kmem_paging_alloc(fault_vaddr & PAGE_MASK,
+                PAGING_FLAG_U | PAGING_FLAG_R);
 }
 
 static inline void idt_int_asgn(int n, uint64_t addr, uint8_t attr,
-		uint8_t ist) {
+        uint8_t ist) {
     idt[n].reserved    = 0;
     idt[n].offset_low  = (uint16_t)addr & 0xffff;
     idt[n].offset_mid  = (uint16_t)(addr >> 16) & 0xffff;
@@ -137,8 +138,8 @@ void idt_init(void) {
     for (uint8_t n = 0; n < NEXCEPTION_VEC; n++)
         idt_int_asgn(n, (uint64_t)int_handlers[n], GATE_INT, 0);
 
-    idt_int_asgn(SYSCALL_VEC, (uint64_t)irq_sys, 
-			GATE_INT | IDT_ATTR_DPL(3), 0);
+    idt_int_asgn(SYSCALL_VEC, (uint64_t)irq_sys,
+            GATE_INT | IDT_ATTR_DPL(3), 0);
     idt_int_asgn(PIT_VEC,      (uint64_t)irq_pit,      GATE_INT, 0);
     idt_int_asgn(KEYBOARD_VEC, (uint64_t)irq_keyboard, GATE_INT, 0);
 

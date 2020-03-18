@@ -1,6 +1,5 @@
-#include "vga.h"
-
-#include "string.h"
+#include <util/vga.h>
+#include <util/string.h>
 
 vga_pos_t vga_pos = {0, 0};
 uint8_t   vga_color;
@@ -12,7 +11,7 @@ void vga_init(uint16_t* p_buffer)
     vga_tab_size = 4;
     vga_color = vga_entry_color(VGA_COLOR_LIGHT_GREY, VGA_COLOR_BLACK);
     vga_buffer = p_buffer;
-	vga_clear();
+    vga_clear();
 }
 
 void vga_clear()
@@ -50,14 +49,14 @@ void vga_nextline()
 
 void vga_cursor_at(size_t rw, size_t cl)
 {
-	vga_pos.x = cl;
-	vga_pos.y = rw;
+    vga_pos.x = cl;
+    vga_pos.y = rw;
 }
 
 void vga_putachar(char c)
 {
     vga_putentryat(c, vga_color,
-			vga_pos.x, vga_pos.y);
+            vga_pos.x, vga_pos.y);
     if (++vga_pos.x == VGA_WIDTH)
         vga_nextline();
 }

@@ -1,9 +1,9 @@
 #include <stdint.h>
 
-#include "../int.h"
-#include "../proc.h"
-#include "../kutil.h"
-#include "../sys.h"
+#include <kernel/int.h>
+#include <kernel/proc.h>
+#include <kernel/kutil.h>
+#include <kernel/sys.h>
 
 /**
  * Syscalls

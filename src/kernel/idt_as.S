@@ -1,6 +1,6 @@
 #define ASM_FILE
-#include "int.h"
-#include "sys.h"
+#include <kernel/int.h>
+#include <kernel/sys.h>
 
     .section .data
     .global int_handlers
@@ -113,11 +113,11 @@ syscall_tab:
 .endm
 //Récupère le code d'erreur (8 byte) dans %rsi
 .macro save_c_reg_err
-	pushq %rcx
+    pushq %rcx
     pushq %rdx
     pushq %rsi
-	movq  24(%rsp), %rsi
-	movq  %rax, 24(%rsp)
+    movq  24(%rsp), %rsi
+    movq  %rax, 24(%rsp)
     pushq %rdi
     pushq %r8
     pushq %r9
@@ -179,13 +179,13 @@ irq_sys:
     jmp   func_end
 
 irq14://#PF: Page Fault
-	save_c_reg_err
-	leaq   -8(%rsp), %rsp
-	movq   %cr2, %rdi //Adresse provoquant le PF
-	call   exception_PF_hdl
-	leaq   8(%rsp), %rsp
-	restore_c_reg
-	iretq
+    save_c_reg_err
+    leaq   -8(%rsp), %rsp
+    movq   %cr2, %rdi //Adresse provoquant le PF
+    call   exception_PF_hdl
+    leaq   8(%rsp), %rsp
+    restore_c_reg
+    iretq
 
 incorrect_rax:
     call invalid_syscall
@@ -229,5 +229,5 @@ pml4_to_cr3:
     ret
 
 invalide_page:
-	invlpg (%rdi)
-	ret
+    invlpg (%rdi)
+    ret

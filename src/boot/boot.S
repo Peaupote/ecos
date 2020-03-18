@@ -1,6 +1,6 @@
 #define ASM_FILE
-#include "../util/gdt.h"
-#include "../util/hdw.h"
+#include <util/gdt.h>
+#include <util/hdw.h>
 
 /* From https://wiki.osdev.org/Bare_Bones */
 /* Declare constants for the multiboot header. */
@@ -17,13 +17,13 @@ search for this signature in the first 8 KiB of the kernel file, aligned at a
 32-bit boundary. The signature is in its own section so the header can be
 forced to be within the first 8 KiB of the kernel file.
 */
-	.section .multiboot
+    .section .multiboot
 .balign 4
 .long MAGIC
 .long FLAGS
 .long CHECKSUM
 
-	.section .bss
+    .section .bss
 
 //Paging structures for id mapping
 .global page_dpt_0
@@ -63,120 +63,120 @@ boot_debug_out:
 
 //espace pour le kernel
 //évite que GRUB charge le module sur une adresse utilisée
-	.section space_for_kernel
+    .section space_for_kernel
 .global KPA           //Adresse physique du kernel
 .balign 0x1000        //alignement à la page 4KB
 KPA: .skip 0x200000   //2MB
 
 
-	.section .text
+    .section .text
 .global _start
 .type _start, @function
 _start:
 
-	//On suppose que l'on est démarré par GRUB
-	//Mode protégé avec des segments 'plats'
-	//Paging désactivé
-	//Ligne A20 activée
+    //On suppose que l'on est démarré par GRUB
+    //Mode protégé avec des segments 'plats'
+    //Paging désactivé
+    //Ligne A20 activée
 
-	//On récupère les informations de multiboot
-	//https://www.gnu.org/software/grub/manual/multiboot/html_node/Boot-information-format.html
-	movl %ebx, (mb_info)
+    //On récupère les informations de multiboot
+    //https://www.gnu.org/software/grub/manual/multiboot/html_node/Boot-information-format.html
+    movl %ebx, (mb_info)
 
 #ifdef BDI
-	//initial CR0
-	mov %cr0, %eax
-	mov %eax, boot_debug_out
+    //initial CR0
+    mov %cr0, %eax
+    mov %eax, boot_debug_out
 
-	//A20 test:
-	mov $0x00042, %eax
-	movb (%eax), %al
-	movb %al, (boot_debug_out+8)
-	mov $0x100042, %eax
-	movb (%eax), %al
-	mov %al, (boot_debug_out+9)
+    //A20 test:
+    mov $0x00042, %eax
+    movb (%eax), %al
+    movb %al, (boot_debug_out+8)
+    mov $0x100042, %eax
+    movb (%eax), %al
+    mov %al, (boot_debug_out+9)
 #endif
 
 
-	//Stack
+    //Stack
     mov $stack_top, %esp
 
-	/*
-	 On charge le kernel ici afin d'être sûr de pouvoir accéder
-	 aux données fournies par GRUB
-	 On récupère l'adresse du kernel 64 bits dans kernel_entry_addr
-	*/
-	call load_kernel64
+    /*
+     On charge le kernel ici afin d'être sûr de pouvoir accéder
+     aux données fournies par GRUB
+     On récupère l'adresse du kernel 64 bits dans kernel_entry_addr
+    */
+    call load_kernel64
 
-	/* --GDT-- */
+    /* --GDT-- */
 #include "gdt.s"
-	/* GDT descriptor */
-	movw $(4*8 - 1), gdt_desc
-	movl $gd_table,  (gdt_desc + 2)
-	movl $0,         (gdt_desc + 6)
+    /* GDT descriptor */
+    movw $(4*8 - 1), gdt_desc
+    movl $gd_table,  (gdt_desc + 2)
+    movl $0,         (gdt_desc + 6)
 
-	cli
-	lgdt gdt_desc
+    cli
+    lgdt gdt_desc
 
-	ljmp $0x18, $reload_seg
+    ljmp $0x18, $reload_seg
 reload_seg:
-	mov $0x10, %ax /*data segment selector*/
-	mov %ax, %ds
-	mov %ax, %ss
-	mov %ax, %es
-	mov %ax, %fs
-	mov %ax, %gs
+    mov $0x10, %ax /*data segment selector*/
+    mov %ax, %ds
+    mov %ax, %ss
+    mov %ax, %es
+    mov %ax, %fs
+    mov %ax, %gs
 
-	/* --Paging-- */
-	call init_paging_directory
+    /* --Paging-- */
+    call init_paging_directory
 
-	//On active le PAE et le PGE
-	movl %cr4, %eax
-	orl  $((1<<CR4_PAE) | (1<<CR4_PGE)), %eax
-	movl %eax, %cr4
+    //On active le PAE et le PGE
+    movl %cr4, %eax
+    orl  $((1<<CR4_PAE) | (1<<CR4_PGE)), %eax
+    movl %eax, %cr4
 
-	//On place l'adresse du PML4 dans CR3
-	movl $page_ml4, %eax
-	movl %eax, %cr3
+    //On place l'adresse du PML4 dans CR3
+    movl $page_ml4, %eax
+    movl %eax, %cr3
 
-	//On active le long-mode
-	movl  $MSR_EFER, %ecx
-	rdmsr
-	btsl  $MSR_EFER_LME, %eax
-	wrmsr
-	
-	//On active le paging
-	movl %cr0,   %eax
-	btsl $CR0_PG,%eax
-	movl %eax,   %cr0
+    //On active le long-mode
+    movl  $MSR_EFER, %ecx
+    rdmsr
+    btsl  $MSR_EFER_LME, %eax
+    wrmsr
 
-	/*
-	Long-mode (sous-mode de compatibilité 32 bits)
-	Paging activé
-	*/
+    //On active le paging
+    movl %cr0,   %eax
+    btsl $CR0_PG,%eax
+    movl %eax,   %cr0
+
+    /*
+    Long-mode (sous-mode de compatibilité 32 bits)
+    Paging activé
+    */
 
 #ifdef BDI
-	movl %cr0, %eax
-	movl %eax, (boot_debug_out+4)
+    movl %cr0, %eax
+    movl %eax, (boot_debug_out+4)
 #endif
 
-	lgdt gdt_desc
-	ljmp $0x18, $reload_seg2
+    lgdt gdt_desc
+    ljmp $0x18, $reload_seg2
 
 reload_seg2:
-	mov $0x10, %ax /*data segment selector*/
-	mov %ax, %ds
-	mov %ax, %ss
-	mov %ax, %es
-	mov %ax, %fs
-	mov %ax, %gs
+    mov $0x10, %ax /*data segment selector*/
+    mov %ax, %ds
+    mov %ax, %ss
+    mov %ax, %es
+    mov %ax, %fs
+    mov %ax, %gs
 
-	movl  $KPA, (bgn_kernel)
-	movl  (mb_info), %edi
-   	mov   (kernel_entry_addr), %eax
-	pushl $0x8 //CS
-	pushl %eax //IP
-	retf       //Far ret
+    movl  $KPA, (bgn_kernel)
+    movl  (mb_info), %edi
+    mov   (kernel_entry_addr), %eax
+    pushl $0x8 //CS
+    pushl %eax //IP
+    retf       //Far ret
 
 /*
 Set the size of the _start symbol to the current location '.' minus its start.

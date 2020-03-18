@@ -11,6 +11,7 @@ SRCDEP=$(foreach file,$(ASFILES),"-MT $(file:.S=.s) $(file)") $(CFILES)
 OBJ=$(ASFILES:.S=.o) $(CFILES:.c=.o)
 KBMAP=gawk -f ../../tools/keyboard_map.awk
 UDEP=vga.o string.o elf64.o
+INCLUDES=-I ../../include
 
 .PHONY: all re clean util tests_prg aux_prg
 
@@ -19,8 +20,11 @@ all: kernel.bin
 %.o:%.c
 	$(CC) $(FLAGS) -o $@ -c $< $(INCLUDES)
 
+%.s:%.S
+	$(CC) -E $< -o $@ $(INCLUDES)
+
 %.o:%.s
-	$(AS) $< -o $@
+	$(AS) $< -o $@ $(INCLUDES)
 
 int_handlers_tab.s:
 	seq 0 31 | gawk '{printf(".quad irq%d\n",$$1)}' > int_handlers_tab.s

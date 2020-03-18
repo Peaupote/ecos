@@ -1,16 +1,16 @@
-#include "tty.h"
+#include <kernel/tty.h>
 
 #include <stddef.h>
 
-#include "../util/vga.h"
-#include "../util/string.h"
-#include "../util/elf64.h"
+#include <util/vga.h>
+#include <util/string.h>
+#include <util/elf64.h>
 
-#include "memory/kmem.h"
-#include "proc.h"
-#include "int.h"
+#include <kernel/memory/kmem.h>
+#include <kernel/proc.h>
+#include <kernel/int.h>
 
-#include "tests.h"
+#include <kernel/tests.h>
 
 #define SB_HEIGHT 32
 #define SB_MASK 0x1f
@@ -89,7 +89,7 @@ extern uint8_t t0_data[];
 
 size_t built_in_exec(size_t in_begin, size_t in_len) {
     decomp_cmd(in_begin, in_len);
-	char* cmd_name = cmd_decomp + cmd_decomp_idx[0];
+    char* cmd_name = cmd_decomp + cmd_decomp_idx[0];
     if (!ustrcmp(cmd_name, "tprint"))
         return tty_writestring("test print");
     else if (!ustrcmp(cmd_name, "memat")) {
@@ -105,13 +105,13 @@ size_t built_in_exec(size_t in_begin, size_t in_len) {
         use_azerty = 1;
     else if (!ustrcmp(cmd_name, "q"))
         use_azerty = 0;
-	else if (!ustrcmp(cmd_name, "test")) {
-		char *arg1 = cmd_decomp + cmd_decomp_idx[1];
-		if (!ustrcmp(arg1, "statut"))
-			test_print_statut();
-		else if(!ustrcmp(arg1, "kheap"))
-			test_kheap();
-	}
+    else if (!ustrcmp(cmd_name, "test")) {
+        char *arg1 = cmd_decomp + cmd_decomp_idx[1];
+        if (!ustrcmp(arg1, "statut"))
+            test_print_statut();
+        else if(!ustrcmp(arg1, "kheap"))
+            test_kheap();
+    }
 
     return 0;
 }
@@ -362,11 +362,11 @@ size_t tty_writestring(const char* str) {
     char c = *str;
     size_t x = cur_ln_x;
     size_t ln_index = (sb_ashift + sb_nb_lines - 1) & SB_MASK;
-	goto loop_enter; while (c) {
+    goto loop_enter; while (c) {
         rt += tty_new_buffer_line(&ln_index);
-		x = 0;
+        x = 0;
 loop_enter:
-		for(; x < VGA_WIDTH && c; ++x, c = *(++str)) {
+        for(; x < VGA_WIDTH && c; ++x, c = *(++str)) {
             if(c == '\n') {
                 for(;x < VGA_WIDTH; ++x)
                     sbuffer[ln_index][x] = vga_entry(' ', back_color);
@@ -381,16 +381,16 @@ loop_enter:
 }
 
 size_t tty_writestringl(const char* str, size_t len) {
-	const char* end = str + len;
+    const char* end = str + len;
     size_t rt = 0;
     char c = *str;
     size_t x = cur_ln_x;
     size_t ln_index = (sb_ashift + sb_nb_lines - 1) & SB_MASK;
-	goto loop_enter; while (str != end) {
+    goto loop_enter; while (str != end) {
         rt += tty_new_buffer_line(&ln_index);
-		x = 0;
+        x = 0;
 loop_enter:
-		for(; x < VGA_WIDTH && str!=end; ++x, c = *(++str)) {
+        for(; x < VGA_WIDTH && str!=end; ++x, c = *(++str)) {
             if(c == '\n') {
                 for(;x < VGA_WIDTH; ++x)
                     sbuffer[ln_index][x] = vga_entry(' ', back_color);
@@ -408,5 +408,5 @@ void tty_writer(void* shift, const char *str) {
     *((size_t*)shift) = tty_writestring(str);
 }
 void tty_seq_write(void* seq, const char* s, size_t len) {
-	((tty_seq_t*)seq)->shift += tty_writestringl(s, len);
+    ((tty_seq_t*)seq)->shift += tty_writestringl(s, len);
 }

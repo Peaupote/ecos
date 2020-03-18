@@ -7,6 +7,7 @@ ASFILES=boot.S
 SRCDEP=$(foreach file,$(ASFILES),"-MT $(file:.S=.s) $(file)") $(CFILES)
 OBJ=$(ASFILES:.S=.o) $(CFILES:.c=.o)
 UDEP=vga.o string.o elf64.o
+INCLUDES=-I ../../include
 
 .PHONY: clean all util
 
@@ -16,10 +17,13 @@ gdt.s: gdt.txt
 	cpp -P gdt.txt | gawk -f ../../tools/fillGDT.awk > gdt.s
 
 %.o:%.c
-	$(CC) $(FLAGS) -o $@ -c $<
+	$(CC) $(FLAGS) -o $@ -c $< $(INCLUDES)
+
+%.s:%.S
+	$(CC) -E $< -o $@ $(INCLUDES)
 
 %.o:%.s
-	$(AS) $< -o $@
+	$(AS) $< -o $@ $(INCLUDES)
 
 UDEP_FROM_HERE=$(patsubst %,../util/32/%,$(UDEP))
 UDEP_FROM_UTIL=$(patsubst %,32/%,$(UDEP))

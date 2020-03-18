@@ -1,8 +1,8 @@
-#include "../int.h"
-#include "../sys.h"
-#include "../proc.h"
-#include "../kutil.h"
-#include "../tty.h"
+#include <kernel/int.h>
+#include <kernel/sys.h>
+#include <kernel/proc.h>
+#include <kernel/kutil.h>
+#include <kernel/tty.h>
 
 struct {
     uint32_t sleep_counter;

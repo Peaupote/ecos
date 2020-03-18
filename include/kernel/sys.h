@@ -21,9 +21,10 @@
 #ifndef ASM_FILE
 
 #include "proc.h"
-#include "syscalls/sleep.h"
 
 void sleep(void);
+void lookup_end_sleep(void);
+
 void wait(void);
 void fork(void);
 void kexit(void);

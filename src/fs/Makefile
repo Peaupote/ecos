@@ -1,7 +1,9 @@
-.PHONY: dummy
+.PHONY: all
 
-dummy:
+all:
 	$(MAKE) -C dummy
+	$(MAKE) -C proc
 
 clean:
 	$(MAKE) -C dummy clean
+	$(MAKE) -C proc  clean

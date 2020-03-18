@@ -1,8 +1,8 @@
-#include "kutil.h"
-#include "file.h"
-#include "proc.h"
+#include <kernel/kutil.h>
+#include <kernel/file.h>
+#include <kernel/proc.h>
 
-#include "../fs/dummy/dummy.h"
+#include <fs/dummy.h>
 
 void vfs_init() {
     klogf(Log_info, "vfs", "Initialize");
