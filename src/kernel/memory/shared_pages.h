@@ -1,3 +1,8 @@
+/*
+ * Gestion des entrées de paging affectées lors de l'accès:
+ * - pages partagées, copiées lors de l'accès si plusieurs utilisateurs
+ * - nouvelle page, crées lors de l'accès
+ */
 #ifndef _SHARED_PG_H
 #define _SHARED_PG_H
 
@@ -21,6 +26,6 @@ uint8_t handle_PF(uint_ptr fault_vaddr);
 void    kmem_fork_paging(phy_addr new_pml4);
 //Le paging actuel doit être `old_pml4`, libère les structures de paging et
 //les pages référencées et switch sur `new_pml4`
-void kmem_free_paging(phy_addr old_pml4, phy_addr new_pml4);
+void    kmem_free_paging(phy_addr old_pml4, phy_addr new_pml4);
 
 #endif

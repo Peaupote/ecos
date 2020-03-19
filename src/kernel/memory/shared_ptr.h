@@ -1,3 +1,6 @@
+/*
+ * Allocation de pointeurs partagés (addresse + nombre d'utilisateurs)
+ */
 #ifndef _SHARED_PTR_H
 #define _SHARED_PTR_H
 
