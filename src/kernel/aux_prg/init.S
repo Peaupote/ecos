@@ -8,10 +8,20 @@ string:
     .skip 256
 text:
     .string "Hello world !\n"
+textv:
+	.string "t0\n"
 
     .section .text
     .global _start
 
+
+.macro print_textv
+    movq    $1, %rdi     // fd
+    movq    $textv, %rsi // src
+    movq    $3, %rdx     // len
+    movq    $SYS_WRITE, %rax
+    int     $0x80
+.endm
 _start:
     movq    $SYS_FORK, %rax
     int     $0x80
@@ -54,21 +64,32 @@ _start:
     movq    $SYS_WRITE, %rax
     int     $0x80
 
+	print_textv
+	//Fork
     movq    $SYS_FORK, %rax
     int     $0x80
     testq   %rax, %rax
     jne     2f
 
-	//#PF
-	movq	$42, %rax
-	movq	$0, (%rax)
+	print_textv
+	movb	$'2', (1 + textv)
+	print_textv
+
+	//Accès au stack
+	pushq   $42
+	popq    %rax
 
 	//Exit
     movq    $0, %rdi
     movq    $SYS_EXIT, %rax
     int     $0x80
 	
-2:  jmp     2b
+2:  
+	print_textv
+	movb	$'1', (1 + textv)
+	print_textv
+
+3:	jmp     3b
 
 1:
     // init wait for all its childrens

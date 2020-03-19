@@ -24,7 +24,7 @@ tests:
 	$(MAKE) -C tests/unit run
 
 start: $(ISO)
-	qemu-system-x86_64 -cdrom $(ISO)
+	qemu-system-x86_64 -cdrom $(ISO) -monitor stdio | tee qemu.out
 
 depends:
 	$(MAKE) -C src/kernel .depends
@@ -39,6 +39,6 @@ clean:
 	$(MAKE) -C src/util   clean
 	$(MAKE) -C src/libc   clean
 	$(MAKE) -C tests      clean
-	rm -rf *.o *.iso *.bin isodir
+	rm -rf *.o *.iso *.bin *.out isodir
 
 re: clean all

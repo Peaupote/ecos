@@ -17,6 +17,7 @@ bgn_kernel = KVA + kba_bgn_krn;
 end_kernel = KVA + kba_end_krn;
 
 low_addr   = KVA + (0x100 << 30);
+sptr_alct  = KVA + (0x182 << 30);
 
 SECTIONS
 {

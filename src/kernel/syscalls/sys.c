@@ -4,6 +4,7 @@
 #include "../proc.h"
 #include "../kutil.h"
 #include "../sys.h"
+#include "../memory/shared_pages.h"
 
 /**
  * Syscalls
@@ -120,7 +121,8 @@ void fork() {
         a[i] = b[i];
 
     fp->p_pml4 = kmem_alloc_page();
-    kmem_copy_paging(fp->p_pml4);
+    kmem_fork_paging(fp->p_pml4);
+	pml4_to_cr3(fp->p_pml4);
 
     // copy file descriptors
     for (int i = 0; i < NFD; i++) {
