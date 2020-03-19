@@ -6,6 +6,8 @@
 #include <stddef.h>
 #include <stdint.h>
 
+#define kAssert(P) kassert(P, #P)
+
 void test_init(const char *n);
 int rand_rng(int min, int max);
 uint64_t rand64();

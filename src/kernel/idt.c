@@ -7,6 +7,7 @@
 #include <kernel/gdt.h>
 #include <kernel/sys.h>
 #include <kernel/memory/kmem.h>
+#include <kernel/memory/shared_pages.h>
 #include <kernel/keyboard.h>
 #include <kernel/tty.h>
 #include <kernel/proc.h>
@@ -85,17 +86,19 @@ void pit_hdl(void) {
 //Present
 #define EXC_PF_ERC_P 1
 //Write
-#define EXC_PF_ERC_W 2
+#define EXC_PF_ERC_W (1<<1)
 //User
-#define EXC_PF_ERC_U 2
+#define EXC_PF_ERC_U (1<<2)
 
 void exception_PF_hdl(uint_ptr fault_vaddr, uint64_t errcode) {
-    //TODO
-    klogf(Log_verb, "exc", "#PF on %p, errcode=%llx",
-            fault_vaddr, errcode);
-    if (errcode & EXC_PF_ERC_U)
-        kmem_paging_alloc(fault_vaddr & PAGE_MASK,
-                PAGING_FLAG_U | PAGING_FLAG_R);
+	klogf(Log_verb, "exc", "#PF on %p, errcode=%llx",
+			fault_vaddr, errcode);
+	if (!(errcode & EXC_PF_ERC_P)) {
+		if (handle_PF(fault_vaddr))
+			kpanic("#PF handling");
+	} else //TODO: kill process
+		kpanic("#PF not handled");
+	klogf(Log_verb, "exc", "#PF handled");
 }
 
 static inline void idt_int_asgn(int n, uint64_t addr, uint8_t attr,

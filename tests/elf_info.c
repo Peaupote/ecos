@@ -1,7 +1,7 @@
-#include<stdio.h>
+#include <stdio.h>
 #include <stdlib.h>
 
-#include "../src/util/elf64.h"
+#include <util/elf64.h>
 
 void wstdio(void* none __attribute__((unused)), const char* str){
 	printf("%s", str);

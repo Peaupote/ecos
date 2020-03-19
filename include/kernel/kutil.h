@@ -6,6 +6,8 @@
 
 #include "../util/string.h"
 
+#define kAssert(P) kassert(P, #P)
+
 int  wprintf(stringl_writer, void*, const char* fmt, va_list params);
 
 int  kprintf(const char *format, ...);

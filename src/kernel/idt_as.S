@@ -33,6 +33,7 @@ syscall_tab:
 .global eoi_iret_to_userspace
 .global pml4_to_cr3
 .global invalide_page
+.global paging_refresh
 
 .extern st_curr_reg
 .extern common_hdl
@@ -229,5 +230,10 @@ pml4_to_cr3:
     ret
 
 invalide_page:
-    invlpg (%rdi)
-    ret
+	invlpg (%rdi)
+	ret
+
+paging_refresh:
+	movq   %cr3, %rax
+	movq   %rax, %cr3
+	ret

@@ -3,7 +3,7 @@
 
 #include "tutil.h"
 
-#include "../../src/kernel/param.h"
+#include <kernel/param.h>
 
 typedef size_t pid_t;
 typedef int32_t  priority_t;

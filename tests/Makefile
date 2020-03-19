@@ -3,13 +3,14 @@ export CC=gcc
 export FLAGS=-O2 -Wall -Wextra -std=gnu99
 SRCDEP=elf_info.c
 UDEP=elf64.o string.o
+INCLUDES=-I ../include
 
 .PHONY: all util clean
 
 all: elf_info.out
 
 %.o:%.c
-	$(CC) $(FLAGS) -o $@ -c $<
+	$(CC) $(FLAGS) -o $@ -c $< $(INCLUDES)
 
 UDEP_FROM_HERE=$(patsubst %,../src/util/test/%,$(UDEP))
 UDEP_FROM_UTIL=$(patsubst %,test/%,$(UDEP))

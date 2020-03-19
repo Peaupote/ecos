@@ -7,12 +7,12 @@
 
 #include <util/elf64.h>
 #include <kernel/memory/kmem.h>
+#include <kernel/memory/shared_pages.h>
 #include <kernel/int.h>
 #include <kernel/tty.h>
 #include <kernel/kutil.h>
 
-#define USER_STACK_TOP  0x57AC3000
-#define USER_STACK_SIZE 0x4000
+#define USER_STACK_PD 0x7FF
 
 #define TEST_SECTION_PQUEUE
 
@@ -193,7 +193,9 @@ proc_t *switch_proc(pid_t pid) {
 uint8_t proc_ldr_alloc_pages(uint_ptr begin, uint_ptr end) {
     uint8_t err;
     for(uint_ptr it = begin & PAGE_MASK; it < end; ++it) {
-        err = kmem_paging_alloc(it, PAGING_FLAG_U | PAGING_FLAG_R);
+        err = kmem_paging_alloc(it,
+				PAGING_FLAG_U | PAGING_FLAG_R,
+				PAGING_FLAG_U | PAGING_FLAG_R);
         if(err >= 2) return err;
     }
     return 0;
@@ -231,12 +233,13 @@ uint8_t proc_create_userspace(void* prg_elf, proc_t *proc) {
 
     //On est désormais dans le paging du processus
     err = 0;
-    proc_ldr_alloc_pages(USER_STACK_TOP - USER_STACK_SIZE,
-                         USER_STACK_TOP);
+	uint64_t* stack_pd = kmem_acc_pts_entry(paging_add_pd(USER_STACK_PD),
+							2, PAGING_FLAG_U | PAGING_FLAG_R);
+	*stack_pd = SPAGING_FLAG_P;
     proc->p_reg.rip = elf_load(proc_ldr, &err, prg_elf);
     if (err) return 2;
 
-    proc->p_reg.rsp = USER_STACK_TOP;
+    proc->p_reg.rsp = paging_add_pd(USER_STACK_PD + 1);
     proc->p_pml4    = pml4_loc;
 
     return 0;

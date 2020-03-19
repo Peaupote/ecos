@@ -209,7 +209,7 @@ size_t tty_new_prompt() {
     return sb_display_shift;
 }
 
-inline size_t get_input_height () {
+static inline size_t get_input_height () {
     size_t new_input_height = ib_size / input_width;
     if((ib_size % input_width) || !ib_size)
         return 1 + new_input_height;
@@ -377,6 +377,8 @@ loop_enter:
         }
     }
     cur_ln_x = x;
+	for(; x < VGA_WIDTH; ++x)
+		sbuffer[ln_index][x] = vga_entry(' ', back_color);
     return rt;
 }
 
@@ -401,6 +403,8 @@ loop_enter:
         }
     }
     cur_ln_x = x;
+	for(; x < VGA_WIDTH; ++x)
+		sbuffer[ln_index][x] = vga_entry(' ', back_color);
     return rt;
 }
 

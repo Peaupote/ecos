@@ -15,6 +15,8 @@
 #define PAGE_SIZE           0x1000
 #define PAGE_MASK           (~(uint64_t) 0xfff)
 #define PAGE_OFS_MASK		( (uint64_t) 0xfff)
+#define PAGE_ENT_MASK		( (uint64_t) 0xff8)
+#define PAGE_ENT            (PAGE_SIZE / 8)
 #define PAGE_SHIFT          12
 
 #define VADDR_MASK ((((uint64_t)1)<<48)-1)
@@ -76,6 +78,10 @@ static inline uint16_t paging_get_pt  (uint_ptr v) {
 static inline uint_ptr paging_rm_loop (uint_ptr v) {
     return (v << 9) & VADDR_MASK;
 }
+static inline uint_ptr paging_add_loop (uint_ptr v) {
+	return (((uint_ptr) PML4_LOOP)<<39)
+	     | ((v & PAGE_MASK) >> 9);
+}
 
 #ifndef __i386__
 static inline uint64_t* paging_pts_acc(uint16_t j0, uint16_t j1,
@@ -85,7 +91,7 @@ static inline uint64_t* paging_pts_acc(uint16_t j0, uint16_t j1,
       | paging_set_pdpt(j1)
       | paging_set_pd  (j2)
       | paging_set_pt  (j3)
-      | (((uint_ptr)num)<<3) );
+      | (((uint_ptr)num	)<<3) );
 }
 static inline uint64_t* paging_adr_acc(uint16_t j0, uint_ptr j1,
         uint_ptr j2, uint_ptr j3, uint_ptr ofs) {

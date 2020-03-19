@@ -4,10 +4,10 @@
 #include <stddef.h>
 #include <stdint.h>
 
-#include "keyboard.h"
+#include <kernel/keyboard.h>
 
 void   tty_init(void);
-void   tty_input(scancode_byte, key_event);
+void   tty_input(scancode_byte scb, key_event ev);
 
 //L'affichage du prompt doit être mis à jour (tty_update_prompt_pos)
 void   tty_afficher_buffer_range(size_t idx_begin, size_t idx_end);
