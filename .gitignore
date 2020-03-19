@@ -8,3 +8,4 @@ isodir
 *.depends
 *.out
 *.tst
+*.img

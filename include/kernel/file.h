@@ -3,11 +3,11 @@
 
 #include <stddef.h>
 #include <stdint.h>
-#include "param.h"
-#include "user.h"
+#include <kernel/param.h>
+#include <kernel/user.h>
+#include <kernel/devices.h>
 
 typedef int32_t  ino_t;
-typedef uint32_t dev_t;
 typedef uint32_t mode_t;
 typedef uint16_t nlink_t;
 typedef uint64_t off_t;
@@ -37,20 +37,6 @@ struct dirent {
     ino_t ino;
     char  fname[255];
 };
-
-struct device_info {
-    uint32_t block_size;
-    uint32_t nb_block;
-    uint32_t nb_inodes;
-    uint32_t nb_free_inodes;
-};
-
-struct device {
-    dev_t     dev_id;
-    char      dev_mnt[256];
-    uint8_t   dev_fs;
-    void     *dev_spblk; // pointer to super block
-} devices[NDEV];
 
 // File system table
 #define NFST 2
