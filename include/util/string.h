@@ -15,6 +15,7 @@ int ustrncmp(const char *lhs, const char *rhs, size_t len);
 void ustrncpy(char *dst, const char *src, size_t len);
 int uis_prefix(const char *s, const char *p);
 char *uindex(const char *src, char c);
+void memcpy(void *dst, const void *src, size_t len);
 
 size_t str_find_first(const char* s, char trg);
 

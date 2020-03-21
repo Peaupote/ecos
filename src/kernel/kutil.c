@@ -184,10 +184,3 @@ void kpanic_ct(const char* msg) {
 void kassert(uint8_t b, const char *msg) {
     if(!b) kpanic(msg);
 }
-
-void memcpy(void* dst, const void* src, size_t len) {
-    uint8_t *d = (uint8_t*)dst;
-    uint8_t *s = (uint8_t*)src;
-    for (size_t i = 0; i < len; i++)
-        d[i] = s[i];
-}
