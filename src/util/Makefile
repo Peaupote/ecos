@@ -3,7 +3,7 @@ TRG_LIST=32 64 test
 TRG?=test
 CC?=gcc
 FLAGS?=-O2 -Wall -Wextra -std=gnu99
-INCLUDES?=-I ../../include
+INCLUDES=-I ../../include
 SRCDEP=vga.c string.c elf64.c
 
 $(TRG)/%.o:%.c

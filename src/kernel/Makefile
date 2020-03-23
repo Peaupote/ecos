@@ -4,7 +4,7 @@ export FLAGS=-O1 -Wall -Wextra -std=gnu99 -nostdlib \
 			 -mcmodel=large -ffreestanding -mno-red-zone -Wno-unused-parameter
 AS=x86_64-elf-as
 CFILES=main.c memory/kmem.c idt.c gdt.c keyboard.c tty.c tests.c \
-		syscalls/sleep.c syscalls/sys.c proc.c kutil.c \
+		syscalls/sleep.c syscalls/sys.c syscalls/execve.c proc.c kutil.c \
 		memory/page_alloc.c memory/shared_pages.c memory/shared_ptr.c \
 		../fs/dummy/dummy.c ../fs/proc/proc.c file.c
 ASFILES=entry.S idt_as.S data.S

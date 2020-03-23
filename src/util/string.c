@@ -50,12 +50,14 @@ int uis_prefix(const char *s, const char *p) {
     return *p;
 }
 
+#ifndef __linux__
 void memcpy(void* dst, const void* src, size_t len) {
     uint8_t *d = (uint8_t*)dst;
     uint8_t *s = (uint8_t*)src;
     for (size_t i = 0; i < len; i++)
         d[i] = s[i];
 }
+#endif
 
 void int64_to_str_hexa(char* out, uint64_t v) {
     for(size_t i=16; i;){

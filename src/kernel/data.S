@@ -6,9 +6,12 @@
 
     .section .rodata
     .global proc_init
-    .global proc_sleep
+    .global edummy_args
 
 .align 0x20
 proc_init:
     .incbin "./aux_prg/init.out"
+.align 0x20
+edummy_args:
+	.incbin "../../tests/prg/args.out"
 .align 0x20

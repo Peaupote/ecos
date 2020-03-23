@@ -8,6 +8,17 @@ string:
     .skip 256
 text:
     .string "Hello world !\n"
+env0:
+	.string "all=42"
+exec_fname:
+	.string "args.out"
+args:
+	.quad exec_fname
+	.quad text
+	.quad 0
+envs:
+	.quad env0
+	.quad 0
 
     .section .text
     .global _start
@@ -57,10 +68,16 @@ _start:
     movq    $SYS_WRITE, %rax
     int     $0x80
 
-//    movq    $SYS_FORK, %rax
-//    int     $0x80
-//    testq   %rax, %rax
-//    jne     2f
+    movq    $SYS_FORK, %rax
+    int     $0x80
+    testq   %rax, %rax
+    jne     2f
+
+	movq    $exec_fname, %rdi //Non utilisé pour l'instant
+	movq    $args,       %rsi
+	movq    $envs,       %rdx
+	movq    $SYS_EXECVE, %rax
+	int     $0x80
 
     //#PF
 //    movq	$42, %rax

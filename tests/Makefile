@@ -3,14 +3,14 @@ export CC=gcc
 export FLAGS=-O2 -Wall -Wextra -std=gnu99
 SRCDEP=elf_info.c
 UDEP=elf64.o string.o
-INCLUDE=-I ../include
+INCLUDES=-I ../include
 
 .PHONY: all util clean ext2
 
 all: elf_info.out util ext2
 
 %.o:%.c
-	$(CC) $(FLAGS) -o $@ -c $< $(INCLUDE)
+	$(CC) $(FLAGS) -o $@ -c $< $(INCLUDES)
 
 UDEP_FROM_HERE=$(patsubst %,../src/util/test/%,$(UDEP))
 UDEP_FROM_UTIL=$(patsubst %,test/%,$(UDEP))
@@ -22,7 +22,7 @@ ext2:
 	$(MAKE) -C ./ext2 all
 
 elf_info.out:elf_info.o util
-	$(CC) $(FLAGS) -o elf_info.out elf_info.o $(UDEP_FROM_HERE) $(INCLUDE)
+	$(CC) $(FLAGS) -o elf_info.out elf_info.o $(UDEP_FROM_HERE) $(INCLUDES)
 
 .depends:
 	../tools/mkdep.sh "$(CC) $(FLAGS)" $(SRCDEP) > .depends

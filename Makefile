@@ -22,7 +22,6 @@ tests:
 	@echo "Testing"
 	$(MAKE) -C tests all
 	$(MAKE) -C tests/unit run
-	$(MAKE) -C tests/ext2 run
 
 start: $(ISO)
 	qemu-system-x86_64 -cdrom $(ISO) -monitor stdio | tee qemu.out

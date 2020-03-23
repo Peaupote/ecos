@@ -24,6 +24,7 @@ syscall_tab:
     .quad write
     .quad read
     .quad lseek
+    .quad execve
 
     .section .text
 .global irq_sys
@@ -216,6 +217,7 @@ func_end:
 
 iret_to_userspace:
     setup_iret
+    restore_curr_proc_reg
     iretq
 
 eoi_iret_to_userspace:
