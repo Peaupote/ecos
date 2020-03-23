@@ -11,10 +11,12 @@
 
 static char *line = 0;
 static struct ext2_mount_info info;
+
+static uint32_t curr_ino;
 static struct ext2_inode *curr;
 
 static void print_type(uint8_t type) {
-    printf("type : ");
+    printf("type : (%x) ", type);
     switch (type&0xf000) {
     case EXT2_TYPE_DIR: printf("directory\n"); break;
     case EXT2_TYPE_REG: printf("regular file\n"); break;
@@ -47,7 +49,7 @@ void ls () {
         exit(1);
     }
 
-    ext2_iter_dir(curr, print_dir, &info);
+    ext2_iter_dir(curr, print_dir, 0, &info);
 }
 
 void print_stat() {
@@ -69,7 +71,8 @@ void cd () {
 
     *s2 = 0;
 
-    struct ext2_inode *inode = ext2_lookup_dir(curr, s1, &info);
+    uint32_t ino = ext2_lookup_dir(curr, s1, &info);
+    struct ext2_inode *inode = ext2_get_inode(ino, &info);
     if (!inode) {
         printf("%s dont exists\n", s1);
         return;
@@ -80,6 +83,7 @@ void cd () {
         return;
     }
 
+    curr_ino = ino;
     curr = inode;
 }
 
@@ -87,7 +91,67 @@ void cmd_mkdir() {
     char *s = strtok(line, " ");
 
     for (s = strtok(0, " "); s; s = strtok(0, " ")) {
-        ext2_mkdir(curr, s, &info);
+        ext2_mkdir(curr_ino, s, &info);
+    }
+}
+
+void save() {
+    char *s = strtok(line, " \n");
+    s = strtok(0, " \n");
+    if (!s) {
+        printf("usage: save name\n");
+        return;
+    }
+
+    int fd = open(s, O_WRONLY|O_CREAT, 0640);
+    if (fd < 0) { perror("open"); goto end; }
+
+    if (lseek(fd, 1024, SEEK_SET) < 0) { perror("seek"); goto end; }
+    if (write(fd, info.sp, info.sp->s_blocks_count * info.block_size) < 0) {
+        perror("write");
+        goto end;
+    }
+
+    printf("fs saved in %s\n", s);
+
+end:
+    close(fd);
+}
+
+void dump() {
+    printf("superblock size : %ld\n", sizeof(struct ext2_superblock));
+    printf("inode count : %d\n", info.sp->s_inodes_count);
+    printf("block count : %d\n", info.sp->s_blocks_count);
+
+    printf("block size  : %d\n", info.block_size);
+    printf("frag  size  : %d\n", ext2_frag_size(info.sp));
+    printf("blocks per group : %d\n", info.sp->s_blocks_per_group);
+    printf("inodes per group : %d\n", info.sp->s_inodes_per_group);
+    printf("number of block groups : %d\n", info.group_count);
+
+    printf("features : ");
+    if (info.sp->s_feature_ro_compat&EXT2_FEATURE_SPARSE_SUPER) {
+        printf("sparse file ");
+    }
+
+    printf("\n");
+    printf("revision level : %d\n", info.sp->s_rev_level);
+    printf("inode size : %d\n", info.sp->s_inode_size);
+
+    printf("\n");
+
+    struct ext2_group_desc *bg = info.bg;
+    for (size_t i = 0 ; i < info.group_count; i++, bg++) {
+        printf("Group %ld:\n", i);
+        printf("block bitmap %d\n", bg->g_block_bitmap);
+        printf("inode bitmap %d\n", bg->g_inode_bitmap);
+        printf("inode table  %d-%d\n", bg->g_inode_table,
+               bg->g_inode_table + (info.sp->s_inode_size * info.sp->s_inodes_per_group) / info.block_size - 1);
+        printf("%d free blocks, %d free inodes, %d directories\n",
+               bg->g_free_blocks_count,
+               bg->g_free_inodes_count,
+               bg->g_dir_count);
+        printf("\n");
     }
 }
 
@@ -135,42 +199,8 @@ int main(int argc, char *argv[]) {
         exit(1);
     }
 
-    printf("superblock size : %ld\n", sizeof(struct ext2_superblock));
-    printf("inode count : %d\n", info.sp->s_inodes_count);
-    printf("block count : %d\n", info.sp->s_blocks_count);
-
-    printf("block size  : %d\n", info.block_size);
-    printf("frag  size  : %d\n", ext2_frag_size(info.sp));
-    printf("blocks per group : %d\n", info.sp->s_blocks_per_group);
-    printf("inodes per group : %d\n", info.sp->s_inodes_per_group);
-    printf("number of block groups : %d\n", info.group_count);
-
-    printf("features : ");
-    if (info.sp->s_feature_ro_compat&EXT2_FEATURE_SPARSE_SUPER) {
-        printf("sparse file ");
-    }
-
-    printf("\n");
-    printf("revision level : %d\n", info.sp->s_rev_level);
-    printf("inode size : %d\n", info.sp->s_inode_size);
-
-    printf("\n");
-
-    struct ext2_group_desc *bg = info.bg;
-    for (size_t i = 0 ; i < info.group_count; i++, bg++) {
-        printf("Group %ld:\n", i);
-        printf("block bitmap %d\n", bg->g_block_bitmap);
-        printf("inode bitmap %d\n", bg->g_inode_bitmap);
-        printf("inode table  %d-%d\n", bg->g_inode_table,
-               bg->g_inode_table + (info.sp->s_inode_size * info.sp->s_inodes_per_group) / info.block_size - 1);
-        printf("%d free blocks, %d free inodes, %d directories\n",
-               bg->g_free_blocks_count,
-               bg->g_free_inodes_count,
-               bg->g_dir_count);
-        printf("\n");
-    }
-
-    curr = ext2_find_inode(EXT2_ROOT_INO, &info); // root
+    curr_ino = EXT2_ROOT_INO;
+    curr = ext2_get_inode(EXT2_ROOT_INO, &info); // root
 
     size_t len = 0;
     ssize_t nread;
@@ -184,6 +214,8 @@ int main(int argc, char *argv[]) {
         else if (!strncmp(line, "cd", 2)) cd(line);
         else if (!strncmp(line, "stat", 4)) print_stat();
         else if (!strncmp(line, "mkdir", 5)) cmd_mkdir();
+        else if (!strncmp(line, "save", 4)) save();
+        else if (!strncmp(line, "dump", 4)) dump();
         else if (!strncmp(line, "\n", 1)) {}
         else {
             printf("unkonwn command %s", line);

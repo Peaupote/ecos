@@ -1,6 +1,7 @@
 #ifndef _H_EXT2
 #define _H_EXT2
 
+#include <stddef.h>
 #include <stdint.h>
 
 struct ext2_mount_info {
@@ -11,7 +12,7 @@ struct ext2_mount_info {
     uint32_t                group_size;
 };
 
-struct block;
+typedef void * block_t;
 
 // file system state
 #define EXT2_STAT_CLEAN 1
@@ -136,9 +137,9 @@ static inline uint32_t ext2_group_count_inodes(struct ext2_superblock *sp) {
         (sp->s_inodes_count % sp->s_inodes_per_group != 0 ? 1 : 0);
 }
 
-static inline struct block *
+static inline block_t
 ext2_get_block(uint32_t n, struct ext2_mount_info *info) {
-    return (struct block*)((char*)info->sp + (n - 1) * info->block_size);
+    return (char*)info->sp + (n - 1) * info->block_size;
 }
 
 int is_superblock_sparse(uint32_t x);
@@ -231,8 +232,19 @@ ext2_inode_index(uint32_t inode, struct ext2_superblock *sp) {
 }
 
 static inline struct ext2_group_desc *
-ext2_find_inode_group(uint32_t inode, struct ext2_mount_info *info) {
+ext2_inode_group(uint32_t inode, struct ext2_mount_info *info) {
     return info->bg + ext2_inode_block_group(inode, info->sp);
+}
+
+static inline uint32_t
+ext2_inode_block_count(struct ext2_inode *inode,
+                       struct ext2_superblock *sp) {
+    return inode->in_blocks / (2 << sp->s_log_block_size);
+}
+
+static inline uint32_t
+ext2_inode_blocks(uint32_t block_count, struct ext2_superblock *sp) {
+    return block_count * (2 << sp->s_log_block_size);
 }
 
 // directory entry
@@ -258,39 +270,47 @@ struct ext2_inode *ext2_lookup(char *fname);
 
 // blocks
 
-struct block *
-ext2_block_alloc(uint32_t inode, struct ext2_mount_info *info);
+uint32_t ext2_block_alloc(struct ext2_mount_info *info);
 
 // inodes
 
 struct ext2_inode *
-ext2_find_inode(uint32_t inode, struct ext2_mount_info *info);
+ext2_get_inode(uint32_t inode, struct ext2_mount_info *info);
 
-struct ext2_inode *ext2_alloc_inode(uint16_t type, uint16_t uid);
+uint32_t
+ext2_lookup_free_inode(struct ext2_mount_info *info);
 
-struct block *
-ext2_get_inode_block(uint32_t block,
-                     struct ext2_inode *inode,
-                     struct ext2_mount_info *info);
+uint32_t
+ext2_alloc_inode(uint16_t type, uint16_t uid, struct ext2_mount_info *);
 
-struct ext2_inode *ext2_alloc(char *fname, uint16_t type, uint16_t uid);
+uint32_t *ext2_get_inode_block_ptr(uint32_t block,
+                                   struct ext2_inode *inode,
+                                   struct ext2_mount_info *info);
+
+uint32_t ext2_get_inode_block_nb(uint32_t block,
+                                 struct ext2_inode *inode,
+                                 struct ext2_mount_info *info);
+
+block_t ext2_get_inode_block(uint32_t block,
+                             struct ext2_inode *inode,
+                             struct ext2_mount_info *info);
 
 // dir
 
 struct ext2_dir_entry *
 ext2_iter_dir(struct ext2_inode *inode,
               int (*iterator)(struct ext2_dir_entry*),
+              size_t *len,
               struct ext2_mount_info *info);
 
-struct ext2_inode *
-ext2_lookup_dir(struct ext2_inode *inode, char *fname,
-                struct ext2_mount_info *info);
+uint32_t ext2_lookup_dir(struct ext2_inode *inode, char *fname,
+                         struct ext2_mount_info *info);
 
 struct ext2_dir_entry *
 ext2_readdir(struct ext2_dir_entry *dir);
 
 struct ext2_dir_entry *
-ext2_mkdir(struct ext2_inode *dir, char *dirname,
+ext2_mkdir(uint32_t parent_inode, char *dirname,
            struct ext2_mount_info *info);
 
 

@@ -8,20 +8,30 @@
 struct ext2_dir_entry *
 ext2_iter_dir(struct ext2_inode *inode,
               int (*iterator)(struct ext2_dir_entry*),
+              size_t *read,
               struct ext2_mount_info *info) {
-    size_t nbblk = 0, len = 0;
+    size_t nbblk = 0, len = 0, len_in_block = 0;
     struct ext2_dir_entry *dir;
 
-    for (dir = ext2_get_inode_block(0, inode, info);
-         len < inode->in_size;
-         dir = ext2_readdir(dir)) {
-        if (!dir->d_ino) dir = ext2_get_inode_block(++nbblk, inode, info);
+    dir = ext2_get_inode_block(0, inode, info);
+    goto start;
+
+    do {
+        if (len_in_block == info->block_size) {
+            len_in_block = 0;
+            dir = ext2_get_inode_block(++nbblk, inode, info);
+            printf("switch block\n");
+        } else dir = ext2_readdir(dir);
+    start:
+
+        if (iterator(dir) < 0) break;
 
         len += dir->d_rec_len;
-        if (iterator(dir) < 0) return dir;
-    }
+        len_in_block += dir->d_rec_len;
+    } while (len < inode->in_size);
 
-    return 0;
+    if (read) *read = len;
+    return dir;
 }
 
 
@@ -31,64 +41,57 @@ static int cmp_dir_name(struct ext2_dir_entry* dir) {
     return 0;
 }
 
-struct ext2_inode *
-ext2_lookup_dir(struct ext2_inode *inode, char *fname,
-                struct ext2_mount_info *info) {
+uint32_t ext2_lookup_dir(struct ext2_inode *inode, char *fname,
+                         struct ext2_mount_info *info) {
     lookup_name = fname;
-    struct ext2_dir_entry *entry = ext2_iter_dir(inode, cmp_dir_name, info);
-
+    struct ext2_dir_entry *entry = ext2_iter_dir(inode, cmp_dir_name,
+                                                 0, info);
     // TODO : binary search
-
-    if (!entry) return 0;
-
-    printf("%d\n", entry->d_ino);
-    return ext2_find_inode(entry->d_ino, info);
+    return entry ? entry->d_ino : 0;
 }
 
-struct ext2_dir_entry *
-ext2_readdir(struct ext2_dir_entry *dir) {
-    // assert (dir->rec_len < sizeof(struct ext2_dir_entry));
+struct ext2_dir_entry *ext2_readdir(struct ext2_dir_entry *dir) {
     return (struct ext2_dir_entry*)((char*)dir + dir->d_rec_len);
 }
 
-struct ext2_dir_entry *
-ext2_mkdir(struct ext2_inode *parent, char *dirname,
-           struct ext2_mount_info *info) {
+
+static int void_iterator(struct ext2_dir_entry * d __attribute__((unused))) {
+    return 0;
+}
+
+struct ext2_dir_entry * ext2_mkdir(uint32_t inode, char *dirname,
+                                   struct ext2_mount_info *info) {
+    struct ext2_inode *parent = ext2_get_inode(inode, info);
+    struct ext2_dir_entry *dir;
+    size_t strlen, rec_len, len, block;
+
     if (!(parent->in_type&EXT2_TYPE_DIR)) return 0;
 
-    size_t strlen = ustrlen(dirname) + 1;
+    strlen = ustrlen(dirname) + 1;
     if (strlen > 256) return 0;
 
-    size_t nbblk = 0, len = 0, len_in_block = 0;
-    struct ext2_dir_entry *dir;
 
-    for (dir = ext2_get_inode_block(0, parent, info); len < parent->in_size;
-         dir = ext2_readdir(dir)) {
-        if (!dir->d_ino) {
-            len_in_block = 0;
-            dir = ext2_get_inode_block(++nbblk, parent, info);
-        }
-
-        len += dir->d_rec_len;
-        len_in_block += dir->d_rec_len;
-    }
+    ext2_iter_dir(parent, void_iterator, &len, info);
+    block = len / info->block_size;
 
     // alignement
-    size_t rec_len;
-    for (rec_len = EXT2_DIR_BASE_SIZE + strlen; len&0x2; len++);
+    for (rec_len = EXT2_DIR_BASE_SIZE + strlen; len&2; len++);
 
-    if (len_in_block + rec_len >= info->block_size) {
-        if (len >= parent->in_size) {
-            printf("alloc\n");
-            ext2_block_alloc(parent, info);
-        }
-        dir = ext2_get_inode_block(++nbblk, parent, info);
-    } else dir = ext2_readdir(dir);
+    // move to right position
+    // and alloc a block if necessary
+    dir = ext2_get_inode_block(block, parent, info);
 
+    dir->d_ino = ext2_alloc_inode(EXT2_TYPE_DIR|0640, 0, info);
     dir->d_name_len = strlen;
     dir->d_rec_len = rec_len;
     parent->in_size += rec_len;
     memcpy(dir->d_name, dirname, strlen);
+
+    // TODO : write . and .. in directory
+
+    uint32_t g = ext2_inode_block_group(inode, info->sp);
+    struct ext2_group_desc *group = info->bg + g;
+    group->g_dir_count++;
 
     printf("%d (%d) %*s\n", dir->d_ino, dir->d_rec_len,
            dir->d_name_len, dir->d_name);

@@ -24,16 +24,30 @@ int ext2_mount(void *fs, struct ext2_mount_info *info) {
     return 0;
 }
 
-struct block *
-ext2_block_alloc(uint32_t inode, struct ext2_mount_info *info) {
-    uint32_t g;
+uint32_t ext2_block_alloc(struct ext2_mount_info *info) {
+    uint32_t g = 0;
     struct ext2_group_desc *group;
 
-    for (group = info->bg + (g = ext2_inode_block_group(inode, info->sp));
+    // TODO : adapt to make block contiguous
+
+    for (group = info->bg + g;
          g < info->group_count && group->g_free_blocks_count == 0;
          group++, g++);
 
-    struct block *block_bitmap = ext2_get_block(group->g_block_bitmap, info);
+    uint8_t *bitmap = ext2_get_block(group->g_block_bitmap, info);
+    uint32_t block, rem = 0;
 
-    return 0;
+    for (block = 0; block < info->sp->s_blocks_per_group; block++) {
+        rem = block & 0b111;
+        if (block != 0 && rem == 0) bitmap++;
+        if (0 == (*bitmap & (1 << rem))) break;
+    }
+
+    // TODO : try an other group
+    if (block == info->sp->s_blocks_per_group) return 0;
+
+    *bitmap |= 1 << rem;
+    group->g_free_blocks_count--;
+
+    return block + 1;
 }
