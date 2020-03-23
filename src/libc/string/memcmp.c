@@ -1,4 +1,4 @@
-#include <string.h>
+#include <libc/string.h>
 
 int memcmp(const void *srcp, const void *dstp, size_t len) {
     char *src = (char*)srcp, *dst = (char*)dstp;

@@ -1,4 +1,4 @@
-#include <string.h>
+#include <libc/string.h>
 
 void *memset(void *pdst, int c, size_t len) {
     char *dst = (char*)pdst;

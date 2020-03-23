@@ -1,7 +1,7 @@
 ISO=ecos.iso
 
 .PHONY: all clean tests start re src/kernel/kernel.bin src/boot/boot.bin \
-	depends
+	depends src/libc/libc.a
 
 all: $(ISO)
 
@@ -11,7 +11,10 @@ src/kernel/kernel.bin:
 src/boot/boot.bin:
 	$(MAKE) -C src/boot boot.bin
 
-$(ISO): src/grub.cfg src/boot/boot.bin src/kernel/kernel.bin
+src/libc/libc.a:
+	$(MAKE) -C src/libc libc.a
+
+$(ISO): src/grub.cfg src/boot/boot.bin src/kernel/kernel.bin src/libc/libc.a
 	mkdir -p isodir/boot/grub
 	cp src/boot/boot.bin isodir/boot/ecos_boot.bin
 	cp src/kernel/kernel.bin isodir/boot/ecos_kernel.bin
@@ -22,7 +25,8 @@ tests:
 	@echo "Testing"
 	$(MAKE) -C tests all
 	$(MAKE) -C tests/unit run
-	$(MAKE) -C tests/ext2 run
+	$(MAKE) -C tests/libc run
+	# $(MAKE) -C tests/ext2 run
 
 start: $(ISO)
 	qemu-system-x86_64 -cdrom $(ISO) -monitor stdio | tee qemu.out

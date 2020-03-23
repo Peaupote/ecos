@@ -1,5 +1,5 @@
-#ifndef _H_STDIO
-#define _H_STDIO
+#ifndef _H_LIBC_STDIO
+#define _H_LIBC_STDIO
 
 int printf(const char *format, ...);
 int putchar(int c);

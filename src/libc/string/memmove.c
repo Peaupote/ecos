@@ -1,4 +1,4 @@
-#include <string.h>
+#include <libc/string.h>
 
 void *memmove(void *pdst, const void *psrc, size_t len) {
     char *dst = (char*)pdst, *src = (char*)psrc;

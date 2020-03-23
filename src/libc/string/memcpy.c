@@ -1,4 +1,4 @@
-#include <string.h>
+#include <libc/string.h>
 
 void *memcpy(void *pdst, const void *psrc, size_t len) {
     char *src = (char*)psrc, *dst = (char*)pdst;

@@ -1,7 +1,7 @@
 export TRG=64
 export CC=x86_64-elf-gcc
 export FLAGS=-O1 -Wall -Wextra -std=gnu99 -nostdlib \
-			 -mcmodel=large -ffreestanding -mno-red-zone -Wno-unused-parameter
+			 -mcmodel=large -ffreestanding -mno-red-zone
 AS=x86_64-elf-as
 CFILES=main.c memory/kmem.c idt.c gdt.c keyboard.c tty.c tests.c \
 		syscalls/sleep.c syscalls/sys.c proc.c kutil.c \

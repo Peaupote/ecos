@@ -5,9 +5,9 @@ SRCDEP=elf_info.c
 UDEP=elf64.o string.o
 INCLUDE=-I ../include
 
-.PHONY: all util clean ext2
+.PHONY: all util clean libc ext2
 
-all: elf_info.out util ext2
+all: elf_info.out util libc ext2
 
 %.o:%.c
 	$(CC) $(FLAGS) -o $@ -c $< $(INCLUDE)
@@ -20,6 +20,9 @@ util:
 
 ext2:
 	$(MAKE) -C ./ext2 all
+
+libc:
+	$(MAKE) -C libc run
 
 elf_info.out:elf_info.o util
 	$(CC) $(FLAGS) -o elf_info.out elf_info.o $(UDEP_FROM_HERE) $(INCLUDE)
@@ -34,3 +37,4 @@ clean:
 	$(MAKE) -C prg  clean
 	$(MAKE) -C unit clean
 	$(MAKE) -C ext2 clean
+	$(MAKE) -C libc clean

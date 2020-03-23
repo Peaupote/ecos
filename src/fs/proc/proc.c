@@ -19,7 +19,8 @@ void *proc_mount() {
     return 0;
 }
 
-int proc_load(void *super, char *fname, struct stat *st, char **end) {
+int proc_load(void *super __attribute__((unused)),
+              char *fname, struct stat *st, char **end) {
     st->st_ino = 0;
 
     if (*fname == '/') fname++;
@@ -65,14 +66,19 @@ success:
 }
 
 // can't create file in this filesystem
-int proc_create(void* super, ino_t ino, char *fname) { return -1; }
+int proc_create(void* super __attribute__((unused)),
+                ino_t ino __attribute__((unused)),
+                char *fname __attribute__((unused))) { return -1; }
 
 // TODO
-int proc_seek(void* super, ino_t ino, off_t pos) { return 0; }
+int proc_seek(void* super __attribute__((unused)),
+              ino_t ino __attribute__((unused)),
+              off_t pos __attribute__((unused))) { return 0; }
 
 #define min(a, b) (a < b ? a : b)
 
-int proc_read(void* super, ino_t ino, void *buf, size_t len) {
+int proc_read(void* super __attribute__((unused)),
+              ino_t ino, void *buf, size_t len) {
     if (ino == 0) return -1;
 
     pid_t pid = ino / 3;
@@ -94,6 +100,11 @@ int proc_read(void* super, ino_t ino, void *buf, size_t len) {
 }
 
 // not allowed to write
-int proc_write(void* super, ino_t ino, void *buf, size_t len) { return -1; }
+int proc_write(void* super __attribute__((unused)),
+               ino_t ino __attribute__((unused)),
+               void *buf __attribute__((unused)),
+               size_t len __attribute__((unused))) { return -1; }
 
-struct dirent *proc_readdir(struct dirent* dir) { return 0; }
+struct dirent *proc_readdir(struct dirent* dir __attribute__((unused))) {
+    return 0;
+}
