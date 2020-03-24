@@ -1,4 +1,4 @@
-FLAGS=-O1 -Wall -Wextra -std=gnu99
+FLAGS=-O1 -Wall -Wextra -std=gnu99 -fno-builtin
 CC=gcc
 ASFILES=
 include ../../src/libc/list.Makefile

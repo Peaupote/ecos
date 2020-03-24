@@ -20,11 +20,11 @@ kba_pt_23    = _ofs;
 	/* GDT */
 _ofs = ALIGN(_ofs, 0x10);
 kba_gdt      = _ofs;
-	_ofs    += (5*8 + 16);
+	_ofs    += 0x48;
 _ofs = ALIGN(_ofs, 0x4);
 _ofs += 2;  /*align = 2 mod 4*/
 kba_gdtd     = _ofs;
-	_ofs    += 2 + 8;
+	_ofs    += 0xa;
 
 /* Contient l'adresse physique de la fin du kernel (première adresse libre) */
 _ofs = ALIGN(_ofs, 4);

@@ -6,6 +6,7 @@
 #include <kernel/memory/shared_pages.h>
 #include <util/elf64.h>
 #include <kernel/kutil.h>
+#include <kernel/gdt.h>
 
 //TODO: vrai système de fichier
 extern uint8_t edummy_args[];
@@ -368,7 +369,9 @@ void execve(void) {
 	state.st_curr_pid = pid;
     st_curr_reg  = &p->p_reg;
 	np->p_stat = FREE;
-	
+
+	klogf(Log_info, "test", "rflags=%llx", p->p_reg.rflags);
+
 	free_tr();
-	iret_to_userspace();
+	iret_to_userspace(SEG_SEL(GDT_RING3_CODE, 3));
 }

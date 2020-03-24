@@ -26,6 +26,7 @@ extern const idt_handler int_handlers[NEXCEPTION_VEC];
 
 struct gate_desc idt[IDT_ENTRIES] = { 0 };
 
+// ! Processus partiellement sauvegardé
 void keyboard_hdl(void){
     uint8_t status;
     key_event ev;
@@ -90,6 +91,7 @@ void pit_hdl(void) {
 //User
 #define EXC_PF_ERC_U (1<<2)
 
+// ! Processus partiellement sauvegardé
 void exception_PF_hdl(uint_ptr fault_vaddr, uint64_t errcode) {
 	klogf(Log_verb, "exc", "#PF on %p, errcode=%llx",
 			fault_vaddr, errcode);
@@ -108,7 +110,7 @@ static inline void idt_int_asgn(int n, uint64_t addr, uint8_t attr,
     idt[n].offset_low  = (uint16_t)addr & 0xffff;
     idt[n].offset_mid  = (uint16_t)(addr >> 16) & 0xffff;
     idt[n].offset_high = (uint32_t)(addr >> 32);
-    idt[n].segment     = offsetof(struct GDT, kernel_code);
+    idt[n].segment     = SEG_SEL(GDT_RING0_CODE, 0);
     idt[n].ist         = ist;
     idt[n].type_attr   = attr;
 }

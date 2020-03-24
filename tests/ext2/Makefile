@@ -1,6 +1,6 @@
 NAME=./test_ext2.out
 CC=gcc
-FLAGS=-O1 -Wall -Wextra -std=gnu99 -Wno-builtin-declaration-mismatch
+FLAGS=-O1 -Wall -Wextra -std=gnu99 -fno-builtin
 FILES=$(addprefix ../../src/fs/ext2/, ext2.c inode.c dir.c) \
 	  ../../src/util/string.o
 OBJ=$(FILES:.c=.o)

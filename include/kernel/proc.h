@@ -106,8 +106,11 @@ pid_t push_ps(pid_t pid);
 uint8_t proc_create_userspace(void* prg_elf, proc_t *proc);
 
 //! ne retournent pas à l'appelant
-extern void iret_to_userspace();
-extern void eoi_iret_to_userspace();
+// prennent en argument le sélecteur du CS destination 
+// (étendu à 8 octets par des zéros)
+// le DS est CS + 8
+extern void iret_to_userspace(uint64_t cs_ze);
+extern void eoi_iret_to_userspace(uint64_t cs_ze);
 
 proc_t *switch_proc(pid_t pid);
 

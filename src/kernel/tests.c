@@ -59,7 +59,7 @@ void test_idt() {
 
 uint8_t test_struct_layout() {
     return
-        sizeof(struct      GDT) == 0x38
+        sizeof(struct      GDT) == 0x48
      && sizeof(struct GDT_desc) == 0xa
      && sizeof(struct      TSS) == 0x68;
 }

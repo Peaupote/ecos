@@ -9,18 +9,22 @@ struct TSS tss = {0};
 
 extern uint8_t stack_top[];
 
-uint8_t ist_stack_1[0x1000] __attribute__ ((aligned (0x10)));
-
 void tss_init() {
     tss.rsp[0] = stack_top;
-    tss.ist[0] = ist_stack_1 + 0x1000;
     asm volatile ("ltr %%ax"
-            :: "rax"(offsetof(struct GDT, tss_low))
+            :: "rax"(SEG_SEL(offsetof(struct GDT, tss_low), 0))
              : "memory");
 }
 
 void gdt_init() {
-    //kernel_code, kernel_data déjà initialisés
+    //ring0_code, ring0_data déjà initialisés
+
+    gd_table.ring1_code = GDT_ENTRY_64(0, 0xfffff,
+            GDT_ACC_P|GDT_ACC_Pr(1)|GDT_ACC_S|GDT_ACC_R|GDT_ACC_E,
+            GDT_FLAG_G|GDT_FLAG_L);
+    gd_table.ring1_data = GDT_ENTRY_64(0, 0xfffff,
+            GDT_ACC_P|GDT_ACC_Pr(1)|GDT_ACC_S|GDT_ACC_R,
+            GDT_FLAG_G|GDT_FLAG_S);
 
     gd_table.ring3_code = GDT_ENTRY_64(0, 0xfffff,
             GDT_ACC_P|GDT_ACC_Pr(3)|GDT_ACC_S|GDT_ACC_R|GDT_ACC_E,

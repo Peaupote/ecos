@@ -11,6 +11,7 @@
 #include <kernel/int.h>
 #include <kernel/tty.h>
 #include <kernel/kutil.h>
+#include <kernel/gdt.h>
 
 #define TEST_SECTION_PQUEUE
 
@@ -148,7 +149,7 @@ void init() {
     st_curr_reg = &one->p_reg;
 
     klog(Log_info, "init", "Process 1 loaded. Start process 1");
-    iret_to_userspace();
+    iret_to_userspace(SEG_SEL(GDT_RING3_CODE, 3));
 }
 
 
@@ -161,12 +162,12 @@ void schedule_proc(uint8_t loop) {
 
         klogf(Log_info, "sched",
               "nb waiting %d\n"
-              "run proc %d : rip %h, rsp %h",
+              "run proc %d : rip %p, rsp %p",
               state.st_waiting_ps + 1, pid,
               p->p_reg.rip,
               p->p_reg.rsp);
 
-        eoi_iret_to_userspace();
+        eoi_iret_to_userspace(SEG_SEL(GDT_RING3_CODE, 3));
     } else if (loop && state.st_proc[state.st_curr_pid].p_stat != RUN) {
         // no process to take hand
         set_interrupt_flag();

@@ -16,9 +16,7 @@ void ustrncpy(char *dst, const char *src, size_t len);
 int uis_prefix(const char *s, const char *p);
 char *uindex(const char *src, char c);
 
-#ifndef __linux__
 void memcpy(void *dst, const void *src, size_t len);
-#endif
 
 size_t str_find_first(const char* s, char trg);
 

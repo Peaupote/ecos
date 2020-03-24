@@ -1,6 +1,6 @@
 export TRG=test
 export CC=gcc
-export FLAGS=-O2 -Wall -Wextra -std=gnu99
+export FLAGS=-O2 -Wall -Wextra -std=gnu99 -fno-builtin
 SRCDEP=elf_info.c
 UDEP=elf64.o string.o
 INCLUDES=-I ../include

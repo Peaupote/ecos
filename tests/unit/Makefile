@@ -1,6 +1,6 @@
 export TRG=test
 export CC=gcc
-export FLAGS=-g -Wall -Wextra -std=gnu99
+export FLAGS=-g -Wall -Wextra -std=gnu99 -fno-builtin
 CFILES=tutil.c
 TESTC=pqueue.c page_alloc.c shared_ptr.c
 TESTDEP=$(foreach file,$(TESTC),"-MT $(file:.c=.out) $(file)") $(CFILES)

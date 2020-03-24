@@ -84,9 +84,9 @@ _start:
 //    movq	$0, (%rax)
 
     //Exit
-//    movq    $0, %rdi
-//    movq    $SYS_EXIT, %rax
-//    int     $0x80
+/*    movq    $0, %rdi
+    movq    $SYS_EXIT, %rax
+    int     $0x80*/
 
 2:  jmp     2b
 
