@@ -24,4 +24,4 @@ run: $(NAME) test.img
 	$(NAME) test.img
 
 clean:
-	rm -f *.o *.img $(NAME)
+	rm -f *.o *.img $(NAME) $(OBJ)

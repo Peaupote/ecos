@@ -36,19 +36,19 @@ struct PageAllocator page_alloc;
 void kmem_init_paging() {
 	for(uint16_t i=0; i<512; ++i)
 		laddr_pd[i] = heap_pd[i] = heap_pt0[i] = dslot_pt[i]
-			= PAGING_FLAG_R;
-	laddr_pd[0] = 0 | PAGING_FLAG_S | PAGING_FLAG_R | PAGING_FLAG_P;
+			= PAGING_FLAG_W;
+	laddr_pd[0] = 0 | PAGING_FLAG_S | PAGING_FLAG_W | PAGING_FLAG_P;
 	heap_pd [0] = paging_phy_addr_page((uint_ptr)heap_pt0)
-                | PAGING_FLAG_R | PAGING_FLAG_P;
+                | PAGING_FLAG_W | PAGING_FLAG_P;
 	*paging_acc_pdpt(PML4_KERNEL_VIRT_ADDR, KERNEL_PDPT_LADDR)
 		= paging_phy_addr_page((uint_ptr) laddr_pd)
-		| PAGING_FLAG_R | PAGING_FLAG_P;
+		| PAGING_FLAG_W | PAGING_FLAG_P;
 	*paging_acc_pdpt(PML4_KERNEL_VIRT_ADDR, KERNEL_PDPT_DSLOT)
 		= paging_phy_addr_page((uint_ptr) dslot_pt)
-		| PAGING_FLAG_R | PAGING_FLAG_P;
+		| PAGING_FLAG_W | PAGING_FLAG_P;
 	*paging_acc_pdpt(PML4_KERNEL_VIRT_ADDR, KERNEL_PDPT_HEAP)
 		= paging_phy_addr_page((uint_ptr) heap_pd)
-		| PAGING_FLAG_R | PAGING_FLAG_P;
+		| PAGING_FLAG_W | PAGING_FLAG_P;
 
 	kernel_pml4 = (*paging_acc_pml4(PML4_LOOP)) & PAGE_MASK;
 }
@@ -118,7 +118,7 @@ void kmem_init_alloc(uint32_t boot_info) {
 	for (; heap_next_page * PAGE_SIZE < s_space;
 			++heap_next_page)
 		heap_pt0[heap_next_page] = (s_pya + heap_next_page * PAGE_SIZE)
-			    | PAGING_FLAG_R | PAGING_FLAG_P | PAGING_FLAG_G;
+			    | PAGING_FLAG_W | PAGING_FLAG_P | PAGING_FLAG_G;
 	
 	uint8_t* s_space_bg  = (uint8_t*) paging_pts_acc
 				(PML4_KERNEL_VIRT_ADDR, KERNEL_PDPT_HEAP, 0, 0, 0);
@@ -180,7 +180,7 @@ void kmem_init_alloc(uint32_t boot_info) {
 }
 
 void kmem_bind_dynamic_slot(uint16_t num, phy_addr p_addr) {
-	dslot_pt[num] = p_addr | PAGING_FLAG_R | PAGING_FLAG_P;
+	dslot_pt[num] = p_addr | PAGING_FLAG_W | PAGING_FLAG_P;
 	invalide_page((uint_ptr)kmem_dynamic_slot(num));
 }
 uint16_t kmem_bind_dynamic_range(uint16_t num,
@@ -192,7 +192,7 @@ uint16_t kmem_bind_dynamic_range(uint16_t num,
 
 uint64_t* kmem_acc_pts_entry(uint_ptr v_addr, uint8_t rlvl, uint16_t flags) {
 	uint64_t query_addr =
-		(uint64_t) paging_acc_pml4(paging_get_pml4(v_addr));
+		(uint64_t) paging_acc_pml4(paging_get_lvl(pgg_pml4, v_addr));
 
 	for(uint8_t lvl=4; lvl != rlvl;) { --lvl;
 		uint64_t* query = (uint64_t*) query_addr;
@@ -203,7 +203,7 @@ uint64_t* kmem_acc_pts_entry(uint_ptr v_addr, uint8_t rlvl, uint16_t flags) {
 
 			query_addr = paging_rm_loop(query_addr);
 			for(uint16_t i=0; i<512; ++i)
-				((uint64_t*) query_addr)[i] = PAGING_FLAG_R;
+				((uint64_t*) query_addr)[i] = PAGING_FLAG_W;
 		} else if((*query) & PAGING_FLAG_S)
 			return NULL;
 		else {
@@ -232,15 +232,17 @@ void kmem_print_paging(uint_ptr v_addr) {
 	}
 }
 
-uint8_t paging_map_to(uint_ptr v_addr, phy_addr p_addr){
-	uint64_t* query = kmem_acc_pts_entry(v_addr, 1, PAGING_FLAG_R);
+uint8_t paging_map_to(uint_ptr v_addr, phy_addr p_addr,
+		uint16_t flags, uint16_t p_flags) {
+	uint64_t* query = kmem_acc_pts_entry(v_addr, 1, flags);
 	if (!query) return ~0;
 	if ( (*query) & PAGING_FLAG_P) return 1; //Déjà assignée
-	*query = p_addr | PAGING_FLAG_R | PAGING_FLAG_P;
+	*query = p_addr | p_flags | PAGING_FLAG_P;
 	return 0;
 }
 
-uint8_t kmem_paging_alloc(uint_ptr v_addr, uint16_t flags, uint16_t p_flags){
+uint8_t kmem_paging_alloc(uint_ptr v_addr,
+		uint16_t flags, uint16_t p_flags) {
 	uint64_t* query = kmem_acc_pts_entry(v_addr, 1, flags);
 	if (!query) return ~0;
 	if ( (*query) & PAGING_FLAG_P) {
@@ -248,6 +250,14 @@ uint8_t kmem_paging_alloc(uint_ptr v_addr, uint16_t flags, uint16_t p_flags){
 		return 1;
 	}
 	*query = kmem_alloc_page() | p_flags | PAGING_FLAG_P;
+	return 0;
+}
+uint8_t kmem_paging_alloc_rng(uint_ptr bg, uint_ptr ed,
+		uint16_t flags, uint16_t p_flags) {
+	for (uint_ptr it = bg & PAGE_MASK; it < ed; ++it) {
+		uint8_t err = kmem_paging_alloc(it, flags, p_flags);
+		if (err >= 2) return err;
+	}
 	return 0;
 }
 
@@ -265,7 +275,8 @@ void kmem_paging_free(uint_ptr v_pg_addr) {
 void* kalloc_page() {
 	uint_ptr v_addr = kheap_alloc_vpage();
 	phy_addr p_addr = kmem_alloc_page();
-	kassert(!paging_map_to(v_addr, p_addr), "kheap bind");
+	kassert(!paging_map_to(v_addr, p_addr, PAGING_FLAG_W, PAGING_FLAG_W),
+			"kheap bind");
 	return (void*)v_addr;
 }
 
@@ -279,17 +290,17 @@ void  kfree_page(void* a) {
 
 void kmem_init_pml4(uint64_t* pml4, phy_addr p_loc) {
 	for(uint16_t i = 0; i < PAGE_ENT; ++i)
-		pml4[i] = PAGING_FLAG_R;
+		pml4[i] = PAGING_FLAG_W;
 	pml4[PML4_KERNEL_VIRT_ADDR] = *paging_acc_pml4(PML4_KERNEL_VIRT_ADDR)
-		& (PAGE_MASK | PAGING_FLAG_P | PAGING_FLAG_R);
-	pml4[PML4_LOOP] = p_loc | PAGING_FLAG_R | PAGING_FLAG_P;
+		& (PAGE_MASK | PAGING_FLAG_P | PAGING_FLAG_W);
+	pml4[PML4_LOOP] = p_loc | PAGING_FLAG_W | PAGING_FLAG_P;
 }
 
 void kmem_copy_pml4(uint64_t* pml4, phy_addr p_loc) {
 	for(uint16_t i = 0; i < PAGE_ENT; ++i)
 		pml4[i] = *paging_acc_pml4(i)
 			& (PAGE_MASK | PAGING_FLAGS);
-	pml4[PML4_LOOP] = p_loc | PAGING_FLAG_R | PAGING_FLAG_P;
+	pml4[PML4_LOOP] = p_loc | PAGING_FLAG_W | PAGING_FLAG_P;
 }
 
 void kmem_copy_rec(uint64_t* dst_entry, uint64_t* src_page, uint8_t lvl) {

@@ -20,4 +20,4 @@ Liste des appels systèmes (implémentés ou à implémenter) avec le type des a
 [ ] int      write(int fd, void *buf, size_t len);
 [ ] int      read(int fd, void *buf, size_t len);
 [ ] int      lseek(int offset);
-[ ] int      execv(char *fname, char **argv, char **env);
+[ ] int      execve(char *fname, char **argv, char **env);

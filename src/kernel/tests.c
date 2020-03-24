@@ -36,7 +36,8 @@ void test_kmem() {
     int64_to_str_hexa(nb_str, new_page);
     vga_writestring(nb_str);
     vga_writestring(" rt=");
-    int64_to_str_hexa(nb_str, paging_map_to(v_addr, new_page));
+    int64_to_str_hexa(nb_str, 
+			paging_map_to(v_addr, new_page, PAGING_FLAG_W, PAGING_FLAG_W));
     vga_writestring(nb_str);
     *((unsigned char*)v_addr) = 42;
 }

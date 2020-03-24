@@ -93,7 +93,8 @@ void pit_hdl(void) {
 void exception_PF_hdl(uint_ptr fault_vaddr, uint64_t errcode) {
 	klogf(Log_verb, "exc", "#PF on %p, errcode=%llx",
 			fault_vaddr, errcode);
-	if (!(errcode & EXC_PF_ERC_P)) {
+	if (!(errcode & EXC_PF_ERC_P)
+			&& paging_get_lvl(pgg_pml4, fault_vaddr) < PML4_END_USPACE) {
 		if (handle_PF(fault_vaddr))
 			kpanic("#PF handling");
 	} else //TODO: kill process

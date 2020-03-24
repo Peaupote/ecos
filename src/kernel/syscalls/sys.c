@@ -5,6 +5,7 @@
 #include <kernel/kutil.h>
 #include <kernel/sys.h>
 #include <kernel/memory/shared_pages.h>
+#include <util/elf64.h>
 
 /**
  * Syscalls
@@ -45,23 +46,23 @@ void kexit() {
 void getpid() {
     proc_t *p = &state.st_proc[state.st_curr_pid];
     p->p_reg.rax = p->p_pid;
-    klogf(Log_info, "syscall", "getpid %d", p->p_pid);
+    klogf(Log_verb, "syscall", "getpid %d", p->p_pid);
 }
 
 void getppid() {
     proc_t *p = &state.st_proc[state.st_curr_pid];
     p->p_reg.rax = p->p_ppid;
-    klogf(Log_info, "syscall", "getppid %d", p->p_ppid);
+    klogf(Log_verb, "syscall", "getppid %d", p->p_ppid);
 }
 
 void wait() {
     proc_t *p = &state.st_proc[state.st_curr_pid];
     if (p->p_nchd > 0) {
         p->p_stat = WAIT;
-        klogf(Log_info, "syscall", "process %d wait %d", p->p_pid, p->p_nchd);
+        klogf(Log_verb, "syscall", "process %d wait %d", p->p_pid, p->p_nchd);
         schedule_proc(1);
     } else {
-        klogf(Log_info, "syscall",
+        klogf(Log_verb, "syscall",
               "process %d has no child. dont wait", p->p_pid);
     }
 }
@@ -73,15 +74,15 @@ void waitpid() {
         if (state.st_proc[pid].p_ppid == p->p_pid &&
             state.st_proc[pid].p_stat == SLEEP) {
             p->p_stat = WAIT;
-            klogf(Log_info, "syscall",
+            klogf(Log_verb, "syscall",
                   "process %d wait %d", p->p_pid, p->p_nchd);
             schedule_proc(1);
         } else {
-            klogf(Log_info, "syscall",
+            klogf(Log_verb, "syscall",
                   "process %d is not %d's child", pid, p->p_pid);
         }
     } else {
-        klogf(Log_info, "syscall",
+        klogf(Log_verb, "syscall",
               "process %d has no child. dont wait", p->p_pid);
     }
 }
@@ -89,23 +90,14 @@ void waitpid() {
 void fork() {
     proc_t *fp, *p = &state.st_proc[state.st_curr_pid];
 
-    // TODO : find more efficient way to choose new pid
-    pid_t pid;
-    for (pid = state.st_curr_pid; pid < NPROC; pid++)
-        if (state.st_proc[pid].p_stat == FREE) break;
-
-    if (pid == NPROC) {
-        for (pid = 2; pid < state.st_curr_pid; pid++)
-            if (state.st_proc[pid].p_stat == FREE) break;
-    }
-
+    pid_t pid = find_new_pid(state.st_curr_pid);
     // we didn't find place for a new processus
     if (pid == state.st_curr_pid) {
         p->p_reg.rax = -1;
         return;
     }
 
-    fp         = &state.st_proc[pid];
+    fp          = &state.st_proc[pid];
     fp->p_pid   = pid;
     fp->p_ppid  = state.st_curr_pid;
     fp->p_stat  = RUN;
@@ -279,7 +271,7 @@ void read() {
     }
 
     chann_t *chann = &state.st_chann[p->p_fds[fd]];
-    klogf(Log_info, "syscall", "process %d read on %d", p->p_pid, fd);
+    klogf(Log_verb, "syscall", "process %d read on %d", p->p_pid, fd);
 
     vfile_t *vfile = chann->chann_vfile;
 
@@ -311,7 +303,7 @@ void write() {
 
     chann_t *chann = &state.st_chann[p->p_fds[fd]];
     vfile_t *vfile = chann->chann_vfile;
-    klogf(Log_info, "syscall", "process %d write on %d", p->p_pid, fd);
+    klogf(Log_verb, "syscall", "process %d write on %d", p->p_pid, fd);
 
     size_t c = 0;
     switch (chann->chann_mode) {
@@ -346,7 +338,7 @@ void lseek(void) {
         return;
     }
 
-    klogf(Log_info, "syscall",
+    klogf(Log_verb, "syscall",
           "process %d lseek %d at %d", p->p_pid, fd, off);
 
     state.st_chann[p->p_fds[fd]].chann_pos = off;

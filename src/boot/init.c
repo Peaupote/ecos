@@ -5,7 +5,7 @@
 #include <util/paging.h>
 #include <def.h>
 
-#define F_PRS	PAGING_FLAG_R | PAGING_FLAG_P
+#define F_PRS	PAGING_FLAG_W | PAGING_FLAG_P
 
 // --Paging--
 
@@ -49,7 +49,7 @@ void init_paging_directory(void){
     //initialisation à vide
     for(size_t s=0; s<5; ++s)
         for(uint16_t i=0; i < 1024; i+=2)
-            st0[s][i] = PAGING_FLAG_R;
+            st0[s][i] = PAGING_FLAG_W;
 
     //initialisation des tables:
     //	PML4_KERNEL_VIRT_ADDR,0,0; PML4_KERNEL_VIRT_ADDR,0,1
