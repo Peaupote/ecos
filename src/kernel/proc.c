@@ -11,8 +11,7 @@
 #include <kernel/int.h>
 #include <kernel/tty.h>
 #include <kernel/kutil.h>
-
-#define USER_STACK_PD 0x7FF
+#include <kernel/gdt.h>
 
 #define TEST_SECTION_PQUEUE
 
@@ -150,7 +149,7 @@ void init() {
     st_curr_reg = &one->p_reg;
 
     klog(Log_info, "init", "Process 1 loaded. Start process 1");
-    iret_to_userspace();
+    iret_to_userspace(SEG_SEL(GDT_RING3_CODE, 3));
 }
 
 
@@ -163,12 +162,12 @@ void schedule_proc(uint8_t loop) {
 
         klogf(Log_info, "sched",
               "nb waiting %d\n"
-              "run proc %d : rip %h, rsp %h",
+              "run proc %d : rip %p, rsp %p",
               state.st_waiting_ps + 1, pid,
               p->p_reg.rip,
               p->p_reg.rsp);
 
-        eoi_iret_to_userspace();
+        eoi_iret_to_userspace(SEG_SEL(GDT_RING3_CODE, 3));
     } else if (loop && state.st_proc[state.st_curr_pid].p_stat != RUN) {
         // no process to take hand
         set_interrupt_flag();
@@ -190,20 +189,18 @@ proc_t *switch_proc(pid_t pid) {
     return p;
 }
 
-uint8_t proc_ldr_alloc_pages(uint_ptr begin, uint_ptr end) {
-    uint8_t err;
-    for(uint_ptr it = begin & PAGE_MASK; it < end; ++it) {
-        err = kmem_paging_alloc(it,
-				PAGING_FLAG_U | PAGING_FLAG_R,
-				PAGING_FLAG_U | PAGING_FLAG_R);
-        if(err >= 2) return err;
-    }
-    return 0;
+static inline uint8_t proc_ldr_alloc_pages(uint_ptr begin, uint_ptr end) {
+	return kmem_paging_alloc_rng(begin, end,
+				PAGING_FLAG_U | PAGING_FLAG_W,
+				PAGING_FLAG_U | PAGING_FLAG_W);
 }
 
 void proc_ldr_fill0(void* err_pt, Elf64_Addr dst, uint64_t sz) {
     uint8_t err = proc_ldr_alloc_pages(dst, dst + sz);
-    if (err) *((uint8_t*)err_pt) = err;
+    if (err) {
+		*((uint8_t*)err_pt) = err;
+		return;
+	}
     //TODO: use quad
     for (size_t i=0; i<sz; ++i)
         ((uint8_t*) dst)[i] = 0;
@@ -211,7 +208,10 @@ void proc_ldr_fill0(void* err_pt, Elf64_Addr dst, uint64_t sz) {
 
 void proc_ldr_copy(void* err_pt, Elf64_Addr dst, void* src, uint64_t sz) {
     uint8_t err = proc_ldr_alloc_pages(dst, dst + sz);
-    if (err) *((uint8_t*)err_pt) = err;
+    if (err) {
+		*((uint8_t*)err_pt) = err;
+		return;
+	}
     for (size_t i=0; i<sz; ++i)
         ((uint8_t*) dst)[i] = ((uint8_t*) src)[i];
 }
@@ -233,13 +233,13 @@ uint8_t proc_create_userspace(void* prg_elf, proc_t *proc) {
 
     //On est désormais dans le paging du processus
     err = 0;
-	uint64_t* stack_pd = kmem_acc_pts_entry(paging_add_pd(USER_STACK_PD),
-							2, PAGING_FLAG_U | PAGING_FLAG_R);
-	*stack_pd = SPAGING_FLAG_P;
+	uint64_t* stack_pd = kmem_acc_pts_entry(paging_add_lvl(pgg_pd, USER_STACK_PD),
+							2, PAGING_FLAG_U | PAGING_FLAG_W);
+	*stack_pd = SPAGING_FLAG_P | PAGING_FLAG_W;
     proc->p_reg.rip = elf_load(proc_ldr, &err, prg_elf);
     if (err) return 2;
 
-    proc->p_reg.rsp = paging_add_pd(USER_STACK_PD + 1);
+    proc->p_reg.rsp = paging_add_lvl(pgg_pd, USER_STACK_PD + 1);
     proc->p_pml4    = pml4_loc;
 
     return 0;

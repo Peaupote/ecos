@@ -32,11 +32,6 @@ forced to be within the first 8 KiB of the kernel file.
 .global mb_info
 .global kernel_entry_addr
 
-#ifdef BDI
-//TODO
-.global boot_debug_out
-#endif
-
 //Pour les asserts de ld
 .global end_used_bss
 .global end_space_for_kernel
@@ -55,11 +50,6 @@ mb_info:
 .skip   4
 kernel_entry_addr: //adresse physique
 .skip   4
-
-#ifdef BDI
-boot_debug_out:
-.skip   0x100 # 256 octets de debug
-#endif
 
 //espace pour le kernel
 //évite que GRUB charge le module sur une adresse utilisée
@@ -82,21 +72,6 @@ _start:
     //On récupère les informations de multiboot
     //https://www.gnu.org/software/grub/manual/multiboot/html_node/Boot-information-format.html
     movl %ebx, (mb_info)
-
-#ifdef BDI
-    //initial CR0
-    mov %cr0, %eax
-    mov %eax, boot_debug_out
-
-    //A20 test:
-    mov $0x00042, %eax
-    movb (%eax), %al
-    movb %al, (boot_debug_out+8)
-    mov $0x100042, %eax
-    movb (%eax), %al
-    mov %al, (boot_debug_out+9)
-#endif
-
 
     //Stack
     mov $stack_top, %esp
@@ -154,11 +129,6 @@ reload_seg:
     Long-mode (sous-mode de compatibilité 32 bits)
     Paging activé
     */
-
-#ifdef BDI
-    movl %cr0, %eax
-    movl %eax, (boot_debug_out+4)
-#endif
 
     lgdt gdt_desc
     ljmp $0x18, $reload_seg2

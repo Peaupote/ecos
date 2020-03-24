@@ -13,6 +13,10 @@
 //Page Global Enable
 #define CR4_PGE 7
 
+// --RFLAGS Register--
+//Interrupt Enable Flag
+#define RFLAGS_IF 9
+
 // --Model Specific Registers--
 
 //Extended Feature Enables

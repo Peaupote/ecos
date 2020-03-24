@@ -6,6 +6,9 @@
 #include "file.h"
 #include "memory/kmem.h"
 
+//Emplacement de la pile des processus
+#define USER_STACK_PD 0x7FF
+
 typedef int32_t  pid_t;
 typedef int32_t  priority_t;
 typedef int32_t  cid_t;
@@ -84,7 +87,7 @@ struct {
     size_t      st_waiting_ps;        // number of processes in queue
     proc_t      st_proc[NPROC];       // table containing all processes
     chann_t     st_chann[NCHAN];      // table containing all channels
-    vfile_t     st_files[NFILE];     // table containing all opened files
+    vfile_t     st_files[NFILE];      // table containing all opened files
 } state;
 
 // pointer to current proc registers
@@ -103,9 +106,29 @@ pid_t push_ps(pid_t pid);
 uint8_t proc_create_userspace(void* prg_elf, proc_t *proc);
 
 //! ne retournent pas à l'appelant
-extern void iret_to_userspace();
-extern void eoi_iret_to_userspace();
+// prennent en argument le sélecteur du CS destination
+// (étendu à 8 octets par des zéros)
+// le DS est CS + 8
+extern void iret_to_userspace(uint64_t cs_ze);
+extern void eoi_iret_to_userspace(uint64_t cs_ze);
 
 proc_t *switch_proc(pid_t pid);
+
+static inline pid_t find_new_pid(pid_t search_p) {
+    // TODO : find more efficient way to choose new pid
+    pid_t pid;
+    for (pid = search_p; pid < NPROC; pid++) {
+        if (state.st_proc[pid].p_stat == FREE)
+            return pid;
+    }
+
+    for (pid = 2; pid < search_p; pid++) {
+        if (state.st_proc[pid].p_stat == FREE)
+            return pid;
+    }
+
+    return search_p;
+}
+
 
 #endif

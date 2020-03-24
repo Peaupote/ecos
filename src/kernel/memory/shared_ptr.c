@@ -10,7 +10,7 @@ sptra_node* spn_at(uint64_t a) {
 
 void sptra_init() {
 	kassert(!kmem_paging_alloc((uint_ptr)&sptr_alct,
-				PAGING_FLAG_R, PAGING_FLAG_R | PAGING_FLAG_G),
+				PAGING_FLAG_W, PAGING_FLAG_W | PAGING_FLAG_G),
 				"sptra page 0");
 	kAssert(sizeof(union SPTRAllocator) == 16);
 	kAssert(sizeof(union sptra_entry) == 16);
@@ -242,7 +242,7 @@ uint64_t sptr_alloc() {
 		if ((rtpt^(sptr_alct.size*sizeof(union sptra_entry))) & PAGE_MASK)
 			kassert(!kmem_paging_alloc(
 					((uint_ptr)&sptr_alct) + (rtpt&PAGE_MASK),
-					PAGING_FLAG_R, PAGING_FLAG_R | PAGING_FLAG_G),
+					PAGING_FLAG_W, PAGING_FLAG_W | PAGING_FLAG_G),
 					"sptra page");
 		return sptr_alct.size = rt;
 	}

@@ -1,6 +1,5 @@
-LIBC_FLAGS=-O1 -Wall -Wextra -std=gnu99
-LIBK_FLAGS?=
-CC?=gcc
+FLAGS?=-O1 -Wall -Wextra -std=gnu99 -fno-builtin
+CC=gcc
 ASFILES=
 include list.Makefile
 include ../../src/libc/list.Makefile

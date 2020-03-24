@@ -32,7 +32,7 @@ extern struct MemBlockTree  khep_alloc;
 void     kmem_init_paging();
 void     kmem_init_alloc(uint32_t boot_info);
 
-static inline uint64_t align_to(uint64_t addr, uint64_t align) {
+static inline uint_ptr align_to(uint_ptr addr, uint64_t align) {
     return (addr % align)
         ? addr + align - (addr % align)
         : addr;
@@ -40,7 +40,7 @@ static inline uint64_t align_to(uint64_t addr, uint64_t align) {
 
 // --Dynamic slots--
 // Permet de mapper des pages physiques dans l'espace virtuel
-
+// Emplacements globaux, conservés lors du changement de pml4
 static inline void* kmem_dynamic_slot(uint16_t num) {
     return paging_pts_acc(PML4_LOOP, PML4_KERNEL_VIRT_ADDR,
             KERNEL_PDPT_DSLOT, num, 0);
@@ -50,7 +50,7 @@ static inline void* kmem_dynamic_slot_at(uint16_t num, phy_addr p) {
             KERNEL_PDPT_DSLOT, num, p & PAGE_OFS_MASK);
 }
 void     kmem_bind_dynamic_slot(uint16_t num, phy_addr p_addr);
-//Retourne le prochain slot libre
+//Retourne le prochain emplacement libre
 uint16_t kmem_bind_dynamic_range(uint16_t num,
             phy_addr p_begin, phy_addr p_end);
 
@@ -58,7 +58,7 @@ uint16_t kmem_bind_dynamic_range(uint16_t num,
 // --Allocation de pages physiques--
 
 static inline phy_addr kmem_alloc_page() {
-    return palloc_alloc_page(&page_alloc);
+	return palloc_alloc_page(&page_alloc);
 }
 static inline void kmem_free_page(phy_addr p) {
     palloc_free_page(&page_alloc, p);
@@ -98,9 +98,13 @@ void kmem_print_paging(uint_ptr v_addr);
 //	0   si la page a bien été affectée
 //	1   si l'emplacement est déjà pris
 //	~0	en cas d'erreur
-uint8_t paging_map_to(uint_ptr v_addr, phy_addr p_addr);
+uint8_t paging_map_to(uint_ptr v_addr, phy_addr p_addr,
+		uint16_t flags, uint16_t p_flags);
 //alloue une page si non déjà affecté
-uint8_t kmem_paging_alloc(uint_ptr v_addr, uint16_t flags, uint16_t p_flags);
+uint8_t kmem_paging_alloc(uint_ptr v_addr,
+		uint16_t flags, uint16_t p_flags);
+uint8_t kmem_paging_alloc_rng(uint_ptr bg, uint_ptr ed,
+		uint16_t flags, uint16_t p_flags);
 
 uint8_t paging_unmap(uint_ptr v_pg_addr);
 void    kmem_paging_free(uint_ptr v_pg_addr);

@@ -3,7 +3,7 @@
 #include <kernel/memory/shared_ptr.h>
 #include <kernel/memory/kmem.h>
 
-#define PAGING_FLAG0 (PAGING_FLAG_U | PAGING_FLAG_R | PAGING_FLAG_P)
+#define PAGING_FLAG0 (PAGING_FLAG_U | PAGING_FLAG_W | PAGING_FLAG_P)
 
 static inline void 
 bind_and_follow(uint64_t* e, uint64_t* a, phy_addr p) {
@@ -37,7 +37,7 @@ void copy_page0(uint64_t* src, uint64_t* dst) {
 
 uint8_t handle_PF(uint_ptr fault_addr) {
 	uint64_t query_addr =
-		(uint64_t) paging_acc_pml4(paging_get_pml4(fault_addr));
+		(uint64_t) paging_acc_pml4(paging_get_lvl(pgg_pml4, fault_addr));
 
 	for(uint8_t lvl = 4; lvl != 0;) { --lvl;
 		uint64_t* query = (uint64_t*) query_addr;
@@ -91,7 +91,7 @@ void kmem_fork_paging(phy_addr new_pml4) {
 	for (uint16_t i = PML4_END_USPACE; i < PAGE_ENT; ++i)
 		dst[i] = src[i];
 
-	dst[PML4_LOOP] = new_pml4 | PAGING_FLAG_R | PAGING_FLAG_P;
+	dst[PML4_LOOP] = new_pml4 | PAGING_FLAG_W | PAGING_FLAG_P;
 	
 	paging_refresh();
 }
