@@ -58,8 +58,8 @@ _start:
     movq    $SYS_READ, %rax
     int     $0x80
 
-    movq    (string), %rax
-    int     $0x80
+//    movq    (string), %rax
+//    int     $0x80
 
     // print on stdout
     movq    $1, %rdi  // fd
@@ -68,6 +68,9 @@ _start:
     movq    $SYS_WRITE, %rax
     int     $0x80
 
+3:  jmp     3b
+
+1:
     movq    $SYS_FORK, %rax
     int     $0x80
     testq   %rax, %rax
@@ -79,20 +82,9 @@ _start:
 	movq    $SYS_EXECVE, %rax
 	int     $0x80
 
-    //#PF
-//    movq	$42, %rax
-//    movq	$0, (%rax)
-
-    //Exit
-/*    movq    $0, %rdi
-    movq    $SYS_EXIT, %rax
-    int     $0x80*/
-
-2:  jmp     2b
-
-1:
-    // init wait for all its childrens
+2:
+	// init wait for all its childrens
     movq    $SYS_WAIT, %rax
     int     $0x80
 
-    jmp     1b
+    jmp     2b

@@ -111,7 +111,8 @@ size_t built_in_exec(size_t in_begin, size_t in_len) {
             test_print_statut();
         else if(!ustrcmp(arg1, "kheap"))
             test_kheap();
-    }
+    } else if (!ustrcmp(cmd_name, "ps"))
+		proc_ps();
 
     return 0;
 }

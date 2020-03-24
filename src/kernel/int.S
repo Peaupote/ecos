@@ -48,10 +48,12 @@ syscall_tab:
 .extern kexit
 .extern invalid_syscall
 .extern exception_PF_hdl
+.extern pit_hdl
+.extern pit_hdl_switch
 
 // Sauvegarde des registres associés au processus courant (st_curr_reg)
 // Utilise la valeur actuelle des registres ainsi qu'une structure d'iret
-// placée sur la pile en 0x10(%rsp)
+// placée sur la pile en %rsp+0x10
 // Les registres autres que %r10 et %r11 ne sont pas modifiés
 .macro save_curr_proc_reg
     pushq  %r15
@@ -88,6 +90,25 @@ syscall_tab:
     movabs $st_curr_reg, %r15
     movq   (%r15), %r15
     movq   0x18(%r15), %rax
+    movq   0x20(%r15), %rbx
+    movq   0x28(%r15), %rcx
+    movq   0x30(%r15), %rdx
+    movq   0x38(%r15), %rsi
+    movq   0x40(%r15), %rdi
+    movq   0x48(%r15), %rbp
+    movq   0x50(%r15), %r8
+    movq   0x58(%r15), %r9
+    movq   0x60(%r15), %r10
+    movq   0x68(%r15), %r11
+    movq   0x70(%r15), %r12
+    movq   0x78(%r15), %r13
+    movq   0x80(%r15), %r14
+	movq   0x88(%r15), %r15
+.endm
+
+.macro restore_curr_proc_reg_exc_rax
+    movabs $st_curr_reg, %r15
+    movq   (%r15), %r15
     movq   0x20(%r15), %rbx
     movq   0x28(%r15), %rcx
     movq   0x30(%r15), %rdx
@@ -199,12 +220,13 @@ syscall_tab:
 	popq  %r10
 .endm
 
-
 #include "int_handlers.s"
 
 irq_keyboard:
     save_c_reg
 	save_data_segments
+    movw  $SEG_SEL(GDT_RING0_DATA,0), %r10w
+    set_data_segments
     
 	call keyboard_hdl
 	
@@ -215,16 +237,26 @@ irq_keyboard:
 irq_pit:
     save_c_reg
 	save_data_segments
+    movw  $SEG_SEL(GDT_RING0_DATA,0), %r10w
+    set_data_segments
 
-    call pit_hdl
+    call  pit_hdl
+	testb %al, %al
+	je    irq_pit_remain
 
+	leaq  -8(%rsp), %rsp
+	restore_c_reg
+	save_curr_proc_reg
+	call  pit_hdl_switch
+
+irq_pit_remain:
     restore_data_segments
 	restore_c_reg
     iretq
 
 irq_sys:
 	save_data_segments16
-    mov   $SEG_SEL(GDT_RING0_DATA,0), %bx
+    movw  $SEG_SEL(GDT_RING0_DATA,0), %r10w
     set_data_segments
     
 	save_curr_proc_reg
@@ -238,13 +270,13 @@ irq_sys:
     callq  *%rax
 
 func_end:
-    restore_curr_proc_reg
+    restore_curr_proc_reg_exc_rax
 	restore_data_segments16
     iretq
 
 incorrect_rax:
     call invalid_syscall
-    jmp   func_end
+    jmp  func_end
 
 
 irq14://#PF: Page Fault

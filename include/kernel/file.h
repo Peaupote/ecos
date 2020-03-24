@@ -55,7 +55,7 @@ struct fs {
 } fst [NFST];
 
 void     vfs_init();
-vfile_t *vfs_load(char *path, uint32_t create);
+vfile_t *vfs_load(const char *path, uint32_t create);
 int      vfs_seek(vfile_t *vfile, off_t pos);
 int      vfs_read(vfile_t *vfile, void *buf, size_t len);
 int      vfs_write(vfile_t *vfile, void *buf, size_t len);
