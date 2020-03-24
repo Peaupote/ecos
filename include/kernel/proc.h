@@ -27,6 +27,7 @@ enum proc_state {
     ZOMB,  // just terminated
     STOP   // ...
 };
+extern char proc_state_char[7];
 
 // offset to access in structure
 #define RFL 0
@@ -98,7 +99,10 @@ struct reg *st_curr_reg;
  * and create process one
  */
 void init(void);
-void schedule_proc(uint8_t loop);
+// Ne renvoie pas
+void  schedule_proc();
+// Renvoi le nouveau processus
+pid_t schedule_proc_ev();
 pid_t push_ps(pid_t pid);
 
 //! change le paging vers celui du processus
@@ -113,6 +117,8 @@ extern void iret_to_userspace(uint64_t cs_ze);
 extern void eoi_iret_to_userspace(uint64_t cs_ze);
 
 proc_t *switch_proc(pid_t pid);
+
+void proc_ps();
 
 static inline pid_t find_new_pid(pid_t search_p) {
     // TODO : find more efficient way to choose new pid

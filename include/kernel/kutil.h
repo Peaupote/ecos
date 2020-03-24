@@ -7,7 +7,9 @@
 #include <libc/stdio.h>
 #include <util/string.h>
 
-#define kAssert(P) kassert(P, #P)
+#define STR_HELPER(x) #x
+#define STR(x) STR_HELPER(x)
+#define kAssert(P) kassert(P, __FILE__":"STR(__LINE__)" "#P)
 
 int  wprintf(stringl_writer, void*, const char* fmt, va_list params);
 

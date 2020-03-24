@@ -108,13 +108,11 @@ size_t built_in_exec(size_t in_begin, size_t in_len) {
         use_azerty = 0;
     else if (!strcmp(cmd_name, "test")) {
         char *arg1 = cmd_decomp + cmd_decomp_idx[1];
-        if (!strcmp(arg1, "statut"))
-            test_print_statut();
-        else if(!strcmp(arg1, "kheap"))
-            test_kheap();
-        else if (!strcmp(arg1, "string"))
-            test_string();
-    }
+        if (!strcmp(arg1, "statut"))      test_print_statut();
+        else if(!strcmp(arg1, "kheap"))   test_kheap();
+        else if (!strcmp(arg1, "string")) test_string();
+    } else if (!ustrcmp(cmd_name, "ps"))
+        proc_ps();
 
     return 0;
 }

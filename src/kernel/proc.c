@@ -18,6 +18,8 @@
 // priority in runqueue according to process status
 int proc_state_pri[7] = { PFREE, PSLEEP, PWAIT, PRUN, PIDLE, PZOMB, PSTOP };
 
+char proc_state_char[7] = {'f', 'S', 'w', 'R', 'i', 'Z', 's'};
+
 // some heap utilitary functions
 
 int push_ps(pid_t pid) {
@@ -153,35 +155,33 @@ void init() {
 }
 
 
-void schedule_proc(uint8_t loop) {
-    clear_interrupt_flag();
+void schedule_proc() {
     if (state.st_waiting_ps > 0) {
         // pick a new process to run
         pid_t pid = pop_ps();
         proc_t *p = switch_proc(pid);
 
         klogf(Log_info, "sched",
-              "nb waiting %d\n"
-              "run proc %d : rip %p, rsp %p",
+              "nb waiting %d run proc %d :\n"
+			  "   rip %p, rsp %p",
               state.st_waiting_ps + 1, pid,
               p->p_reg.rip,
               p->p_reg.rsp);
 
-        eoi_iret_to_userspace(SEG_SEL(GDT_RING3_CODE, 3));
-    } else if (loop && state.st_proc[state.st_curr_pid].p_stat != RUN) {
-        // no process to take hand
-        set_interrupt_flag();
-        while(1) halt();
+        iret_to_userspace(SEG_SEL(GDT_RING3_CODE, 3));
     }
+    // no process to take hand
+	klogf(Log_info, "sched", "halt");
+	set_interrupt_flag();
+	while(1) halt();
+}
+pid_t schedule_proc_ev() {
+	kAssert(!push_ps(state.st_curr_pid));
+	return pop_ps();
 }
 
 proc_t *switch_proc(pid_t pid) {
-    proc_t *p = &state.st_proc[state.st_curr_pid];
-
-    if (p->p_pid != pid && p->p_stat == RUN)
-        push_ps(state.st_curr_pid);
-
-    p = &state.st_proc[pid];
+    proc_t *p = state.st_proc + pid;
     state.st_curr_pid = pid;
     st_curr_reg = &p->p_reg;
     pml4_to_cr3(p->p_pml4);
@@ -243,4 +243,14 @@ uint8_t proc_create_userspace(void* prg_elf, proc_t *proc) {
     proc->p_pml4    = pml4_loc;
 
     return 0;
+}
+
+void proc_ps() {
+	for (pid_t pid = 1; pid < NPROC; pid++) {
+		proc_t* p = state.st_proc + pid;
+		if (p->p_stat != FREE)
+			kprintf("%cpid=%d st=%c ppid=%d\n",
+					pid==state.st_curr_pid ? '*' : ' ',
+					pid, proc_state_char[p->p_stat], p->p_ppid);
+	}
 }

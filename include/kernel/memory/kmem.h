@@ -14,6 +14,7 @@
 #define KERNEL_PDPT_DSLOT 0x180
 #define KERNEL_PDPT_HEAP  0x181
 #define KERNEL_PDPT_SPTR  0x182
+#define PML4_PSKD         0xfd
 #define PML4_COPY_RES     0xfe
 #define PML4_END_USPACE   PML4_KERNEL_VIRT_ADDR
 
