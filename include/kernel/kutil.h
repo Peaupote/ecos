@@ -4,7 +4,8 @@
 #include <stddef.h>
 #include <stdarg.h>
 
-#include "../util/string.h"
+#include <libc/stdio.h>
+#include <util/string.h>
 
 #define kAssert(P) kassert(P, #P)
 

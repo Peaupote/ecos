@@ -1,3 +1,5 @@
+#include <libc/string.h>
+
 #include <kernel/kutil.h>
 #include <kernel/file.h>
 #include <kernel/proc.h>
@@ -57,8 +59,8 @@ static struct device *find_device(char *fname) {
 
     size_t i, mnt, len = 0;
     for (i = 0; i < NDEV; i++) {
-        if (*devices[i].dev_mnt && !uis_prefix(fname, devices[i].dev_mnt)) {
-            size_t l = ustrlen(devices[i].dev_mnt);
+        if (*devices[i].dev_mnt && !is_prefix(fname, devices[i].dev_mnt)) {
+            size_t l = strlen(devices[i].dev_mnt);
             if (l > len) {
                 mnt = i;
                 len = l;
@@ -81,11 +83,11 @@ vfile_t *vfs_load(char *filename, uint32_t create) {
 
     struct fs *fs = &fst[dev->dev_fs];
     struct stat st;
-    char *fname = filename + ustrlen(dev->dev_mnt);
+    char *fname = filename + strlen(dev->dev_mnt);
     int rc = fs->fs_load(dev->dev_spblk, fname, &st, &fname);
 
     if (rc < 0) {
-        if (!create || *uindex(fname, '/')) {
+        if (!create || *index(fname, '/')) {
             klogf(Log_error, "vfs", "file %s dont exists", filename);
             return 0;
         }

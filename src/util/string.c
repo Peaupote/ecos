@@ -22,39 +22,9 @@ int ustrcmp(const char *lhs, const char *rhs) {
     return 0;
 }
 
-int ustrncmp(const char *lhs, const char *rhs, size_t len) {
-    while(len-- && *lhs && *rhs){
-        if ((unsigned char)*lhs < (unsigned char)*rhs)
-            return -1;
-        if ((unsigned char)*lhs > (unsigned char)*rhs)
-            return 1;
-        ++lhs;
-        ++rhs;
-    }
-    if(*rhs) return -1;
-    if(*lhs) return  1;
-    return 0;
-}
-
-void ustrncpy(char *dst, const char *src, size_t len) {
-    while (len-- && (*dst++ = *src++));
-}
-
-char *uindex(const char *src, char c) {
-    while (*src && *src != c) src++;
-    return (char*)src;
-}
-
-int uis_prefix(const char *s, const char *p) {
+int is_prefix(const char *s, const char *p) {
     while (*p && *p++ == *s++);
     return *p;
-}
-
-void memcpy(void* dst, const void* src, size_t len) {
-    uint8_t *d = (uint8_t*)dst;
-    uint8_t *s = (uint8_t*)src;
-    for (size_t i = 0; i < len; i++)
-        d[i] = s[i];
 }
 
 void int64_to_str_hexa(char* out, uint64_t v) {

@@ -1,6 +1,6 @@
 #include <stddef.h>
 #include <fs/ext2.h>
-#include <util/string.h>
+#include <libc/string.h>
 
 #include <stdio.h>
 #include <string.h>
@@ -37,7 +37,7 @@ ext2_iter_dir(struct ext2_inode *inode,
 
 static char *lookup_name;
 static int cmp_dir_name(struct ext2_dir_entry* dir) {
-    if (!ustrncmp(dir->d_name, lookup_name, 255)) return -1;
+    if (!strncmp(dir->d_name, lookup_name, 255)) return -1;
     return 0;
 }
 
@@ -63,29 +63,29 @@ struct ext2_dir_entry * ext2_mkdir(uint32_t inode, char *dirname,
                                    struct ext2_mount_info *info) {
     struct ext2_inode *parent = ext2_get_inode(inode, info);
     struct ext2_dir_entry *dir;
-    size_t strlen, rec_len, len, block;
+    size_t str_len, rec_len, len, block;
 
     if (!(parent->in_type&EXT2_TYPE_DIR)) return 0;
 
-    strlen = ustrlen(dirname) + 1;
-    if (strlen > 256) return 0;
+    str_len = strlen(dirname) + 1;
+    if (str_len > 256) return 0;
 
 
     ext2_iter_dir(parent, void_iterator, &len, info);
     block = len / info->block_size;
 
     // alignement
-    for (rec_len = EXT2_DIR_BASE_SIZE + strlen; len&2; len++);
+    for (rec_len = EXT2_DIR_BASE_SIZE + str_len; len&2; len++);
 
     // move to right position
     // and alloc a block if necessary
     dir = ext2_get_inode_block(block, parent, info);
 
     dir->d_ino = ext2_alloc_inode(EXT2_TYPE_DIR|0640, 0, info);
-    dir->d_name_len = strlen;
+    dir->d_name_len = str_len;
     dir->d_rec_len = rec_len;
     parent->in_size += rec_len;
-    memcpy(dir->d_name, dirname, strlen);
+    memcpy(dir->d_name, dirname, str_len);
 
     // TODO : write . and .. in directory
 

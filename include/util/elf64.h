@@ -8,6 +8,7 @@
 #include <stdint.h>
 
 #include "string.h"
+#include <libc/stdio.h> // string_writer def
 
 #define EI_NIDENT 16
 #define SHN_UNDEF 0
@@ -40,16 +41,16 @@ typedef struct {
 
 //Section Header
 typedef struct {
-	Elf64_Word	sh_name;
-	Elf64_Word	sh_type;
-	Elf64_Xword	sh_flags;
-	Elf64_Addr	sh_addr;
-	Elf64_Off	sh_offset;
-	Elf64_Xword	sh_size;
-	Elf64_Word	sh_link;
-	Elf64_Word	sh_info;
-	Elf64_Xword	sh_addralign;
-	Elf64_Xword	sh_entsize;
+    Elf64_Word	sh_name;
+    Elf64_Word	sh_type;
+    Elf64_Xword	sh_flags;
+    Elf64_Addr	sh_addr;
+    Elf64_Off	sh_offset;
+    Elf64_Xword	sh_size;
+    Elf64_Word	sh_link;
+    Elf64_Word	sh_info;
+    Elf64_Xword	sh_addralign;
+    Elf64_Xword	sh_entsize;
 } __attribute__((packed)) Elf64_Shdr;
 
 //Section Types (sh_type)
@@ -93,8 +94,8 @@ typedef struct {
 void elf_readinfo(string_writer, void*, void* elf_begin);
 
 struct elf_loader{
-	void (*fill0)(void*, Elf64_Addr, uint64_t);
-	void (* copy)(void*, Elf64_Addr, void*, uint64_t);//dst,src,sz
+    void (*fill0)(void*, Elf64_Addr, uint64_t);
+    void (* copy)(void*, Elf64_Addr, void*, uint64_t);//dst,src,sz
 };
 Elf64_Addr elf_load(struct elf_loader, void* el_i, void* elf_begin);
 

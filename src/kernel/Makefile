@@ -1,8 +1,14 @@
 export TRG=64
 export CC=x86_64-elf-gcc
 export FLAGS=-O1 -Wall -Wextra -std=gnu99 -nostdlib \
-			 -mcmodel=large -ffreestanding -mno-red-zone
-AS=x86_64-elf-as
+			 -mcmodel=large -ffreestanding -mno-red-zone \
+			 -D__is_kernel
+export AS=x86_64-elf-as
+export AR=x86_64-elf-ar
+#include ../libc/list.Makefile
+#LIBK_FILES=$(addprfix ../libc/, $(LIBK_FILES))
+include ../../tests/libc/list.Makefile
+TESTS_LIBK:=$(addprefix ../../tests/libc/, $(TESTS_LIBK))
 CFILES=main.c memory/kmem.c idt.c gdt.c keyboard.c tty.c tests.c \
 		syscalls/sleep.c syscalls/sys.c proc.c kutil.c \
 		memory/page_alloc.c memory/shared_pages.c memory/shared_ptr.c \
@@ -14,7 +20,7 @@ KBMAP=gawk -f ../../tools/keyboard_map.awk
 UDEP=vga.o string.o elf64.o
 INCLUDES=-I ../../include
 
-.PHONY: all re clean util tests_prg aux_prg
+.PHONY: all re clean util libk test_libk tests_prg aux_prg
 
 all: kernel.bin
 
@@ -43,6 +49,12 @@ data.o:data.s tests_prg aux_prg
 UDEP_FROM_HERE=$(patsubst %,../util/64/%,$(UDEP))
 UDEP_FROM_UTIL=$(patsubst %,64/%,$(UDEP))
 
+libk:
+	$(MAKE) -C ../libc libk.a
+
+test_libk:
+	$(MAKE) -C ../../tests/libc build_libk
+
 util:
 	$(MAKE) -C ../util $(UDEP_FROM_UTIL)
 
@@ -52,8 +64,9 @@ aux_prg:
 tests_prg:
 	$(MAKE) -C ../../tests/prg all
 
-kernel.bin:linker.ld ../boot/boot_data.ld $(OBJ) util
-	$(CC) -T linker.ld -o kernel.bin $(FLAGS) $(OBJ) $(UDEP_FROM_HERE) \
+kernel.bin:linker.ld ../boot/boot_data.ld $(OBJ) util libk test_libk
+	$(CC) -T linker.ld -o kernel.bin $(FLAGS) $(LIBK_OBJ) \
+		$(OBJ) $(UDEP_FROM_HERE) $(TESTS_LIBK) ../libc/libk.a \
 		$(INCLUDES) -lgcc
 
 .depends:

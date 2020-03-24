@@ -1,5 +1,5 @@
 #include <fs/proc.h>
-#include <util/string.h>
+#include <libc/string.h>
 #include <kernel/file.h>
 #include <kernel/proc.h>
 
@@ -27,7 +27,7 @@ int proc_load(void *super __attribute__((unused)),
     if (!*fname) return 0;
 
     klogf(Log_info, "procfs", "load %s", fname);
-    *end = uindex(fname, '/');
+    *end = index(fname, '/');
     pid_t pid = atoi(fname, *end-fname);
 
     if (pid < 0) {
@@ -51,10 +51,10 @@ int proc_load(void *super __attribute__((unused)),
 
     // get filename
     fname = *end;
-    if (!ustrncmp(fname, "stat", 5)) {
+    if (!strncmp(fname, "stat", 5)) {
         st->st_ino = pid * NB_PROC_FILE + STAT_PROC_FILE;
         goto success;
-    } else if (!ustrncmp(fname, "cwd", 4)) {
+    } else if (!strncmp(fname, "cwd", 4)) {
         st->st_ino = pid * NB_PROC_FILE + CWD_PROC_FILE;
         goto success;
     }

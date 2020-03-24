@@ -3,13 +3,14 @@
 #include <stddef.h>
 
 #include <util/vga.h>
-#include <util/string.h>
 #include <util/elf64.h>
+#include <libc/string.h>
 
 #include <kernel/memory/kmem.h>
 #include <kernel/proc.h>
 #include <kernel/int.h>
 
+#include <tests.h>
 #include <kernel/tests.h>
 
 #define SB_HEIGHT 32
@@ -90,27 +91,29 @@ extern uint8_t t0_data[];
 size_t built_in_exec(size_t in_begin, size_t in_len) {
     decomp_cmd(in_begin, in_len);
     char* cmd_name = cmd_decomp + cmd_decomp_idx[0];
-    if (!ustrcmp(cmd_name, "tprint"))
+    if (!strcmp(cmd_name, "tprint"))
         return tty_writestring("test print");
-    else if (!ustrcmp(cmd_name, "memat")) {
+    else if (!strcmp(cmd_name, "memat")) {
         uint_ptr ptr = int64_of_str_hexa(cmd_decomp + cmd_decomp_idx[1]);
         char data_str[3];
         data_str[2] = '\0';
         int8_to_str_hexa(data_str, *(uint8_t*)ptr);
         return tty_writestring(data_str);
     }
-    else if (!ustrcmp(cmd_name, "kprint"))
+    else if (!strcmp(cmd_name, "kprint"))
         do_kprint = !do_kprint;
-    else if (!ustrcmp(cmd_name, "a"))
+    else if (!strcmp(cmd_name, "a"))
         use_azerty = 1;
-    else if (!ustrcmp(cmd_name, "q"))
+    else if (!strcmp(cmd_name, "q"))
         use_azerty = 0;
-    else if (!ustrcmp(cmd_name, "test")) {
+    else if (!strcmp(cmd_name, "test")) {
         char *arg1 = cmd_decomp + cmd_decomp_idx[1];
-        if (!ustrcmp(arg1, "statut"))
+        if (!strcmp(arg1, "statut"))
             test_print_statut();
-        else if(!ustrcmp(arg1, "kheap"))
+        else if(!strcmp(arg1, "kheap"))
             test_kheap();
+        else if (!strcmp(arg1, "string"))
+            test_string();
     }
 
     return 0;
@@ -377,8 +380,8 @@ loop_enter:
         }
     }
     cur_ln_x = x;
-	for(; x < VGA_WIDTH; ++x)
-		sbuffer[ln_index][x] = vga_entry(' ', back_color);
+    for(; x < VGA_WIDTH; ++x)
+        sbuffer[ln_index][x] = vga_entry(' ', back_color);
     return rt;
 }
 
@@ -403,8 +406,8 @@ loop_enter:
         }
     }
     cur_ln_x = x;
-	for(; x < VGA_WIDTH; ++x)
-		sbuffer[ln_index][x] = vga_entry(' ', back_color);
+    for(; x < VGA_WIDTH; ++x)
+        sbuffer[ln_index][x] = vga_entry(' ', back_color);
     return rt;
 }
 

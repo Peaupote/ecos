@@ -1,25 +1,33 @@
-FLAGS=-O1 -Wall -Wextra -std=gnu99
-CC=gcc
+LIBC_FLAGS=-O1 -Wall -Wextra -std=gnu99
+LIBK_FLAGS?=
+CC?=gcc
 ASFILES=
+include list.Makefile
 include ../../src/libc/list.Makefile
 LIBC_FILES:=$(addprefix ../../src/libc/, $(LIBC_FILES))
-TEST_FILES=string.c
-OBJ=$(LIBC_FILES:.c=.o)
-TESTS=$(TEST_FILES:.c=.out)
 INCLUDES=-I ../../include
 
-.PHONY: run libc
+.PHONY: run libc libk build_libk
 
 all: run
 
-%.out:%.c libc
-	$(CC) $(FLAGS) -o $@ ../../src/libc/libc.a $< $(INCLUDES)
+build_libk: $(TESTS_LIBK)
+
+%.libc.out:%.c libc
+	$(CC) $(FLAGS) -D__is_libc -o $@ ../../src/libc/libc.a $< $(INCLUDES)
+
+%.libk.out:%.c libk
+	$(CC) $(FLAGS) -D__is_libk -o $@ -c $< $(INCLUDES)
 
 libc:
-	$(MAKE) -C ../../src/libc
+	$(MAKE) -C ../../src/libc libc.a
 
-run: libc $(OBJ) $(TESTS)
-	$(foreach t, $(TESTS), ./$(t))
+libk:
+	$(MAKE) -C ../../src/libc libk.a
+
+run: $(TESTS_LIBC)
+	@echo $(TESTS_LIBC)
+	$(foreach t, $(TESTS_LIBC), @./$(t))
 
 clean:
 	rm -rf *.o *.out *.s

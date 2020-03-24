@@ -1,5 +1,5 @@
 #include <fs/dummy.h>
-#include <util/string.h>
+#include <libc/string.h>
 #include <kernel/kutil.h>
 
 #define INO_NB 128
@@ -54,9 +54,9 @@ int dummy_load(void *super, char *fname, struct stat *st, char **end) {
             return -1;
         }
 
-        ptr = uindex(fname, '/');
+        ptr = index(fname, '/');
         while((dir = dummy_readdir(dir))) {
-            if (!ustrncmp(dir->fname, fname, *end - fname)) {
+            if (!strncmp(dir->fname, fname, *end - fname)) {
                 p = dir->ino;
                 curr = start_sector + dir->ino;
                 *end = fname;
@@ -110,7 +110,7 @@ int dummy_create(void *super, ino_t parent, char *fname) {
     }
 
     dir->ino = ino;
-    ustrncpy(dir->fname, fname, 255);
+    strncpy(dir->fname, fname, 255);
 
     p->blk_ino.ino_kind = KD_USED;
     p->blk_ino.ino_size = 0;

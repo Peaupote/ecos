@@ -1,25 +1,29 @@
-CC=gcc
-AR=ar
-FLAGS=-O2 -g -Wall -Wextra -std=gnu99 \
+CC?=gcc
+AR?=ar
+FLAGS?=-O2 -g -Wall -Wextra -std=gnu99 \
 		-nostdlib -mcmodel=large -ffreestanding \
 		-mno-red-zone
 include list.Makefile
-FILES=$(LIBC_FILES)
-OBJ=$(LIBC_OBJ)
-SRCDEP=$(FILES)
+SRCDEP=$(LIBC_FILES) $(LIBK_FILES)
 INCLUDES=-I ../../include
 
 ##
 
-.PHONY: all re clean libc.a
+.PHONY: all re clean
 
-all: libc.a
+all: libc.a libk.a
 
-%.o:%.c
-	$(CC) $(FLAGS) -c $? -o $@ $(INCLUDES)
+%.libc.o:%.c
+	$(CC) $(FLAGS) -D__is_libc -c $? -o $@ $(INCLUDES)
 
-libc.a: $(OBJ)
-	$(AR) rcs libc.a $(OBJ)
+%.libk.o:%.c
+	$(CC) $(FLAGS) -D__is_libk -c $? -o $@ $(INCLUDES)
+
+libc.a: $(LIBC_OBJ)
+	$(AR) rcs $@ $(LIBC_OBJ)
+
+libk.a: $(LIBK_OBJ)
+	$(AR) rcs $@ $(LIBK_OBJ)
 
 .depends:
 	../../tools/mkdep.sh "$(CC) $(FLAGS)" $(SRCDEP) > .depends
@@ -28,6 +32,6 @@ include .depends
 
 clean:
 	@echo "Clean trash files"
-	rm -rf $(NAME) $(OBJ) *.o *.a
+	rm -rf $(NAME) $(OBJ) *.o **/*.o *.a
 
 re: clean $(NAME)
