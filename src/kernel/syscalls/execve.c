@@ -28,7 +28,8 @@ void edummy_lseek() {
 	edummy_pos = state.st_proc[state.st_curr_pid].p_reg.rsi;
 }
 
-
+// Zone de transfert
+// permet de conserver des données lors du changement de paging
 struct execve_tr {
 	Elf64_Ehdr ehdr;
 	size_t     nb_sections;
@@ -47,7 +48,7 @@ struct section {
 };
 
 static inline struct execve_tr* trf() {
-	return (struct execve_tr*) paging_acc_pd(PML4_COPY_RES, 0, 0);
+	return (struct execve_tr*) paging_acc_pd(PML4_PSKD, 0, 0);
 }
 static inline struct section* sections() {
 	return (struct section*) align_to(
@@ -55,7 +56,7 @@ static inline struct section* sections() {
 			alignof(struct section));
 }
 static inline uint_ptr tr_lim() {
-	return (uint_ptr) paging_acc_pd(PML4_COPY_RES+1, 0, 0);
+	return (uint_ptr) paging_acc_pd(PML4_PSKD + 1, 0, 0);
 }
 
 static inline void execve_tr_do_alloc_pg(uint_ptr page_v_addr) {
@@ -199,11 +200,11 @@ loop_exit:;
 
 static inline void free_tr() {
 	for (uint16_t i = 0; i < PAGE_ENT; ++i) {
-		uint64_t e = *paging_acc_pdpt(PML4_COPY_RES, i);
+		uint64_t e = *paging_acc_pdpt(PML4_PSKD, i);
 		if (e & PAGING_FLAG_P)
 			kmem_free_page(e & PAGE_MASK);
 	}
-	uint64_t *pd = paging_acc_pml4(PML4_COPY_RES);
+	uint64_t *pd = paging_acc_pml4(PML4_PSKD);
 	kmem_free_page((*pd) & PAGE_MASK);
 	*pd = 0;
 }
@@ -268,12 +269,12 @@ static inline bool execve_load_elf64(proc_t* p, int fd,
 
 	// Zone de transfert
 	volatile phy_addr tr_pd = kmem_alloc_page();
-	*paging_acc_pml4(PML4_COPY_RES) = tr_pd 
+	*paging_acc_pml4(PML4_PSKD) = tr_pd 
 		| PAGING_FLAG_W | PAGING_FLAG_P;
-	invalide_page((uint_ptr)paging_acc_pdpt(PML4_COPY_RES, 0));
+	invalide_page((uint_ptr)paging_acc_pdpt(PML4_PSKD, 0));
 
 	for (uint16_t i = 0; i < PAGE_ENT; ++i)
-		*paging_acc_pdpt(PML4_COPY_RES, i) = 0;
+		*paging_acc_pdpt(PML4_PSKD, i) = 0;
 	for (uint_ptr i = 0; i < sizeof(struct execve_tr); i += PAGE_SIZE)
 		execve_tr_do_alloc_pg(((uint_ptr)trf()) + i);
 
@@ -296,14 +297,17 @@ static inline bool execve_load_elf64(proc_t* p, int fd,
 	*npml4 = kmem_alloc_page();
 	kmem_bind_dynamic_slot(0, *npml4);
 	kmem_init_pml4(kmem_dynamic_slot(0), *npml4);
-	((uint64_t*)kmem_dynamic_slot(0))[PML4_COPY_RES] = tr_pd
-			| PAGING_FLAG_P | PAGING_FLAG_W;
+	uint64_t* npml4_v      = (uint64_t*)kmem_dynamic_slot(0);
+	npml4_v[PML4_PSKD]     = tr_pd
+	       | PAGING_FLAG_P | PAGING_FLAG_W;
+	npml4_v[PML4_COPY_RES] = old_pml4
+	       | PAGING_FLAG_P | PAGING_FLAG_W;
 	pml4_to_cr3(*npml4);
 
 	if (!execve_load_args() || !execve_load_sections(p, fd)) {
 		free_tr();
 		kmem_free_paging(*npml4, old_pml4);
-		*paging_acc_pml4(PML4_COPY_RES) = 0;
+		*paging_acc_pml4(PML4_PSKD) = 0;
 		return false;
 	}
 
@@ -312,17 +316,16 @@ static inline bool execve_load_elf64(proc_t* p, int fd,
 	return true;
 }
 
-void execve(void) {
+int execve(const char *fname, const char **argv, const char **env) {
 	klogf(Log_info, "syscall", "EXECVE");
 	pid_t pid = state.st_curr_pid;
     proc_t *p = state.st_proc + pid;
 	
 	pid_t npid = find_new_pid(pid);
-	if (npid == pid) {
-		p->p_reg.rax = -1;
-		return;
-	}
-	// TODO : real process
+	if (npid == pid)
+		return -1;
+
+	// TODO : real process, cli
 	proc_t *np = state.st_proc + npid;
 	np->p_stat = RUN;
 	state.st_curr_pid = npid;
@@ -335,21 +338,18 @@ void execve(void) {
 	edummy_open();
 	int fd = (int)p->p_reg.rax;
 	if (fd == -1) {
-		p->p_reg.rax = -1;
 		np->p_stat = FREE;
-		return;
+		return -1;
 	}
 
 	phy_addr npml4;
 
-	if (!execve_load_elf64(np, fd,
-				(const char**)p->p_reg.rsi, (const char**)p->p_reg.rdx,
-				p->p_pml4, &npml4, &p->p_reg.rip)) {
+	if (!execve_load_elf64(np, fd, argv, env, p->p_pml4, &npml4, 
+				&p->p_reg.rip)) {
 		np->p_reg.rdi = fd;
 		edummy_close();
-		p->p_reg.rax = -1;
 		np->p_stat = FREE;
-		return;
+		return -1;
 	}
 	
 	np->p_reg.rdi = fd;
@@ -370,8 +370,13 @@ void execve(void) {
     st_curr_reg  = &p->p_reg;
 	np->p_stat = FREE;
 
-	klogf(Log_info, "test", "rflags=%llx", p->p_reg.rflags);
+	// Libération de l'ancien paging
+	kmem_free_paging_range(paging_acc_pdpt(PML4_COPY_RES, 0),
+			4, PML4_END_USPACE);
+	kmem_free_page(PAGE_MASK & *paging_acc_pml4(PML4_COPY_RES));
 
 	free_tr();
 	iret_to_userspace(SEG_SEL(GDT_RING3_CODE, 3));
+	kAssert(false);
+	return 0;
 }

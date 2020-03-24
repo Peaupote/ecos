@@ -23,27 +23,27 @@
 
 #include "proc.h"
 
-void sleep(void);
-void lookup_end_sleep(void);
+uint64_t sleep(uint64_t);
+void     lookup_end_sleep(void);
 
-void wait(void);
-void fork(void);
-void kexit(void);
-void getpid(void);
-void getppid(void);
-void waitpid(void);
+pid_t    wait(void);
+pid_t    fork(void);
+void     kexit(void);
+pid_t    getpid(void);
+pid_t    getppid(void);
+pid_t    waitpid(pid_t);
 
-void open(void);
-void close(void);
-void dup(void);
-void pipe(void);
-void write(void);
-void read(void);
-void lseek(void);
+int      open(const char* fname, enum chann_mode mode);
+int      close(int fd);
+int      dup(int fd);
+int      pipe(int fds[2]);
+int      write(int fd, uint8_t *s, size_t len);
+int      read(int fd, uint8_t *buf, size_t len);
+off_t    lseek(int fd, off_t offset);
 
-void execve(void);
+int      execve(const char *fname, const char **argv, const char **env);
 
-void invalid_syscall();
+int      invalid_syscall();
 
 #endif
 

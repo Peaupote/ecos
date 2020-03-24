@@ -75,12 +75,33 @@ void common_hdl(uint8_t num, uint64_t errcode) {
     // TODO : something
 }
 
-void pit_hdl(void) {
-    static uint8_t clock = 0;
-    if ((clock++ & SCHED_FREQ) == 0) schedule_proc(0);
 
+// Processus partiellent sauvegardé
+bool pit_hdl(void) {
+    static uint8_t clock = 0;
     lookup_end_sleep();
+    if ((clock++ & SCHED_FREQ) == 0) {
+		pid_t pid = schedule_proc_ev();
+		if (pid != state.st_curr_pid) {
+			state.st_curr_pid = pid;
+			return true;
+		}
+	}
+
     write_eoi();
+	return false;
+}
+
+void pit_hdl_switch(void) {
+	proc_t *p = switch_proc(state.st_curr_pid);
+	klogf(Log_info, "sched",
+		  "pit switch, nb waiting %d run proc %d :\n" 
+		  "   rip %p, rsp %p",
+		  state.st_waiting_ps + 1,
+		  state.st_curr_pid,
+		  p->p_reg.rip,
+		  p->p_reg.rsp);
+	eoi_iret_to_userspace(SEG_SEL(GDT_RING3_CODE, 3));
 }
 
 //--#PF errcode--

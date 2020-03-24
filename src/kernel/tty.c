@@ -114,7 +114,9 @@ size_t built_in_exec(size_t in_begin, size_t in_len) {
             test_kheap();
         else if (!strcmp(arg1, "string"))
             test_string();
-    }
+    } else if (!ustrcmp(cmd_name, "ps"))
+        proc_ps();
+>>>>>>> b236ab78d490df5a792fa4852076620a3df60d4a
 
     return 0;
 }

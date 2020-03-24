@@ -97,7 +97,7 @@ void kmem_fork_paging(phy_addr new_pml4) {
 }
 
 void kmem_free_rec(uint64_t* entry, uint8_t lvl);
-void kmem_free_loop(uint64_t* page_bg,
+void kmem_free_paging_range(uint64_t* page_bg,
 			uint8_t lvl, uint16_t lim) {
 	for (uint16_t i = 0; i < lim; ++i) {
 		if (page_bg[i] & PAGING_FLAG_P)
@@ -118,12 +118,12 @@ void kmem_free_loop(uint64_t* page_bg,
 void kmem_free_rec(uint64_t* entry, uint8_t lvl) {
 	if (lvl) {
 		uint64_t* page_bg = (uint64_t*) paging_rm_loop((uint_ptr)entry);
-		kmem_free_loop(page_bg, lvl, PAGE_ENT);
+		kmem_free_paging_range(page_bg, lvl, PAGE_ENT);
 	}
 	kmem_free_page((*entry) & PAGE_MASK);
 }
 void kmem_free_paging(phy_addr old_pml4, phy_addr new_pml4) {
-	kmem_free_loop(paging_acc_pml4(0), 4, PML4_END_USPACE);
+	kmem_free_paging_range(paging_acc_pml4(0), 4, PML4_END_USPACE);
 
 	pml4_to_cr3(new_pml4);
 

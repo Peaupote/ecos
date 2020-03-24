@@ -52,7 +52,7 @@ void vfs_init() {
     klogf(Log_info, "vfs", "/proc sucessfully mounted");
 }
 
-static struct device *find_device(char *fname) {
+static inline struct device *find_device(const char *fname) {
     // if mnt_pt is empty the mount point is unused
     // if more than one mount point is prefix of the file name
     // return the longest of the two prefix
@@ -71,7 +71,7 @@ static struct device *find_device(char *fname) {
     return len > 0 ? devices + mnt : 0;
 }
 
-vfile_t *vfs_load(char *filename, uint32_t create) {
+vfile_t *vfs_load(const char *filename, uint32_t create) {
     struct device *dev = find_device(filename);
     if (!dev) {
         klogf(Log_info, "vfs", "no mount point %s", filename);
@@ -83,7 +83,7 @@ vfile_t *vfs_load(char *filename, uint32_t create) {
 
     struct fs *fs = &fst[dev->dev_fs];
     struct stat st;
-    char *fname = filename + strlen(dev->dev_mnt);
+    const char *fname = filename + strlen(dev->dev_mnt);
     int rc = fs->fs_load(dev->dev_spblk, fname, &st, &fname);
 
     if (rc < 0) {
