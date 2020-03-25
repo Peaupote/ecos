@@ -1,4 +1,5 @@
-LIBC_FILES=string/memcmp.c \
+LIBC_AS_FILES=sys.s
+LIBC_CFILES=string/memcmp.c \
 	  string/memcpy.c \
 	  string/memset.c \
 	  string/memmove.c \
@@ -11,7 +12,8 @@ LIBC_FILES=string/memcmp.c \
 	  stdio/printf.c \
 	  stdio/putchar.c \
 	  stdio/puts.c
-LIBC_OBJ=$(LIBC_FILES:%.c=%.libc.o)
+LIBC_FILES=$(LIBC_CFILES) $(LIBC_AS_FILES)
+LIBC_OBJ=$(LIBC_FILES:%.c=%.libc.o) $(LIBC_AS_FILES:%.s=%.libc.o)
 
 LIBK_FILES=string/memcmp.c \
 	  string/memcpy.c \
