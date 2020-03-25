@@ -11,7 +11,7 @@ static const char *hex_digits     = "0123456789ABCDEF";
 static size_t
 itoa(long long int x, const char *digits, size_t base) {
     if (x == 0) {
-        buf[254] = *digits;
+        buf[254] = digits[0];
         buf[255] = 0;
         return 1;
     }
@@ -33,7 +33,7 @@ itoa(long long int x, const char *digits, size_t base) {
 static size_t
 ultoa(uint64_t x, const char *digits, size_t base) {
     if (x == 0) {
-        buf[254] = *digits;
+        buf[254] = digits[0];
         buf[255] = 0;
         return 1;
     }
@@ -48,7 +48,7 @@ ultoa(uint64_t x, const char *digits, size_t base) {
 
 static size_t complete_buf(size_t clen, size_t objlen, char c) {
     for(;clen < objlen; ++clen)
-        buf[255 - clen] = c;
+        buf[255 - clen - 1] = c;
     return clen;
 }
 
@@ -121,7 +121,7 @@ int fpprintf(stringl_writer w, void* wi, const char* fmt, va_list ps) {
                         ultoa(va_arg(ps, uint64_t), hex_digits, 16),
                         16, '0');
             print_buf:
-                (*w)(wi, buf + 256 - len, len);
+                (*w)(wi, buf + 255 - len, len);
                 count += len;
             break;
             default:
