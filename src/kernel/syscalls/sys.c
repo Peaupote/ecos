@@ -188,13 +188,14 @@ int open(const char *fname, enum chann_mode mode) {
 
     c->chann_pos   = 0;
 
-    for (int fd = 0; fd < NFD; fd++)
+    for (int fd = 0; fd < NFD; fd++) {
         if (p->p_fds[fd] == -1) {
             p->p_fds[fd] = cid;
             klogf(Log_info, "syscall", "process %d open %s on %d",
 					state.st_curr_pid, fname, fd);
             return fd;
         }
+	}
 
 	return -1;
 }

@@ -314,7 +314,8 @@ static inline bool execve_load_elf64(proc_t* p, int fd,
 	return true;
 }
 
-int execve(const char *fname, const char **argv, const char **env) {
+int execve(const char *fname __attribute__((unused)) /*TODO*/,
+		const char **argv, const char **env) {
 	klogf(Log_info, "syscall", "EXECVE");
 	pid_t pid = state.st_curr_pid;
     proc_t *p = state.st_proc + pid;
