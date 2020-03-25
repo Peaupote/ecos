@@ -2,6 +2,8 @@
 #include <kernel/sys.h>
 
     .section .data
+pid_cp1:
+	.long 0
 fname:
     .string "/proc/1/stat"
 string:
@@ -68,9 +70,14 @@ _start:
     movq    $SYS_WRITE, %rax
     int     $0x80
 
-3:  jmp     3b
+3:  
+//	jmp     3b
+	movq    $0, %rdi
+	movq    $SYS_EXIT, %rax
+	int     $0x80
 
 1:
+	movq    %rax, (pid_cp1)
     movq    $SYS_FORK, %rax
     int     $0x80
     testq   %rax, %rax
@@ -83,8 +90,12 @@ _start:
 	int     $0x80
 
 2:
+	movq    (pid_cp1),    %rdi
+    movq    $SYS_WAITPID, %rax
+    int     $0x80
+4:
 	// init wait for all its childrens
     movq    $SYS_WAIT, %rax
     int     $0x80
 
-    jmp     2b
+    jmp     4b

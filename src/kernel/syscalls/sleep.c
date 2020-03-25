@@ -13,9 +13,8 @@ uint64_t sleep(uint64_t time) {
     proc_t *p = &state.st_proc[state.st_curr_pid];
     size_t i = 0;
 
-    if (p->p_stat == SLEEP) {
+    if (p->p_stat == SLEEP)
         kpanic("try to make sleep a sleeping process");
-    }
 
     // look for first empty spot
     while(i < NSLEEP && state.st_proc[sleeps[i].pid].p_stat == SLEEP) i++;
@@ -27,15 +26,15 @@ uint64_t sleep(uint64_t time) {
     }
 
     p->p_stat = SLEEP;
-    sleeps[i].pid = p->p_pid;
+    sleeps[i].pid = state.st_curr_pid;
 
     // probably not correct here
     sleeps[i].sleep_counter = time * (1193180 / (1L << 16));
-    klogf(Log_info, "syscall", "process %d sleep for %d sec", p->p_pid, time);
-    schedule_proc(1);
+    klogf(Log_info, "syscall", "process %d sleep for %d sec",
+			state.st_curr_pid, time);
 
-	kAssert(false);
-	return 0;
+	schedule_proc();
+	never_reached return 0;
 }
 
 void lookup_end_sleep(void) {
@@ -44,7 +43,7 @@ void lookup_end_sleep(void) {
         if (state.st_proc[pid].p_stat == SLEEP &&
             --sleeps[i].sleep_counter == 0) {
             state.st_proc[pid].p_stat = RUN;
-            push_ps(pid);
+            sched_add_proc(pid);
         }
     }
 }

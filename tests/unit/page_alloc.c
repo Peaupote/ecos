@@ -5,8 +5,12 @@ typedef uint64_t phy_addr;
 #include "../../src/kernel/memory/page_alloc.c"
 
 void test_find_8(uint64_t v, uint8_t sz) {
-    uint8_t rt = find_in_8(v, sz);
-    if(v && !((v>>(sz*rt)) & ((1<<sz)-1))) texit("find 8");
+    uint8_t rt = find_bit_64(v, sz, 3);
+	if (v)
+		kAssert(((v>>(sz*rt))     & ((1<<sz)-1))
+			&& (rt == 7 || !((v>>(sz*(rt+1))) & ((1<<sz)-1))));
+	else
+		kAssert(rt == 0);
 }
 void sq_test_find_8() {
     test_find_8(1L<<47, 8);

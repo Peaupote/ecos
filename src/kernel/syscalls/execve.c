@@ -7,6 +7,7 @@
 #include <util/elf64.h>
 #include <kernel/kutil.h>
 #include <kernel/gdt.h>
+#include <util/misc.h>
 
 //TODO: vrai système de fichier
 extern uint8_t edummy_args[];
@@ -211,11 +212,8 @@ static inline void free_tr() {
 
 static inline bool execve_tr_args(const char* args[], const char* envs[]) {
 	trf()->args_bg = 0;
-	for (size_t s = 0; s < trf()->nb_sections; ++s) {
-		uint_ptr ed = sections()[s].dst + sections()[s].sz;
-		if (ed > trf()->args_bg)
-			trf()->args_bg = ed;
-	}
+	for (size_t s = 0; s < trf()->nb_sections; ++s)
+		maxa_uint_ptr(&trf()->args_bg, sections()[s].dst + sections()[s].sz);
 	trf()->args_bg = align_to(trf()->args_bg, alignof(char**));
 
 	trf()->args_t_bg = align_to(
@@ -328,10 +326,11 @@ int execve(const char *fname, const char **argv, const char **env) {
 	// TODO : real process, cli
 	proc_t *np = state.st_proc + npid;
 	np->p_stat = RUN;
-	state.st_curr_pid = npid;
-    st_curr_reg = &np->p_reg;
 	for (int i = 0; i < NFD; ++i)
 		np->p_fds[i] = UNUSED;
+
+	state.st_curr_pid = npid;
+    st_curr_reg = &np->p_reg;
 
 	np->p_reg.rdi = p->p_reg.rdi;
 	np->p_reg.rsi = READ;
@@ -376,7 +375,6 @@ int execve(const char *fname, const char **argv, const char **env) {
 	kmem_free_page(PAGE_MASK & *paging_acc_pml4(PML4_COPY_RES));
 
 	free_tr();
-	iret_to_userspace(SEG_SEL(GDT_RING3_CODE, 3));
-	kAssert(false);
-	return 0;
+	iret_to_proc(p);
+	never_reached return 0;
 }

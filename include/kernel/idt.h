@@ -14,7 +14,7 @@
 //DPL
 #define IDT_ATTR_DPL(R)       ((R)<<5)
 //Present
-#define IDT_ATTR_P            0x80
+#define IDT_ATTR_P            (1<<7)
 
 
 /**

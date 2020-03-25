@@ -26,11 +26,11 @@
 #define PML4_LOOP           0xff
 
 //Present
-#define PAGING_FLAG_P		0x1
+#define PAGING_FLAG_P		(1<<0)
 //Read/write: read only si 0
-#define PAGING_FLAG_W		0x2
+#define PAGING_FLAG_W		(1<<1)
 //User/supervisor
-#define PAGING_FLAG_U		0x4
+#define PAGING_FLAG_U		(1<<2)
 //page Size: si 1 dans le PD utilise une page de 2MB (si PAE)
 //à la place d'une PT requiert PSE (ou PAE)
 #define PAGING_FLAG_S		(1<<7)

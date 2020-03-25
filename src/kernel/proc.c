@@ -12,122 +12,64 @@
 #include <kernel/tty.h>
 #include <kernel/kutil.h>
 #include <kernel/gdt.h>
+#include <util/misc.h>
 
-#define TEST_SECTION_PQUEUE
+char proc_state_char[5] = {'f', 's', 'w', 'R', 'Z'};
 
-// priority in runqueue according to process status
-int proc_state_pri[7] = { PFREE, PSLEEP, PWAIT, PRUN, PIDLE, PZOMB, PSTOP };
-
-char proc_state_char[7] = {'f', 'S', 'w', 'R', 'i', 'Z', 's'};
-
-// some heap utilitary functions
-
-int push_ps(pid_t pid) {
-    // test if remain space
-    if (state.st_waiting_ps >= NHEAP)
-        return -1;
-
-    pid_t* rq1 = state.st_runqueues - 1;
-    proc_t *p = state.st_proc + pid;
-    priority_t ps_priority = p->p_pri = proc_state_pri[p->p_stat];
-    size_t i = ++state.st_waiting_ps;
-
-    pid_t hp_pid = rq1[i >> 1];
-    priority_t hp_priority = state.st_proc[hp_pid].p_pri;
-
-    // up heap
-    while ((i>>1)
-        && (hp_pid = rq1[i>>1],
-            ps_priority < (hp_priority = state.st_proc[hp_pid].p_pri))) {
-        rq1[i] = hp_pid;
-        i >>= 1;
-    }
-    rq1[i] = pid;
-    return 0;
-}
-
-pid_t pop_ps() {
-    // test if heap is non empty
-    if (state.st_waiting_ps == 0)
-        return -1;
-
-    pid_t* rq1 = state.st_runqueues - 1;
-    pid_t pid  = rq1[1];
-    rq1[1]     = rq1[state.st_waiting_ps--];
-
-    // down heap
-    // sort imédiatement si st_waiting_ps <= 1
-    for (size_t i = 1; (i<<1) <= state.st_waiting_ps;) {
-        size_t  win = i, l = i<<1, r = (i<<1) + 1;
-        size_t  lpr_index = i - 1;
-        uint8_t lpr_shift = 1 << (lpr_index % 8);
-        lpr_index /= 8;
-
-        pid_t pidwin = rq1[win],
-                pidl = rq1[l];
-
-        priority_t winp = state.st_proc[pidwin].p_pri,
-                   lp   = state.st_proc[pidl].p_pri;
-
-        if (lp < winp) {
-            win    = l;
-            pidwin = pidl;
-            winp   = lp;
-        }
-        if (r <= state.st_waiting_ps){
-            pid_t pidr    = rq1[r];
-            priority_t rp = state.st_proc[pidr].p_pri;
-            if (rp < winp ||
-                (rp == winp
-                 && (lpr_shift &
-                     (state.st_runqueues_lpr[lpr_index] ^= lpr_shift)))) {
-                win    = r;
-                pidwin = pidr;
-                winp   = lp;
-            }
-        }
-
-        if (win == i) break;
-
-        rq1[win] = rq1[i];
-        rq1[i]   = pidwin;
-        i = win;
-    }
-
-    return pid;
-}
-
-#undef TEST_SECTION_PQUEUE
-
+extern void    proc_idle_entry(void);
 extern uint8_t proc_init[];
 
+void sched_init() {
+	struct scheduler* s = &state.st_sched;
+	s->pres    = 0;
+	s->nb_proc = 0;
+	for (size_t p = 0; p < NB_PRIORITY_LVL; ++p) {
+		s->files[p].first = PID_NONE;
+		s->files[p].last  = PID_NONE;
+	}
+}
+
 void init() {
-    // construct processus one
-    proc_t *one = &state.st_proc[1];
-    one->p_pid   = 1;
-    one->p_ppid  = 0;
-    one->p_stat  = RUN;
-    one->p_pml4  = 0;
-    one->p_nchd  = 0;
+	sched_init();
+
+	// processus 0: p_idle
+    proc_t *p_idle = &state.st_proc[PID_IDLE];
+    p_idle->p_ppid = 0;
+	p_idle->p_nchd = 1;
+    p_idle->p_stat = RUN;
+	p_idle->p_rng1 = true;
+	p_idle->p_prio = 0; //priorité minimale
+	p_idle->p_pml4 = (phy_addr)NULL;
+	p_idle->p_reg.rsp = (uint_ptr)NULL; //pas de pile
+	p_idle->p_reg.rip = (uint_ptr)&proc_idle_entry;
+
+    // processus 1: init
+    proc_t *p_init = &state.st_proc[PID_INIT];
+    p_init->p_ppid = 1;
+	p_init->p_nchd = 1;
+    p_init->p_stat = RUN;
+	p_init->p_rng1 = false; //TODO
+	p_init->p_prio = NB_PRIORITY_LVL - 1; //priorité maximale
 
     // set file descriptors
     // stdin
-    one->p_fds[0] = 0;
+    p_init->p_fds[0] = 0;
     state.st_chann[0].chann_mode = STREAM_IN;
     state.st_chann[0].chann_acc  = 1;
 
     // stdout
-    one->p_fds[1] = 1;
+    p_init->p_fds[1] = 1;
     state.st_chann[1].chann_mode = STREAM_OUT;
     state.st_chann[1].chann_acc  = 1;
 
     // stderr
-    one->p_fds[1] = 2;
+    p_init->p_fds[1] = 2;
     state.st_chann[2].chann_mode = STREAM_OUT;
     state.st_chann[2].chann_acc  = 1;
 
     // set unused file desc
-    for (size_t i = 3; i < NFD; i++) one->p_fds[i] = -1;
+    for (size_t i = 0; i < NFD; i++) p_idle->p_fds[i] = -1;
+    for (size_t i = 3; i < NFD; i++) p_init->p_fds[i] = -1;
 
     // set chann to free
     for (cid_t cid = 3; cid < NCHAN; cid++) {
@@ -139,55 +81,95 @@ void init() {
     for (pid_t pid = 2; pid < NPROC; pid++) {
         state.st_proc[pid].p_stat = FREE;
         state.st_proc[pid].p_ppid = 0;
-        state.st_proc[pid].p_pid  = pid;
-    }
+	}
 
     vfs_init();
 
-    proc_create_userspace(proc_init, one);
+	sched_add_proc(PID_IDLE);
+    proc_create_userspace(proc_init, p_init);
 
-    state.st_curr_pid   = 1;
-    state.st_waiting_ps = 0;
-    st_curr_reg = &one->p_reg;
+    state.st_curr_pid = 1;
+    st_curr_reg       = &p_init->p_reg;
 
     klog(Log_info, "init", "Process 1 loaded. Start process 1");
-    iret_to_userspace(SEG_SEL(GDT_RING3_CODE, 3));
+	iret_to_proc(p_init);
 }
 
+void sched_add_proc(pid_t pid) {
+	proc_t     *p = state.st_proc + pid;
+	priority_t pr = p->p_prio;
+	pid_t     prl = state.st_sched.files[pr].last;
+	
+	klogf(Log_verb, "sched", "add %d @ %d", (int)pid, (int)pr);
+
+	++state.st_sched.nb_proc;
+	p->p_nxpf = PID_NONE;
+	if (~prl)
+		state.st_proc[prl].p_nxpf = pid;
+	else {
+		state.st_sched.files[pr].first = pid;
+		state.st_sched.pres |= ((uint64_t)1) << pr;
+	}
+	state.st_sched.files[pr].last = pid;
+}
+
+pid_t sched_pop_proc() {
+	struct scheduler* s = &state.st_sched;
+	priority_t pr = find_bit_64(s->pres, 1, 6);
+	pid_t     pid = s->files[pr].first;
+	pid_t      nx = state.st_proc[pid].p_nxpf;
+	klogf(Log_verb, "sched", "rem %d @ %d", (int)pid, (int)pr);
+	--s->nb_proc;
+	s->files[pr].first = nx;
+	if (!~nx) {
+		s->files[pr].last = PID_NONE;
+		s->pres &= ~(((uint64_t)1) << pr);
+	}
+	return pid;
+}
+
+int hit = 0;
 
 void schedule_proc() {
-    if (state.st_waiting_ps > 0) {
+    if (state.st_sched.pres) {
+		kAssert(state.st_sched.nb_proc > 0);
         // pick a new process to run
-        pid_t pid = pop_ps();
+        pid_t pid = sched_pop_proc();
         proc_t *p = switch_proc(pid);
 
         klogf(Log_info, "sched",
-              "nb waiting %d run proc %d :\n"
+              "nb R %d, run proc %d :\n"
 			  "   rip %p, rsp %p",
-              state.st_waiting_ps + 1, pid,
+              state.st_sched.nb_proc + 1, pid,
               p->p_reg.rip,
               p->p_reg.rsp);
-
-        iret_to_userspace(SEG_SEL(GDT_RING3_CODE, 3));
+		
+		iret_to_proc(p);
     }
-    // no process to take hand
-	klogf(Log_info, "sched", "halt");
-	set_interrupt_flag();
-	while(1) halt();
+	
+	// Le processus IDLE empêche que l'on arrive ici
+	never_reached
 }
 pid_t schedule_proc_ev() {
-	kAssert(!push_ps(state.st_curr_pid));
-	return pop_ps();
+	sched_add_proc(state.st_curr_pid);
+	pid_t rt = sched_pop_proc();
+	klogf(Log_verb, "sched",
+		  "nb waiting %d choose proc %d",
+		  state.st_sched.nb_proc + 1,
+		  state.st_curr_pid);
+	return rt;
 }
 
 proc_t *switch_proc(pid_t pid) {
-    proc_t *p = state.st_proc + pid;
+    proc_t *p   = state.st_proc + pid;
     state.st_curr_pid = pid;
     st_curr_reg = &p->p_reg;
-    pml4_to_cr3(p->p_pml4);
+	
+	if (p->p_pml4) pml4_to_cr3(p->p_pml4);
 
     return p;
 }
+
 
 static inline uint8_t proc_ldr_alloc_pages(uint_ptr begin, uint_ptr end) {
 	return kmem_paging_alloc_rng(begin, end,
@@ -246,11 +228,12 @@ uint8_t proc_create_userspace(void* prg_elf, proc_t *proc) {
 }
 
 void proc_ps() {
-	for (pid_t pid = 1; pid < NPROC; pid++) {
+	for (pid_t pid = 0; pid < NPROC; pid++) {
 		proc_t* p = state.st_proc + pid;
 		if (p->p_stat != FREE)
-			kprintf("%cpid=%d st=%c ppid=%d\n",
+			kprintf("%cpid=%d st=%c ppid=%d pr=%d\n",
 					pid==state.st_curr_pid ? '*' : ' ',
-					pid, proc_state_char[p->p_stat], p->p_ppid);
+					(int)pid, (int)proc_state_char[p->p_stat],
+					(int)p->p_ppid, (int)p->p_prio);
 	}
 }

@@ -10,6 +10,8 @@
 #define STR_HELPER(x) #x
 #define STR(x) STR_HELPER(x)
 #define kAssert(P) kassert(P, __FILE__":"STR(__LINE__)" "#P)
+#define never_reached kassert(false, __FILE__":"STR(__LINE__)\
+									" never reached assert");
 
 int  wprintf(stringl_writer, void*, const char* fmt, va_list params);
 

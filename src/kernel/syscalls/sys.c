@@ -6,49 +6,58 @@
 #include <kernel/sys.h>
 #include <kernel/memory/shared_pages.h>
 #include <util/elf64.h>
+#include <util/misc.h>
 
 /**
  * Syscalls
+ * TODO: check args domain
  */
 
-void kexit() {
-    proc_t *p = &state.st_proc[state.st_curr_pid],
-        *pp = &state.st_proc[p->p_ppid];
+void kexit(int status) {
+    proc_t  *p = &state.st_proc[state.st_curr_pid];
+	pid_t ppid = p->p_ppid;
+    proc_t *pp = &state.st_proc[ppid];
 
-    int status = p->p_reg.rdi;
-    klogf(Log_info, "syscall",
-          "kill pid %d with status %d", p->p_pid, status);
+    klogf(Log_info, "syscall", "kill pid %d with status %d ppid=%d(%c)",
+		  state.st_curr_pid, status, ppid,
+		  proc_state_char[pp->p_stat]);
 
     klogf(Log_verb, "mem", "pre_free: %lld pages disponibles",
             (long long int)kmem_nb_page_free());
     kmem_free_paging(p->p_pml4, kernel_pml4);
 
-    if (pp->p_stat == WAIT) {
-        pp->p_stat    = RUN;
-		kAssert(!push_ps(p->p_ppid));
-        pp->p_reg.rax = status;
-    	pp->p_nchd--; // one child less
-		p->p_ppid = 0;
-		p->p_stat = FREE;
-    } else
-		p->p_stat = ZOMB;
-
     for (pid_t pid = 2; pid < NPROC; pid++) {
-        pp = &state.st_proc[pid];
-        if (pp->p_ppid == state.st_curr_pid) {
-            pp->p_ppid = 1;
+        proc_t* cp = &state.st_proc[pid];
+        if (cp->p_ppid == state.st_curr_pid) {
+            cp->p_ppid = 1;
             state.st_proc[1].p_nchd++;
         }
     }
 
-    schedule_proc(1);
-	kAssert(false);
+    if (pp->p_stat == WAIT
+		&& (rei_cast(pid_t, pp->p_reg.rax) == PID_NONE
+			|| rei_cast(pid_t, pp->p_reg.rax) == state.st_curr_pid)) {
+		
+		p->p_stat     = FREE;
+		pp->p_stat    = RUN;
+		sched_add_proc(ppid);
+        pp->p_reg.rax = state.st_curr_pid;
+    	pp->p_nchd--;
+        
+		//TODO: status -> switch to parent
+
+		schedule_proc();
+		never_reached
+    } else {
+		p->p_stat = ZOMB;
+		schedule_proc();
+		never_reached
+	}
 }
 
 pid_t getpid() {
-    proc_t *p = &state.st_proc[state.st_curr_pid];
-    klogf(Log_verb, "syscall", "getpid %d", p->p_pid);
-	return p->p_pid;
+    klogf(Log_verb, "syscall", "getpid %d", state.st_curr_pid);
+	return state.st_curr_pid;
 }
 
 pid_t getppid() {
@@ -72,65 +81,66 @@ pid_t wait() { //TODO: statut
 		}
 
         p->p_stat = WAIT;
-        klogf(Log_verb, "syscall", "process %d wait %d", p->p_pid, p->p_nchd);
-        schedule_proc(1);
-		kAssert(false);
-		return 0;
+		rei_cast(pid_t, p->p_reg.rax) = PID_NONE;
+        klogf(Log_info, "syscall", "process %d wait %d childs",
+				state.st_curr_pid, p->p_nchd);
+        schedule_proc();
+		never_reached return 0;
     } else {
         klogf(Log_verb, "syscall",
-              "process %d has no child. dont wait", p->p_pid);
+              "process %d has no child. dont wait", state.st_curr_pid);
 		return -1;
     }
 }
 
-pid_t waitpid(pid_t pid) {
-    proc_t *p = &state.st_proc[state.st_curr_pid];
-    if (p->p_nchd > 0) {
-        if (state.st_proc[pid].p_ppid == p->p_pid &&
-            state.st_proc[pid].p_stat == SLEEP) {
-            p->p_stat = WAIT;
-            klogf(Log_verb, "syscall",
-                  "process %d wait %d", p->p_pid, p->p_nchd);
-            schedule_proc(1);
-			kAssert(false);
-			return 0;
-        } else {
-            klogf(Log_verb, "syscall",
-                  "process %d is not %d's child", pid, p->p_pid);
-			return -1;
-        }
-    } else {
-        klogf(Log_verb, "syscall",
-              "process %d has no child. dont wait", p->p_pid);
+pid_t waitpid(pid_t cpid) {
+	if (cpid == PID_NONE) return wait();
+	
+	pid_t mpid = state.st_curr_pid;
+    proc_t  *p = &state.st_proc[mpid];
+	if (state.st_proc[cpid].p_ppid == mpid) {
+		
+		if (state.st_proc[cpid].p_stat == ZOMB)
+			return cpid;
+
+        p->p_stat = WAIT;
+		rei_cast(pid_t, p->p_reg.rax) = cpid;
+        klogf(Log_info, "syscall", "process %d wait child %d", mpid, cpid);
+        schedule_proc();
+		never_reached return 0;
+
+	} else {
+		klogf(Log_info, "syscall", "process %d is not %d's child",
+				cpid, mpid);
 		return -1;
-    }
+	}
 }
 
 pid_t fork() {
     proc_t *fp, *p = &state.st_proc[state.st_curr_pid];
 
-    pid_t pid = find_new_pid(state.st_curr_pid);
+    pid_t cpid = find_new_pid(state.st_curr_pid);
     // we didn't find place for a new processus
-    if (pid == state.st_curr_pid)
+    if (cpid == state.st_curr_pid)
         return -1;
 
-    fp          = &state.st_proc[pid];
-    fp->p_pid   = pid;
+    fp          = &state.st_proc[cpid];
     fp->p_ppid  = state.st_curr_pid;
-    fp->p_stat  = RUN;
-    fp->p_pri   = p->p_pri;
     fp->p_nchd  = 0;
+    fp->p_stat  = RUN;
+	fp->p_rng1  = false;
+    fp->p_prio  = p->p_prio;
+
     p->p_nchd++; // one more child
 
     // TODO clean
     uint64_t *a = (uint64_t*)&fp->p_reg;
     uint64_t *b = (uint64_t*)&p->p_reg;
-
-    for (size_t i = 0; i < 18; i++)
-        a[i] = b[i];
+    for (size_t i = 0; i < 18; i++) a[i] = b[i];
 
     fp->p_pml4 = kmem_alloc_page();
     kmem_fork_paging(fp->p_pml4);
+	paging_refresh();
 
     // copy file descriptors
     for (int i = 0; i < NFD; i++) {
@@ -145,11 +155,12 @@ pid_t fork() {
 
     fp->p_reg.rax = 0;
 
-	kAssert(!push_ps(pid));
+	sched_add_proc(cpid);
 
-    klogf(Log_info, "syscall", "fork %d into %d", p->p_pid, fp->p_pid);
+    klogf(Log_info, "syscall", "fork %d into %d",
+			state.st_curr_pid, cpid);
 
-	return pid;
+	return cpid; // On retourne au parent
 }
 
 int open(const char *fname, enum chann_mode mode) {
@@ -170,8 +181,8 @@ int open(const char *fname, enum chann_mode mode) {
 
     c->chann_vfile = vfs_load(fname, 1);
     if (!c->chann_vfile) {
-        klogf(Log_error, "sys",
-              "process %d couldn't open %s", p->p_pid, fname);
+        klogf(Log_error, "sys", "process %d couldn't open %s",
+				state.st_curr_pid, fname);
         return -1;
     }
 
@@ -180,8 +191,8 @@ int open(const char *fname, enum chann_mode mode) {
     for (int fd = 0; fd < NFD; fd++)
         if (p->p_fds[fd] == -1) {
             p->p_fds[fd] = cid;
-            klogf(Log_info, "syscall",
-                  "process %d open %s on %d", p->p_pid, fname, fd);
+            klogf(Log_info, "syscall", "process %d open %s on %d",
+					state.st_curr_pid, fname, fd);
             return fd;
         }
 
@@ -267,7 +278,8 @@ int read(int fd, uint8_t *d, size_t len) {
 		return -1;
 
     chann_t *chann = &state.st_chann[p->p_fds[fd]];
-    klogf(Log_verb, "syscall", "process %d read on %d", p->p_pid, fd);
+    klogf(Log_verb, "syscall", "process %d read on %d",
+			state.st_curr_pid, fd);
 
     vfile_t *vfile = chann->chann_vfile;
 
@@ -293,7 +305,8 @@ int write(int fd, uint8_t *s, size_t len) {
 
     chann_t *chann = &state.st_chann[p->p_fds[fd]];
     vfile_t *vfile = chann->chann_vfile;
-    klogf(Log_verb, "syscall", "process %d write on %d", p->p_pid, fd);
+    klogf(Log_verb, "syscall", "process %d write on %d",
+			state.st_curr_pid, fd);
 
     size_t c = 0;
     switch (chann->chann_mode) {
@@ -319,20 +332,27 @@ off_t lseek(int fd, off_t off) {
 
     if (fd < 0 || fd > NFD) {
         klogf(Log_error, "syscall",
-              "process %d lseek on invalid file descriptor %d", p->p_pid, fd);
+				"process %d lseek on invalid file descriptor %d",
+				state.st_curr_pid, fd);
 		return -1;
     }
 
-    klogf(Log_verb, "syscall",
-          "process %d lseek %d at %d", p->p_pid, fd, off);
+    klogf(Log_verb, "syscall", "process %d lseek %d at %d",
+			state.st_curr_pid, fd, off);
 
     state.st_chann[p->p_fds[fd]].chann_pos = off;
 
 	return off;
 }
 
-int invalid_syscall() {
+uint64_t invalid_syscall() {
     proc_t *p = &state.st_proc[state.st_curr_pid];
     klogf(Log_error, "syscall", "invalid syscall code %d", p->p_reg.rax);
-	return -1;
+	return ~(uint64_t)0;
+}
+
+// Appels système de privilège ring 1
+
+void prires_proc_struct(void) {
+	state.st_proc[state.st_curr_pid].p_rng1 = false;
 }

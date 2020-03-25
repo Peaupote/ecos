@@ -9,6 +9,7 @@
 
 // special interrupt vectors
 #define SYSCALL_VEC           0x80
+#define SYSCALL_R1_VEC        0x7f
 #define PIT_VEC               0x20
 #define KEYBOARD_VEC          0x21
 
