@@ -46,7 +46,8 @@ struct dirent {
 struct fs {
     char             fs_name[4];
     void          *(*fs_mnt)();
-    int            (*fs_load)(void*, char *fname, struct stat *st, char**);
+    int            (*fs_load)(void*, const char *fname,
+                              struct stat *st, char**);
     int            (*fs_create)(void*, ino_t, char*);
     int            (*fs_seek)(void*, ino_t, off_t);
     int            (*fs_read)(void*, ino_t, void*, size_t);

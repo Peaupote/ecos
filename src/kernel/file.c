@@ -83,7 +83,7 @@ vfile_t *vfs_load(const char *filename, uint32_t create) {
 
     struct fs *fs = &fst[dev->dev_fs];
     struct stat st;
-    const char *fname = filename + strlen(dev->dev_mnt);
+    char *fname = (char*)(filename + strlen(dev->dev_mnt));
     int rc = fs->fs_load(dev->dev_spblk, fname, &st, &fname);
 
     if (rc < 0) {

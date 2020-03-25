@@ -37,30 +37,31 @@ struct dirent *dummy_readdir(struct dirent *dir) {
     return dir;
 }
 
-int dummy_load(void *super, char *fname, struct stat *st, char **end) {
+int dummy_load(void *super, const char *fname, struct stat *st, char **end) {
     block_t *start_sector = (block_t*)super;
     block_t *curr = start_sector + 1;
     ino_t p = 1; // last existing parent
     struct dirent *dir = (struct dirent*)(&curr->blk_content);
     char *ptr;
+    char *f = (char*)fname;
 
     klogf(Log_info, "dumb", "load");
 
     if (!end || !*end) return -1;
 
     // assert fname start with /
-    while (dir && *fname++) {
+    while (dir && *f++) {
         if (curr->blk_ino.ino_kind != KD_DIR) {
             return -1;
         }
 
-        ptr = index(fname, '/');
+        ptr = index(f, '/');
         while((dir = dummy_readdir(dir))) {
-            if (!strncmp(dir->fname, fname, *end - fname)) {
+            if (!strncmp(dir->fname, f, *end - f)) {
                 p = dir->ino;
                 curr = start_sector + dir->ino;
-                *end = fname;
-                fname = ptr;
+                *end = f;
+                f = ptr;
                 break;
             }
         }

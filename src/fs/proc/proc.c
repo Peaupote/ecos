@@ -4,7 +4,7 @@
 #include <kernel/proc.h>
 
 // no pid is larger than 5 digit in base 10
-static int atoi(char *s, size_t len) {
+static int atoi(const char *s, size_t len) {
     size_t i, res = 0;
     for (i = 0; *s && i < len; i++, s++) {
         if (*s < '0' || *s > '9') return -1;
@@ -20,7 +20,8 @@ void *proc_mount() {
 }
 
 int proc_load(void *super __attribute__((unused)),
-              char *fname, struct stat *st, char **end) {
+              const char *fname,
+              struct stat *st, char **end) {
     st->st_ino = 0;
 
     if (*fname == '/') fname++;

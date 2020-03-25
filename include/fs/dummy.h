@@ -38,7 +38,7 @@ typedef struct block block_t;
 
 void *dummy_mount();
 
-int dummy_load(void *super, char *fname, struct stat *st, char **end);
+int dummy_load(void *super, const char *fname, struct stat *st, char **end);
 int dummy_create(void *super, ino_t parent, char *fname);
 
 int dummy_seek(void *super, ino_t ino, off_t pos);
