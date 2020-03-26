@@ -13,3 +13,4 @@ _start:
     movq    $buf, %rsi
     movq    $14, %rdx
     movq    $SYS_WRITE, %rax
+    int     $0x80

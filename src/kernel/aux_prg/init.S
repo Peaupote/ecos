@@ -71,6 +71,8 @@ _start:
     movq    $SYS_CLOSE, %rax
     int     $0x80
 
+    sleep
+
     // cat /home/mpouzet/hello-world.s
     movq    $fname2, %rdi
     movq    $1, %rsi
@@ -84,6 +86,8 @@ _start:
     movq    %r15, %rdi
     movq    $SYS_CLOSE, %rax
     int     $0x80
+
+    sleep
 
     // cat /home/mpouzet/bio.txt
     movq    $fname3, %rdi
