@@ -18,16 +18,18 @@
 #define SCHED_FREQ 0x3
 
 /**
- * priorities (the less the better)
+ * TODO: rm priorities (the less the better)
  */
 #define PFREE  100
 #define PSLEEP 30
 #define PWAIT  10
 #define PRUN   0
-#define PIDLE  -1
 #define PZOMB  -10
-#define PSTOP  1
 
+// Nombre de priorités (nice) dans le scheduler
+// Au sein du kernel la meilleure priorité est NB_PRIORITY_LVL-1, la pire 0
+// NB_PRIORITY_LVL <= 64
+#define NB_PRIORITY_LVL 40
 
 /**
  * Dont touch too much here

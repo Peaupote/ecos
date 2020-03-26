@@ -19,6 +19,9 @@
 #define SYS_LSEEK   13
 #define SYS_EXECVE  14
 
+#define SYS_R1_PRIRES 0
+#define SYS_R1_IDLE   1
+
 #ifndef ASM_FILE
 
 #include "proc.h"
@@ -28,7 +31,7 @@ void     lookup_end_sleep(void);
 
 pid_t    wait(void);
 pid_t    fork(void);
-void     kexit(void);
+void     kexit(int status);
 pid_t    getpid(void);
 pid_t    getppid(void);
 pid_t    waitpid(pid_t);
@@ -43,7 +46,9 @@ off_t    lseek(int fd, off_t offset);
 
 int      execve(const char *fname, const char **argv, const char **env);
 
-int      invalid_syscall();
+uint64_t invalid_syscall();
+
+void     prires_proc_struct(void);
 
 #endif
 

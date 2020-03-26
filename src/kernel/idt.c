@@ -19,6 +19,7 @@
 #define GATE_INT  (IDT_ATTR_P|IDT_TYPE_INT)
 
 extern void irq_sys(void);
+extern void irq_sys_ring1(void);
 extern void irq_keyboard(void);
 extern void irq_pit(void);
 
@@ -94,14 +95,12 @@ bool pit_hdl(void) {
 
 void pit_hdl_switch(void) {
     proc_t *p = switch_proc(state.st_curr_pid);
-    klogf(Log_verb, "sched",
-          "pit switch, nb waiting %d run proc %d :\n"
+    klogf(Log_info, "sched",
+          "pit switch, nb R %d, run proc %d :\n"
           "   rip %p, rsp %p",
-          state.st_waiting_ps + 1,
-          state.st_curr_pid,
-          p->p_reg.rip,
-          p->p_reg.rsp);
-    eoi_iret_to_userspace(SEG_SEL(GDT_RING3_CODE, 3));
+          state.st_sched.nb_proc + 1, state.st_curr_pid,
+          p->p_reg.rip, p->p_reg.rsp);
+    eoi_iret_to_proc(p);
 }
 
 //--#PF errcode--
@@ -167,6 +166,8 @@ void idt_init(void) {
 
     idt_int_asgn(SYSCALL_VEC, (uint64_t)irq_sys,
             GATE_INT | IDT_ATTR_DPL(3), 0);
+    idt_int_asgn(SYSCALL_R1_VEC, (uint64_t)irq_sys_ring1,
+            GATE_INT | IDT_ATTR_DPL(1), 0);
     idt_int_asgn(PIT_VEC,      (uint64_t)irq_pit,      GATE_INT, 0);
     idt_int_asgn(KEYBOARD_VEC, (uint64_t)irq_keyboard, GATE_INT, 0);
 
