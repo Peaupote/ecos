@@ -4,9 +4,11 @@
 #include <kernel/file.h>
 #include <kernel/proc.h>
 
+#include <fs/ext2.h>
 #include <fs/dummy.h>
 #include <fs/proc.h>
 
+extern char home_partition[];
 void vfs_init() {
     klogf(Log_info, "vfs", "Initialize");
 
@@ -15,41 +17,55 @@ void vfs_init() {
         devices[i].dev_mnt[0] = 0;
     }
 
-    klogf(Log_info, "vfs", "setup dumb file system");
-    memcpy(fst[DUMMY_FS].fs_name, "dumb", 4);
-    fst[DUMMY_FS].fs_mnt     = dummy_mount;
-    fst[DUMMY_FS].fs_load    = dummy_load;
-    fst[DUMMY_FS].fs_create  = dummy_create;
-    fst[DUMMY_FS].fs_read    = dummy_read;
-    fst[DUMMY_FS].fs_write   = dummy_write;
-    fst[DUMMY_FS].fs_readdir = dummy_readdir;
-    fst[DUMMY_FS].fs_seek    = dummy_seek;
+    /* klogf(Log_info, "vfs", "setup dumb file system"); */
+    /* memcpy(fst[DUMMY_FS].fs_name, "dumb", 4); */
+    /* fst[DUMMY_FS].fs_mnt     = &dummy_mount; */
+    /* fst[DUMMY_FS].fs_load    = &dummy_load; */
+    /* fst[DUMMY_FS].fs_create  = &dummy_create; */
+    /* fst[DUMMY_FS].fs_read    = &dummy_read; */
+    /* fst[DUMMY_FS].fs_write   = &dummy_write; */
+    /* fst[DUMMY_FS].fs_readdir = &dummy_readdir; */
+    /* fst[DUMMY_FS].fs_seek    = &dummy_seek; */
 
-    klogf(Log_info, "vfs", "setup proc file system");
-    memcpy(fst[PROC_FS].fs_name, "proc", 4);
-    fst[PROC_FS].fs_mnt     = proc_mount;
-    fst[PROC_FS].fs_load    = proc_load;
-    fst[PROC_FS].fs_create  = proc_create;
-    fst[PROC_FS].fs_read    = proc_read;
-    fst[PROC_FS].fs_write   = proc_write;
-    fst[PROC_FS].fs_readdir = proc_readdir;
-    fst[PROC_FS].fs_seek    = proc_seek;
+    /* klogf(Log_info, "vfs", "setup proc file system"); */
+    /* memcpy(fst[PROC_FS].fs_name, "proc", 4); */
+    /* fst[PROC_FS].fs_mnt     = &proc_mount; */
+    /* fst[PROC_FS].fs_load    = &proc_load; */
+    /* fst[PROC_FS].fs_create  = &proc_create; */
+    /* fst[PROC_FS].fs_read    = &proc_read; */
+    /* fst[PROC_FS].fs_write   = &proc_write; */
+    /* fst[PROC_FS].fs_readdir = &proc_readdir; */
+    /* fst[PROC_FS].fs_seek    = &proc_seek; */
 
-    void *spblk = fst[DUMMY_FS].fs_mnt();
-    if (!spblk) {
-        kpanic("Failed to mount /tmp");
+    klogf(Log_info, "vfs", "setup ext2 file system");
+    memcpy(fst[EXT2_FS].fs_name, "ext2", 4);
+    fst[EXT2_FS].fs_mnt     = (fs_mnt_t*)&ext2_mount;
+    fst[EXT2_FS].fs_lookup  = (fs_lookup_t*)&ext2_lookup;
+    fst[EXT2_FS].fs_stat    = (fs_stat_t*)&ext2_stat;
+    fst[EXT2_FS].fs_read    = (fs_rdwr_t*)&ext2_read;
+    fst[EXT2_FS].fs_write   = (fs_rdwr_t*)&ext2_write;
+    fst[EXT2_FS].fs_readdir = (fs_readdir_t*)&ext2_readdir;
+
+
+    /* if (!fst[DUMMY_FS].fs_mnt(0, &devices[0].dev_info)) { */
+    /*     kpanic("Failed to mount /tmp"); */
+    /* } */
+
+    /* memcpy(devices[0].dev_mnt, "/tmp", 6); */
+    /* devices[0].dev_fs = DUMMY_FS; */
+
+    /* klogf(Log_info, "vfs", "/tmp sucessfully mounted"); */
+
+    /* memcpy(devices[1].dev_mnt, "/proc", 6); */
+    /* devices[1].dev_fs = PROC_FS; */
+    /* klogf(Log_info, "vfs", "/proc sucessfully mounted"); */
+
+    memcpy(devices[2].dev_mnt, "/home", 6);
+    devices[2].dev_fs = EXT2_FS;
+    if (!fst[EXT2_FS].fs_mnt(home_partition, &devices[2].dev_info)) {
+        kpanic("Failed to mount /home");
     }
-
-    memcpy(devices[0].dev_mnt, "/tmp", 6);
-    devices[0].dev_fs = DUMMY_FS;
-    devices[0].dev_spblk = spblk;
-
-    klogf(Log_info, "vfs", "/tmp sucessfully mounted");
-
-    memcpy(devices[1].dev_mnt, "/proc", 6);
-    devices[1].dev_fs = PROC_FS;
-    devices[1].dev_spblk = 0;
-    klogf(Log_info, "vfs", "/proc sucessfully mounted");
+    klogf(Log_info, "vfs", "/home sucessfully mounted");
 }
 
 static inline struct device *find_device(const char *fname) {
@@ -71,6 +87,32 @@ static inline struct device *find_device(const char *fname) {
     return len > 0 ? devices + mnt : 0;
 }
 
+static int vfs_lookup(struct mount_info *info, struct fs *fs,
+                      const char *full_name, struct stat *st) {
+    char name[256] = { 0 };
+    char *start, *end;
+
+    if (!full_name) return 0;
+    start = (char*)(*full_name == '/' ? full_name + 1 : full_name);
+    end = index(start, '/');
+
+    uint32_t ino = info->root_ino;
+
+    while (*start) {
+        memcpy(name, start, end - start);
+        name[end - start + 1] = 0;
+
+        if (!(ino = fs->fs_lookup(name, ino, info)))
+            return 0;
+
+        if (!*end || !*(end+1)) break;
+        start = end+1;
+        end = index(start, '/');
+    }
+
+    return fs->fs_stat(ino, st, info);
+}
+
 vfile_t *vfs_load(const char *filename, uint32_t create) {
     struct device *dev = find_device(filename);
     if (!dev) {
@@ -84,7 +126,7 @@ vfile_t *vfs_load(const char *filename, uint32_t create) {
     struct fs *fs = &fst[dev->dev_fs];
     struct stat st;
     char *fname = (char*)(filename + strlen(dev->dev_mnt));
-    int rc = fs->fs_load(dev->dev_spblk, fname, &st, &fname);
+    int rc = vfs_lookup(&dev->dev_info, fs, fname, &st);
 
     if (rc < 0) {
         if (!create || *index(fname, '/')) {
@@ -92,15 +134,8 @@ vfile_t *vfs_load(const char *filename, uint32_t create) {
             return 0;
         }
 
-        // TODO : fill stat
-        rc = fs->fs_create(dev->dev_spblk, st.st_ino, fname);
-        if (rc < 0) {
-            return 0;
-        }
-
-        st.st_ino = rc;
-
-        klogf(Log_info, "vfs", "create file %s inode %d", filename, rc);
+        // TODO : create
+        klogf(Log_error, "vfs", "create not implemeted yet");
     }
 
     size_t free = 0;
@@ -122,22 +157,36 @@ vfile_t *vfs_load(const char *filename, uint32_t create) {
     memcpy(&state.st_files[free].vf_stat, &st, sizeof(struct stat));
     state.st_files[free].vf_stat.st_dev = dev->dev_id;
     state.st_files[free].vf_cnt = 0;
+    state.st_files[free].vf_pos = 0;
     return state.st_files + free;
-}
-
-int vfs_seek(vfile_t *vfile, off_t pos) {
-    struct device *dev = devices + vfile->vf_stat.st_dev;
-    return fst[dev->dev_fs].fs_seek(dev->dev_spblk, vfile->vf_stat.st_ino, pos);
 }
 
 int vfs_read(vfile_t *vfile, void *buf, size_t len) {
     struct device *dev = devices + vfile->vf_stat.st_dev;
-    return fst[dev->dev_fs].fs_read(dev->dev_spblk, vfile->vf_stat.st_ino,
-                                   buf, len);
+    int32_t rc = fst[dev->dev_fs].fs_read(vfile->vf_stat.st_ino,
+                                         buf, vfile->vf_pos,
+                                         len, &dev->dev_info);
+    if (rc < 0) {
+        klogf(Log_error, "vfs", "error %d on read", rc);
+        return rc;
+    }
+
+    vfile->vf_pos += rc;
+    return rc;
 }
 
 int vfs_write(vfile_t *vfile, void *buf, size_t len) {
     struct device *dev = devices + vfile->vf_stat.st_dev;
-    return fst[dev->dev_fs].fs_write(dev->dev_spblk, vfile->vf_stat.st_ino,
-                                    buf, len);
+    int32_t rc = fst[dev->dev_fs].fs_write(vfile->vf_stat.st_ino,
+                                          buf, vfile->vf_pos,
+                                          len, &dev->dev_info);
+    if (rc < 0) return rc;
+    vfile->vf_pos += rc;
+    return rc;
+}
+
+int vfs_seek(vfile_t *vfile, off_t pos) {
+    // TODO : add checks regarding file size
+    vfile->vf_pos = pos;
+    return 0;
 }

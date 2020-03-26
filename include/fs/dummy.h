@@ -34,16 +34,17 @@ struct super_block {
     uint8_t  padding[sizeof(struct block) - 4];
 } __attribute__((packed));
 
-typedef struct block block_t;
+typedef struct block dummy_block_t;
 
-void *dummy_mount();
+int dummy_mount(void *, struct mount_info*);
 
-int dummy_load(void *super, const char *fname, struct stat *st, char **end);
-int dummy_create(void *super, ino_t parent, char *fname);
+int dummy_load(struct mount_info*,
+               const char *fname, struct stat *st, char **end);
+int dummy_create(struct mount_info*, ino_t parent, char *fname);
 
-int dummy_seek(void *super, ino_t ino, off_t pos);
-int dummy_read(void *super, ino_t ino, void *buf, size_t len);
-int dummy_write(void *super, ino_t ino, void *buf, size_t len);
+int dummy_seek(struct mount_info*, ino_t ino, off_t pos);
+int dummy_read(struct mount_info*, ino_t ino, void *buf, size_t len);
+int dummy_write(struct mount_info*, ino_t ino, void *buf, size_t len);
 struct dirent *dummy_readdir(struct dirent*);
 
 #endif

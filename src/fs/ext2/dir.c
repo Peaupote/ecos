@@ -2,8 +2,14 @@
 #include <fs/ext2.h>
 #include <libc/string.h>
 
+#if defined(__is_test)
 #include <stdio.h>
 #include <string.h>
+#endif
+
+#if defined(__is_kernel)
+#include <kernel/kutil.h>
+#endif
 
 struct ext2_dir_entry *
 ext2_iter_dir(struct ext2_inode *inode,
@@ -20,7 +26,9 @@ ext2_iter_dir(struct ext2_inode *inode,
         if (len_in_block == info->block_size) {
             len_in_block = 0;
             dir = ext2_get_inode_block(++nbblk, inode, info);
+#if defined(__is_test)
             printf("switch block\n");
+#endif
         } else dir = ext2_readdir(dir);
     start:
 
@@ -35,13 +43,13 @@ ext2_iter_dir(struct ext2_inode *inode,
 }
 
 
-static char *lookup_name;
+static const char *lookup_name;
 static int cmp_dir_name(struct ext2_dir_entry* dir) {
     if (!strncmp(dir->d_name, lookup_name, 255)) return -1;
     return 0;
 }
 
-uint32_t ext2_lookup_dir(struct ext2_inode *inode, char *fname,
+uint32_t ext2_lookup_dir(struct ext2_inode *inode, const char *fname,
                          struct ext2_mount_info *info) {
     lookup_name = fname;
     struct ext2_dir_entry *entry = ext2_iter_dir(inode, cmp_dir_name,
@@ -93,8 +101,10 @@ struct ext2_dir_entry * ext2_mkdir(uint32_t inode, char *dirname,
     struct ext2_group_desc *group = info->bg + g;
     group->g_dir_count++;
 
+#if defined(__is_test)
     printf("%d (%d) %*s\n", dir->d_ino, dir->d_rec_len,
            dir->d_name_len, dir->d_name);
+#endif
 
     return dir;
 }

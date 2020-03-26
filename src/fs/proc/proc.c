@@ -14,12 +14,13 @@ static int atoi(const char *s, size_t len) {
     return res;
 }
 
-void *proc_mount() {
+int proc_mount(void *partition __attribute__((unused)),
+               struct mount_info *info __attribute__((unused))) {
     // nothing to do because we access directly to kernel data
-    return 0;
+    return 1;
 }
 
-int proc_load(void *super __attribute__((unused)),
+int proc_load(struct mount_info *info __attribute__((unused)),
               const char *fname,
               struct stat *st, char **end) {
     st->st_ino = 0;
@@ -67,18 +68,18 @@ success:
 }
 
 // can't create file in this filesystem
-int proc_create(void* super __attribute__((unused)),
+int proc_create(struct mount_info *info __attribute__((unused)),
                 ino_t ino __attribute__((unused)),
                 char *fname __attribute__((unused))) { return -1; }
 
 // TODO
-int proc_seek(void* super __attribute__((unused)),
+int proc_seek(struct mount_info *info __attribute__((unused)),
               ino_t ino __attribute__((unused)),
               off_t pos __attribute__((unused))) { return 0; }
 
 #define min(a, b) (a < b ? a : b)
 
-int proc_read(void* super __attribute__((unused)),
+int proc_read(struct mount_info *info __attribute__((unused)),
               ino_t ino, void *buf, size_t len) {
     if (ino == 0) return -1;
 
@@ -101,7 +102,7 @@ int proc_read(void* super __attribute__((unused)),
 }
 
 // not allowed to write
-int proc_write(void* super __attribute__((unused)),
+int proc_write(struct mount_info *info __attribute__((unused)),
                ino_t ino __attribute__((unused)),
                void *buf __attribute__((unused)),
                size_t len __attribute__((unused))) { return -1; }

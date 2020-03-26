@@ -272,11 +272,14 @@ int read(int fd, uint8_t *d, size_t len) {
 
     vfile_t *vfile = chann->chann_vfile;
 
+    int rc;
     switch (chann->chann_mode) {
     case READ:
     case RDWR:
         vfs_seek(vfile, chann->chann_pos);
-        return vfs_read(vfile, d, len);
+        rc = vfs_read(vfile, d, len);
+        chann->chann_pos += rc;
+        return rc;
 
     case STREAM_IN:
         kAssert(false); // TODO
