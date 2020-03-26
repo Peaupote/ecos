@@ -10,3 +10,4 @@ isodir
 *.tst
 *.img
 *.a
+tests/ext2/home

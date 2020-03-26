@@ -156,6 +156,7 @@ void init() {
 
 
 void schedule_proc() {
+    kprintf("sched\n");
     if (state.st_waiting_ps > 0) {
         // pick a new process to run
         pid_t pid = pop_ps();
@@ -163,7 +164,7 @@ void schedule_proc() {
 
         klogf(Log_info, "sched",
               "nb waiting %d run proc %d :\n"
-			  "   rip %p, rsp %p",
+              "   rip %p, rsp %p",
               state.st_waiting_ps + 1, pid,
               p->p_reg.rip,
               p->p_reg.rsp);
@@ -171,13 +172,14 @@ void schedule_proc() {
         iret_to_userspace(SEG_SEL(GDT_RING3_CODE, 3));
     }
     // no process to take hand
-	klogf(Log_info, "sched", "halt");
-	set_interrupt_flag();
-	while(1) halt();
+    klogf(Log_info, "sched", "halt");
+    set_interrupt_flag();
+    while(1) halt();
 }
+
 pid_t schedule_proc_ev() {
-	kAssert(!push_ps(state.st_curr_pid));
-	return pop_ps();
+    kAssert(!push_ps(state.st_curr_pid));
+    return pop_ps();
 }
 
 proc_t *switch_proc(pid_t pid) {
@@ -190,17 +192,17 @@ proc_t *switch_proc(pid_t pid) {
 }
 
 static inline uint8_t proc_ldr_alloc_pages(uint_ptr begin, uint_ptr end) {
-	return kmem_paging_alloc_rng(begin, end,
-				PAGING_FLAG_U | PAGING_FLAG_W,
-				PAGING_FLAG_U | PAGING_FLAG_W);
+    return kmem_paging_alloc_rng(begin, end,
+                PAGING_FLAG_U | PAGING_FLAG_W,
+                PAGING_FLAG_U | PAGING_FLAG_W);
 }
 
 void proc_ldr_fill0(void* err_pt, Elf64_Addr dst, uint64_t sz) {
     uint8_t err = proc_ldr_alloc_pages(dst, dst + sz);
     if (err) {
-		*((uint8_t*)err_pt) = err;
-		return;
-	}
+        *((uint8_t*)err_pt) = err;
+        return;
+    }
     //TODO: use quad
     for (size_t i=0; i<sz; ++i)
         ((uint8_t*) dst)[i] = 0;
@@ -209,9 +211,9 @@ void proc_ldr_fill0(void* err_pt, Elf64_Addr dst, uint64_t sz) {
 void proc_ldr_copy(void* err_pt, Elf64_Addr dst, void* src, uint64_t sz) {
     uint8_t err = proc_ldr_alloc_pages(dst, dst + sz);
     if (err) {
-		*((uint8_t*)err_pt) = err;
-		return;
-	}
+        *((uint8_t*)err_pt) = err;
+        return;
+    }
     for (size_t i=0; i<sz; ++i)
         ((uint8_t*) dst)[i] = ((uint8_t*) src)[i];
 }
@@ -233,9 +235,9 @@ uint8_t proc_create_userspace(void* prg_elf, proc_t *proc) {
 
     //On est désormais dans le paging du processus
     err = 0;
-	uint64_t* stack_pd = kmem_acc_pts_entry(paging_add_lvl(pgg_pd, USER_STACK_PD),
-							2, PAGING_FLAG_U | PAGING_FLAG_W);
-	*stack_pd = SPAGING_FLAG_P | PAGING_FLAG_W;
+    uint64_t* stack_pd = kmem_acc_pts_entry(paging_add_lvl(pgg_pd, USER_STACK_PD),
+                            2, PAGING_FLAG_U | PAGING_FLAG_W);
+    *stack_pd = SPAGING_FLAG_P | PAGING_FLAG_W;
     proc->p_reg.rip = elf_load(proc_ldr, &err, prg_elf);
     if (err) return 2;
 
@@ -246,11 +248,11 @@ uint8_t proc_create_userspace(void* prg_elf, proc_t *proc) {
 }
 
 void proc_ps() {
-	for (pid_t pid = 1; pid < NPROC; pid++) {
-		proc_t* p = state.st_proc + pid;
-		if (p->p_stat != FREE)
-			kprintf("%cpid=%d st=%c ppid=%d\n",
-					pid==state.st_curr_pid ? '*' : ' ',
-					pid, proc_state_char[p->p_stat], p->p_ppid);
-	}
+    for (pid_t pid = 1; pid < NPROC; pid++) {
+        proc_t* p = state.st_proc + pid;
+        if (p->p_stat != FREE)
+            kprintf("%cpid=%d st=%c ppid=%d\n",
+                    pid==state.st_curr_pid ? '*' : ' ',
+                    pid, proc_state_char[p->p_stat], p->p_ppid);
+    }
 }

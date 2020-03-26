@@ -34,8 +34,8 @@ uint64_t sleep(uint64_t time) {
     klogf(Log_info, "syscall", "process %d sleep for %d sec", p->p_pid, time);
     schedule_proc(1);
 
-	kAssert(false);
-	return 0;
+    kAssert(false);
+    return 0;
 }
 
 void lookup_end_sleep(void) {
