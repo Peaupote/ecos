@@ -10,7 +10,7 @@ INCLUDE ../boot/boot_data.ld
  * flag -mcmodel=large de gcc*/
 KVA = 0x80 << 39;
 
-stack_top  = KVA + kba_stk_tp;
+kernel_stack_top = KVA + kba_stk_tp;
 gd_table   = KVA + kba_gdt;
 gdt_desc   = KVA + kba_gdtd;
 bgn_kernel = KVA + kba_bgn_krn;

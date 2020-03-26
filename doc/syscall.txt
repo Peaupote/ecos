@@ -10,8 +10,9 @@ Liste des appels systèmes (implémentés ou à implémenter) avec le type des a
 [x] uint32_t sleep(uint32_t time);
 [x] pid_t    fork();
 [x] void     exit(int status);
-[x] pid_t    wait();
-[x] pid_t    waitpid(pid_t pid);
+[x] pid_t    wait(int* status);
+		renvoit le status du fils ssi le pointeur est non nul
+[x] pid_t    waitpid(int* status, pid_t pid);
 	    si pid == -1:
 		    attend qu'un enfant quelconque termine
 	    sinon
@@ -27,9 +28,10 @@ Liste des appels systèmes (implémentés ou à implémenter) avec le type des a
 [ ] int      lseek(int offset);
 [ ] int      execve(char *fname, char **argv, char **env);
 
+Appels systèmes accessibles avec le niveau de privilège ring <= 1
+
 === int 0x7f ===
-Appels systèmes accessibles avec le niveau de privilège ring 1
- -  void     prires()
-         passe en ring 3
- -  void     proc_idle()
-         utile seulement pour IDLE
+ -  void     prires(uint16_t new_ring)
+         passe en ring new_ring
+=== int 0x7e ===
+appelle la fonction dont l'adresse est passée dans %rax

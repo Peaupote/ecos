@@ -1,5 +1,6 @@
 #define ASM_FILE
 #include <kernel/sys.h>
+#include <kernel/int.h>
 
     .section .data
 pid_cp1:
@@ -10,6 +11,8 @@ string:
     .skip 256
 text:
     .string "Hello world !\n"
+execve_fail:
+	.string "execve FAIL\n"
 env0:
 	.string "all=42"
 exec_fname:
@@ -25,12 +28,17 @@ envs:
     .section .text
     .global _start
 
-_start:
+_start:// Ring 1
     movq    $SYS_FORK, %rax
     int     $0x80
 
     cmp     $0, %rax
     jne     1f
+
+	// passage au ring 3
+	movq    $3,             %rdi
+	movq    $SYS_R1_PRIRES, %rax
+	int     $SYSCALL_R1_VEC
 
     movq    $fname, %rdi
     movq    $3, %rsi // chann mode WRITE
@@ -82,6 +90,11 @@ _start:
     int     $0x80
     testq   %rax, %rax
     jne     2f
+	
+	// passage au ring 3
+	movq    $3,             %rdi
+	movq    $SYS_R1_PRIRES, %rax
+	int     $SYSCALL_R1_VEC
 
 	movq    $exec_fname, %rdi //Non utilisé pour l'instant
 	movq    $args,       %rsi
@@ -89,13 +102,25 @@ _start:
 	movq    $SYS_EXECVE, %rax
 	int     $0x80
 
+    movq    $1,    %rdi
+    movq    $execve_fail, %rsi
+    movq    $12, %rdx
+    movq    $SYS_WRITE, %rax
+    int     $0x80
+
+	movq    $-1, %rdi
+	movq    $SYS_EXIT, %rax
+	int     $0x80
+
 2:
 	movq    (pid_cp1),    %rdi
+	movq    $0,           %rsi
     movq    $SYS_WAITPID, %rax
     int     $0x80
 4:
 	// init wait for all its childrens
-    movq    $SYS_WAIT, %rax
+	movq    $0,           %rsi
+    movq    $SYS_WAIT,    %rax
     int     $0x80
 
     jmp     4b

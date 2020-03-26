@@ -20,6 +20,7 @@
 
 extern void irq_sys(void);
 extern void irq_sys_ring1(void);
+extern void irq_sys_ring1_call(void);
 extern void irq_keyboard(void);
 extern void irq_pit(void);
 
@@ -167,6 +168,8 @@ void idt_init(void) {
     idt_int_asgn(SYSCALL_VEC, (uint64_t)irq_sys,
             GATE_INT | IDT_ATTR_DPL(3), 0);
     idt_int_asgn(SYSCALL_R1_VEC, (uint64_t)irq_sys_ring1,
+            GATE_INT | IDT_ATTR_DPL(1), 0);
+    idt_int_asgn(SYSCALL_R1_CALL_VEC, (uint64_t)irq_sys_ring1_call,
             GATE_INT | IDT_ATTR_DPL(1), 0);
     idt_int_asgn(PIT_VEC,      (uint64_t)irq_pit,      GATE_INT, 0);
     idt_int_asgn(KEYBOARD_VEC, (uint64_t)irq_keyboard, GATE_INT, 0);

@@ -14,7 +14,7 @@ kernel_entry:
 kernel_entry_vrip:
 
     //On charge la nouvelle adresse virtuelle de la pile
-    movabsq $stack_top, %rsp
+    movabsq $kernel_stack_top, %rsp
 
     call kernel_main
 

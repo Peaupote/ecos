@@ -1,13 +1,13 @@
+#include <kernel/proc.h>
+
 #include <stddef.h>
 #include <stdint.h>
 
 #include <kernel/int.h>
 #include <kernel/sys.h>
-#include <kernel/proc.h>
 
 #include <util/elf64.h>
 #include <kernel/memory/kmem.h>
-#include <kernel/memory/shared_pages.h>
 #include <kernel/int.h>
 #include <kernel/tty.h>
 #include <kernel/kutil.h>
@@ -34,21 +34,25 @@ void init() {
 
 	// processus 0: p_idle
     proc_t *p_idle = &state.st_proc[PID_IDLE];
-    p_idle->p_ppid = 0;
+    p_idle->p_ppid = PID_IDLE;
+	p_idle->p_prsb = p_idle->p_nxsb = PID_NONE;
+	p_idle->p_fchd = PID_IDLE;
 	p_idle->p_nchd = 1;
     p_idle->p_stat = RUN;
-	p_idle->p_rng1 = true;
+	p_idle->p_ring = 0;
 	p_idle->p_prio = 0; //priorité minimale
 	p_idle->p_pml4 = (phy_addr)NULL;
-	p_idle->p_reg.rsp = (uint_ptr)NULL; //pas de pile
+	p_idle->p_reg.rsp = (uint_ptr)kernel_stack_top;
 	p_idle->p_reg.rip = (uint_ptr)&proc_idle_entry;
 
     // processus 1: init
     proc_t *p_init = &state.st_proc[PID_INIT];
-    p_init->p_ppid = 1;
+    p_init->p_ppid = PID_INIT;
+	p_init->p_prsb = p_init->p_nxsb = PID_NONE;
+	p_init->p_fchd = PID_INIT;
 	p_init->p_nchd = 1;
     p_init->p_stat = RUN;
-	p_init->p_rng1 = false; //TODO
+	p_init->p_ring = 1;
 	p_init->p_prio = NB_PRIORITY_LVL - 1; //priorité maximale
 
     // set file descriptors
@@ -78,15 +82,17 @@ void init() {
     }
 
     // set all remaining slots to free processus
+	state.st_free_proc = 2;
     for (pid_t pid = 2; pid < NPROC; pid++) {
         state.st_proc[pid].p_stat = FREE;
-        state.st_proc[pid].p_ppid = 0;
+		state.st_proc[pid].p_nxfr = pid + 1;
 	}
+	state.st_proc[NPROC - 1].p_nxfr = PID_NONE;
 
     vfs_init();
 
 	sched_add_proc(PID_IDLE);
-    proc_create_userspace(proc_init, p_init);
+    proc_create_userspace(proc_init, p_init); //TODO in kernel
 
     state.st_curr_pid = 1;
     st_curr_reg       = &p_init->p_reg;
@@ -214,14 +220,12 @@ uint8_t proc_create_userspace(void* prg_elf, proc_t *proc) {
     set_interrupt_flag();
 
     //On est désormais dans le paging du processus
-    err = 0;
-	uint64_t* stack_pd = kmem_acc_pts_entry(paging_add_lvl(pgg_pd, USER_STACK_PD),
-							2, PAGING_FLAG_U | PAGING_FLAG_W);
-	*stack_pd = SPAGING_FLAG_P | PAGING_FLAG_W;
+    proc->p_reg.rsp = make_proc_stack();
+    
+	err = 0;
     proc->p_reg.rip = elf_load(proc_ldr, &err, prg_elf);
     if (err) return 2;
 
-    proc->p_reg.rsp = paging_add_lvl(pgg_pd, USER_STACK_PD + 1);
     proc->p_pml4    = pml4_loc;
 
     return 0;

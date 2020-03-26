@@ -17,15 +17,6 @@
 // careful ! it's a modulo implemented with a bitwise &
 #define SCHED_FREQ 0x3
 
-/**
- * TODO: rm priorities (the less the better)
- */
-#define PFREE  100
-#define PSLEEP 30
-#define PWAIT  10
-#define PRUN   0
-#define PZOMB  -10
-
 // Nombre de priorités (nice) dans le scheduler
 // Au sein du kernel la meilleure priorité est NB_PRIORITY_LVL-1, la pire 0
 // NB_PRIORITY_LVL <= 64

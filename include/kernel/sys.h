@@ -20,7 +20,6 @@
 #define SYS_EXECVE  14
 
 #define SYS_R1_PRIRES 0
-#define SYS_R1_IDLE   1
 
 #ifndef ASM_FILE
 
@@ -29,12 +28,12 @@
 uint64_t sleep(uint64_t);
 void     lookup_end_sleep(void);
 
-pid_t    wait(void);
+pid_t    wait(int* status);
+pid_t    waitpid(int* status, pid_t);
 pid_t    fork(void);
 void     kexit(int status);
 pid_t    getpid(void);
 pid_t    getppid(void);
-pid_t    waitpid(pid_t);
 
 int      open(const char* fname, enum chann_mode mode);
 int      close(int fd);
@@ -44,11 +43,12 @@ int      write(int fd, uint8_t *s, size_t len);
 int      read(int fd, uint8_t *buf, size_t len);
 off_t    lseek(int fd, off_t offset);
 
-int      execve(const char *fname, const char **argv, const char **env);
+//int    execve(const char *fname, const char **argv, const char **env);
+int      execve(reg_t fname, reg_t argv, reg_t env);
 
 uint64_t invalid_syscall();
 
-void     prires_proc_struct(void);
+void     prires_proc_struct(uint16_t new_ring);
 
 #endif
 

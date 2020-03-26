@@ -7,10 +7,8 @@
 
 struct TSS tss = {0};
 
-extern uint8_t stack_top[];
-
 void tss_init() {
-    tss.rsp[0] = stack_top;
+    tss.rsp[0] = kernel_stack_top;
     asm volatile ("ltr %%ax"
             :: "rax"(SEG_SEL(offsetof(struct GDT, tss_low), 0))
              : "memory");

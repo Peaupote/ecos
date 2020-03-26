@@ -2,10 +2,13 @@
 #define _H_PROC
 
 #include <stddef.h>
+
+#include "kutil.h"
 #include "gdt.h"
 #include "param.h"
 #include "file.h"
 #include "memory/kmem.h"
+#include "memory/shared_pages.h"
 
 //Emplacement de la pile des processus
 #define USER_STACK_PD 0x7FF
@@ -37,8 +40,9 @@ extern char proc_state_char[5];
 #define RIP 8
 #define RSP 16
 
+typedef uint64_t reg_t;
 struct reg {
-    uint64_t rflags, rip, rsp,
+    reg_t rflags, rip, rsp,
         rax, rbx, rcx, rdx, rsi,
         rdi, rbp, r8, r9, r10, r11,
         r12, r13, r14, r15;
@@ -46,12 +50,18 @@ struct reg {
 
 typedef struct proc {
     pid_t            p_ppid;     // parent pid
-	pid_t            p_nxpf;     // next in priority file,
-								 //   undefined if not in a file
+	union {
+		pid_t        p_nxpf;     // if in a file: next in priority file
+		pid_t        p_nxfr;     // if FREE: next free
+		pid_t        p_nxzb;     // if ZOMB: next ZOMB sibling 
+	};
+	pid_t            p_prsb;     // prev sibling
+	pid_t            p_nxsb;     // next sibling
+	pid_t        	 p_fchd;     // first child
     uint64_t         p_nchd;     // number of child processus
 	//TODO: bit field
     enum proc_state  p_stat;     // current status of the processus
-	bool             p_rng1;     // run in ring 1
+	uint8_t          p_ring;     // ring level (2 bits)
     priority_t       p_prio;     // priority of the process
     int              p_fds[NFD]; // table of file descriptors
     phy_addr         p_pml4;     // paging
@@ -103,6 +113,7 @@ struct scheduler {
 struct {
     pid_t       st_curr_pid;          // pid of current running process
 	struct scheduler st_sched;
+	pid_t       st_free_proc;         // head of the free linked list
     proc_t      st_proc[NPROC];       // table containing all processes
     chann_t     st_chann[NCHAN];      // table containing all channels
     vfile_t     st_files[NFILE];      // table containing all opened files
@@ -138,34 +149,42 @@ extern void iret_to_userspace(uint64_t cs_ze);
 extern void eoi_iret_to_userspace(uint64_t cs_ze);
 
 static inline void iret_to_proc(const proc_t* p) {
-	iret_to_userspace(p->p_rng1
-				? SEG_SEL(GDT_RING1_CODE, 1)
-				: SEG_SEL(GDT_RING3_CODE, 3));
+	iret_to_userspace(gdt_ring_lvl(p->p_ring));
 }
 static inline void eoi_iret_to_proc(const proc_t* p) {
-	eoi_iret_to_userspace(p->p_rng1
-				? SEG_SEL(GDT_RING1_CODE, 1)
-				: SEG_SEL(GDT_RING3_CODE, 3));
+	eoi_iret_to_userspace(gdt_ring_lvl(p->p_ring));
 }
 
 proc_t *switch_proc(pid_t pid);
 
 void proc_ps();
 
-static inline pid_t find_new_pid(pid_t search_p) {
-    // TODO : find more efficient way to choose new pid
-    pid_t pid;
-    for (pid = search_p; pid < NPROC; pid++) {
-        if (state.st_proc[pid].p_stat == FREE)
-            return pid;
-    }
+static inline pid_t find_new_pid() {
+	pid_t pid = state.st_free_proc;
+	if (~pid)
+		state.st_free_proc = state.st_proc[pid].p_nxfr;
+	else
+		klogf(Log_error, "proc", "can't find a new pid");
+	return pid;
+}
 
-    for (pid = 2; pid < search_p; pid++) {
-        if (state.st_proc[pid].p_stat == FREE)
-            return pid;
-    }
+static inline void free_pid(pid_t p) {
+	state.st_proc[p].p_nxfr = state.st_free_proc;
+	state.st_free_proc = p;
+	state.st_proc[p].p_stat = FREE;
+}
 
-    return search_p;
+static inline void proc_set_curr_pid(pid_t pid) {
+    state.st_curr_pid = pid;
+    st_curr_reg = &state.st_proc[pid].p_reg;
+}
+
+
+static inline uintptr_t make_proc_stack() {
+	*kmem_acc_pts_entry(paging_add_lvl(pgg_pd, USER_STACK_PD),
+							2, PAGING_FLAG_U | PAGING_FLAG_W)
+		= SPAGING_FLAG_P | PAGING_FLAG_W;
+	return paging_add_lvl(pgg_pd, USER_STACK_PD + 1);
 }
 
 #endif

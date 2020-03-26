@@ -1,9 +1,10 @@
+#include <kernel/sys.h>
+
 #include <stdint.h>
 
 #include <kernel/int.h>
 #include <kernel/proc.h>
 #include <kernel/kutil.h>
-#include <kernel/sys.h>
 #include <kernel/memory/shared_pages.h>
 #include <util/elf64.h>
 #include <util/misc.h>
@@ -14,17 +15,83 @@
  */
 
 void kexit(int status) {
-    proc_t  *p = &state.st_proc[state.st_curr_pid];
+    proc_t  *p = state.st_proc + state.st_curr_pid;
 	pid_t ppid = p->p_ppid;
-    proc_t *pp = &state.st_proc[ppid];
+    proc_t *pp = state.st_proc + ppid;
 
     klogf(Log_info, "syscall", "kill pid %d with status %d ppid=%d(%c)",
 		  state.st_curr_pid, status, ppid,
 		  proc_state_char[pp->p_stat]);
 
-    klogf(Log_verb, "mem", "pre_free: %lld pages disponibles",
-            (long long int)kmem_nb_page_free());
-    kmem_free_paging(p->p_pml4, kernel_pml4);
+	if (~p->p_fchd) {
+		proc_t* fcp = state.st_proc + p->p_fchd;
+		proc_t*  ip = state.st_proc + PID_INIT;
+
+		if (fcp->p_stat == ZOMB) {
+
+			pid_t zcpid = p->p_fchd;
+			proc_t* zcp = fcp;
+			goto loop_enter_z;
+			while (~zcp->p_nxzb) {
+				zcpid = zcp->p_nxzb;
+				zcp   = state.st_proc + zcpid;
+			loop_enter_z:
+				zcp->p_ppid = PID_INIT;
+			}
+			pid_t cpid = p->p_fchd;
+			proc_t* cp = fcp;
+			while (~cp->p_nxsb) {
+				cpid = cp->p_nxsb;
+				cp   = state.st_proc + cpid;
+				cp->p_ppid = PID_INIT;
+			}
+
+			if (~ip->p_fchd) {
+				proc_t* ifcp = state.st_proc + ip->p_fchd;
+				if (ifcp->p_stat == ZOMB) {
+					cp ->p_nxsb = ifcp->p_nxsb;
+					if (~ifcp->p_nxsb)
+						state.st_proc[ifcp->p_nxsb].p_prsb = cpid;
+					zcp->p_nxzb = ifcp->p_nxzb;
+					if (~ifcp->p_nxzb)
+						state.st_proc[ifcp->p_nxzb].p_prsb = zcpid;
+				} else {
+					cp->p_nxsb   = ip->p_fchd;
+					ifcp->p_prsb = cpid;
+				}
+			}
+			ip->p_fchd = p->p_fchd;
+
+		} else {
+
+			pid_t cpid = p->p_fchd;
+			proc_t* cp = fcp;
+			goto loop_enter_l;
+			while (~cp->p_nxsb) {
+				cpid = cp->p_nxsb;
+				cp   = state.st_proc + cpid;
+			loop_enter_l:
+				cp->p_ppid = PID_INIT;
+			}
+
+			if (~ip->p_fchd) {
+				proc_t* ifcp = state.st_proc + ip->p_fchd;
+				if (ifcp->p_stat == ZOMB) {
+					cp -> p_nxsb = ifcp->p_nxsb;
+					if (~ifcp->p_nxsb)
+						state.st_proc[ifcp->p_nxsb].p_prsb = cpid;
+					ifcp->p_nxsb = p->p_fchd;
+					fcp ->p_prsb = ip->p_fchd;
+				} else {
+					cp->p_nxsb   = ip->p_fchd;
+					ifcp->p_prsb = cpid;
+					ip->p_fchd   = p->p_fchd;
+				}
+			} else
+				ip->p_fchd = p->p_fchd;
+		}
+		ip->p_nchd += p->p_nchd;
+	}
 
     for (pid_t pid = 2; pid < NPROC; pid++) {
         proc_t* cp = &state.st_proc[pid];
@@ -34,25 +101,55 @@ void kexit(int status) {
         }
     }
 
+	if (~p->p_nxsb)
+		state.st_proc[p->p_nxsb].p_prsb = p->p_prsb;
+	
+	if (~p->p_prsb)
+		state.st_proc[p->p_prsb].p_nxsb = p->p_nxsb;
+	else
+		pp->p_fchd = p->p_nxsb;
+
     if (pp->p_stat == WAIT
 		&& (rei_cast(pid_t, pp->p_reg.rax) == PID_NONE
 			|| rei_cast(pid_t, pp->p_reg.rax) == state.st_curr_pid)) {
 		
-		p->p_stat     = FREE;
-		pp->p_stat    = RUN;
-		sched_add_proc(ppid);
-        pp->p_reg.rax = state.st_curr_pid;
-    	pp->p_nchd--;
-        
-		//TODO: status -> switch to parent
+    	kmem_free_paging(p->p_pml4, pp->p_pml4);
 
-		schedule_proc();
-		never_reached
+		free_pid(state.st_curr_pid);
+    	pp->p_nchd--;
+        pp->p_reg.rax = state.st_curr_pid;
+		pp->p_stat    = RUN;
+		
+		proc_set_curr_pid(ppid);
+		int* rt_st = rei_cast(int*, pp->p_reg.rsi);
+		if (rt_st)
+			*rt_st = status;
+		
+		iret_to_proc(pp);
     } else {
-		p->p_stat = ZOMB;
+		// on réajoute le processus comme premier enfant
+		p->p_prsb = PID_NONE;
+		if (~pp->p_fchd) {
+			proc_t* fc = state.st_proc + pp->p_fchd;
+			fc->p_prsb = state.st_curr_pid;
+			if (fc->p_stat == ZOMB) {
+				if (~fc->p_nxsb)
+					state.st_proc[fc->p_nxsb].p_prsb = state.st_curr_pid;
+				p->p_nxsb = fc->p_nxsb;
+				p->p_nxzb = pp->p_fchd;
+			} else {
+				p->p_nxzb = PID_NONE;
+				p->p_nxsb = pp->p_fchd;
+			}
+		} else
+			p->p_nxsb = p->p_nxzb = PID_NONE;
+		pp->p_fchd = state.st_curr_pid;
+
+    	kmem_free_paging(p->p_pml4, kernel_pml4);
+		p->p_stat = ZOMB;// statut dans rdi
 		schedule_proc();
-		never_reached
 	}
+	never_reached
 }
 
 pid_t getpid() {
@@ -66,26 +163,47 @@ pid_t getppid() {
     return p->p_ppid;
 }
 
-pid_t wait() { //TODO: statut
+static inline void rem_child_Z0(proc_t* p, proc_t* cp) {
+	if (~cp->p_nxzb) {
+		p->p_fchd = cp->p_nxzb;
+		state.st_proc[cp->p_nxzb].p_prsb = PID_NONE;
+		state.st_proc[cp->p_nxzb].p_nxsb = p->p_nxsb;
+		if (~cp->p_nxsb)
+			state.st_proc[cp->p_nxsb].p_prsb = cp->p_nxzb;
+	} else {
+		p->p_fchd = cp->p_nxsb;
+		if (~cp->p_nxsb)
+			state.st_proc[cp->p_nxsb].p_prsb = PID_NONE;
+	}
+}
+
+pid_t wait(int* rt_st) {
 	klogf(Log_verb, "syscall", "wait");
     proc_t *p = &state.st_proc[state.st_curr_pid];
-    if (p->p_nchd > 0) {
-		
-		for (pid_t pid = 2; pid < NPROC; pid++) {
-			proc_t* cp = state.st_proc + pid;
-			if (cp->p_ppid == state.st_curr_pid 
-					&& cp->p_stat == ZOMB) {
-				cp->p_stat = FREE;
-				return pid;
-			}
+    if (~p->p_fchd) {
+		// Si il y a un zombie alors le premier enfant en est un
+		proc_t* cp = state.st_proc + p->p_fchd;
+		if (cp->p_stat == ZOMB) {
+
+			pid_t cpid = p->p_fchd;
+			if (rt_st)
+				*rt_st = cp->p_reg.rdi;
+
+			rem_child_Z0(p, cp);
+			
+			--p->p_nchd;
+			free_pid(cpid);
+			return cpid;
+
+		} else {
+			p->p_stat = WAIT;
+			rei_cast(pid_t, p->p_reg.rax) = PID_NONE;
+			klogf(Log_info, "syscall", "process %d wait %d childs",
+					state.st_curr_pid, p->p_nchd);
+			schedule_proc();
+			never_reached return 0;
 		}
 
-        p->p_stat = WAIT;
-		rei_cast(pid_t, p->p_reg.rax) = PID_NONE;
-        klogf(Log_info, "syscall", "process %d wait %d childs",
-				state.st_curr_pid, p->p_nchd);
-        schedule_proc();
-		never_reached return 0;
     } else {
         klogf(Log_verb, "syscall",
               "process %d has no child. dont wait", state.st_curr_pid);
@@ -93,15 +211,29 @@ pid_t wait() { //TODO: statut
     }
 }
 
-pid_t waitpid(pid_t cpid) {
-	if (cpid == PID_NONE) return wait();
+pid_t waitpid(int* rt_st, pid_t cpid) {
+	if (cpid == PID_NONE) return wait(rt_st);
 	
 	pid_t mpid = state.st_curr_pid;
-    proc_t  *p = &state.st_proc[mpid];
-	if (state.st_proc[cpid].p_ppid == mpid) {
+    proc_t  *p = state.st_proc + mpid;
+	proc_t *cp = state.st_proc + cpid;
+	if (cp->p_ppid == mpid) {
 		
-		if (state.st_proc[cpid].p_stat == ZOMB)
+		if (cp->p_stat == ZOMB) {
+
+			if (rt_st) *rt_st = cp->p_reg.rdi;
+			
+			if (~cp->p_prsb) {
+				state.st_proc[cp->p_prsb].p_nxzb = cp->p_nxzb;
+				if (~cp->p_nxzb)
+					state.st_proc[cp->p_nxzb].p_prsb = cp->p_prsb;
+			} else
+				rem_child_Z0(p, cp);
+
+			--p->p_nchd;
+			free_pid(cpid);
 			return cpid;
+		}
 
         p->p_stat = WAIT;
 		rei_cast(pid_t, p->p_reg.rax) = cpid;
@@ -117,25 +249,46 @@ pid_t waitpid(pid_t cpid) {
 }
 
 pid_t fork() {
-    proc_t *fp, *p = &state.st_proc[state.st_curr_pid];
+    proc_t *fp, *pp = state.st_proc + state.st_curr_pid;
 
-    pid_t cpid = find_new_pid(state.st_curr_pid);
+    pid_t fpid = find_new_pid();
     // we didn't find place for a new processus
-    if (cpid == state.st_curr_pid)
-        return -1;
+    if (!~fpid) return -1;
 
-    fp          = &state.st_proc[cpid];
+    fp          = state.st_proc + fpid;
     fp->p_ppid  = state.st_curr_pid;
+
+	if (~pp->p_fchd) {
+		proc_t *fc = state.st_proc + pp->p_fchd;
+		if (fc->p_stat == ZOMB) {
+			fp->p_prsb = pp->p_fchd;
+			fp->p_nxsb = fc->p_nxsb;
+			if (~fc->p_nxsb)
+				state.st_proc[fc->p_nxsb].p_prsb = fpid;
+			fc->p_nxsb = fpid;
+		} else {
+			fc->p_prsb = fpid;
+			fp->p_nxsb = pp->p_fchd;
+			fp->p_prsb = PID_NONE;
+			pp->p_fchd = fpid;
+		}
+	} else {
+		fp->p_nxsb = PID_NONE;
+		fp->p_prsb = PID_NONE;
+		pp->p_fchd = fpid;
+	}
+
+	fp->p_fchd  = PID_NONE;
     fp->p_nchd  = 0;
     fp->p_stat  = RUN;
-	fp->p_rng1  = false;
-    fp->p_prio  = p->p_prio;
+	fp->p_ring  = pp->p_ring;
+    fp->p_prio  = pp->p_prio;
 
-    p->p_nchd++; // one more child
+    pp->p_nchd++; // one more child
 
     // TODO clean
     uint64_t *a = (uint64_t*)&fp->p_reg;
-    uint64_t *b = (uint64_t*)&p->p_reg;
+    uint64_t *b = (uint64_t*)&pp->p_reg;
     for (size_t i = 0; i < 18; i++) a[i] = b[i];
 
     fp->p_pml4 = kmem_alloc_page();
@@ -144,7 +297,7 @@ pid_t fork() {
 
     // copy file descriptors
     for (int i = 0; i < NFD; i++) {
-        cid_t cid = p->p_fds[i];
+        cid_t cid = pp->p_fds[i];
         fp->p_fds[i] = cid;
         if (cid >= 0 && cid < NCHAN &&
             state.st_chann[cid].chann_mode != UNUSED) {
@@ -155,12 +308,12 @@ pid_t fork() {
 
     fp->p_reg.rax = 0;
 
-	sched_add_proc(cpid);
+	sched_add_proc(fpid);
 
     klogf(Log_info, "syscall", "fork %d into %d",
-			state.st_curr_pid, cpid);
+			state.st_curr_pid, fpid);
 
-	return cpid; // On retourne au parent
+	return fpid; // On retourne au parent
 }
 
 int open(const char *fname, enum chann_mode mode) {
@@ -354,6 +507,6 @@ uint64_t invalid_syscall() {
 
 // Appels système de privilège ring 1
 
-void prires_proc_struct(void) {
-	state.st_proc[state.st_curr_pid].p_rng1 = false;
+void prires_proc_struct(uint16_t new_ring) {
+	state.st_proc[state.st_curr_pid].p_ring = rei_cast(uint8_t, new_ring);
 }

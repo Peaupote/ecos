@@ -29,11 +29,11 @@ syscall_tab:
     .quad execve
 syscall_ring1_tab:
 	.quad prires
-	.quad sys_proc_idle
 
     .section .text
 .global irq_sys
 .global irq_sys_ring1
+.global irq_sys_ring1_call
 .global irq_keyboard
 .global irq_pit
 
@@ -43,8 +43,6 @@ syscall_ring1_tab:
 .global pml4_to_cr3
 .global invalide_page
 .global paging_refresh
-
-.global proc_idle_entry
 
 .extern st_curr_reg
 .extern common_hdl
@@ -284,14 +282,18 @@ incorrect_rax:
     call invalid_syscall
     jmp  func_end
 
+irq_sys_ring1_call:
+	callq  *%rax
+	iretq
+
 irq_sys_ring1:
     save_c_reg
 	save_data_segments
-    movw  $SEG_SEL(GDT_RING0_DATA,0), %r10w
+    movw   $SEG_SEL(GDT_RING0_DATA,0), %r10w
     set_data_segments
     
-    movabs $syscall_ring1_tab, %rbx
-    lea    (%rbx, %rax, 8), %rax
+    movabs $syscall_ring1_tab, %r10
+    lea    (%r10,  %rax, 8), %rax
     movq   (%rax), %rax
     jmpq   *%rax
 
@@ -304,23 +306,15 @@ irq_sys_ring1_end:
 // reg save 9 quad
 // ds  save 1 quad
 prires:
-	call prires_proc_struct
-	movq $SEG_SEL(GDT_RING3_DATA, 3),     (%rsp) //ds
-	movq $SEG_SEL(GDT_RING3_DATA, 3), 0x70(%rsp) //ss
-	movq $SEG_SEL(GDT_RING3_CODE, 3), 0x58(%rsp) //cs
-	jmp  irq_sys_ring1_end
-
-sys_proc_idle:
-	movabs $st_curr_reg, %rax
-	movq   (%rax), %rax
-	movabs $proc_idle_syscall, %r8
-	movq   %r8,          0x08(%rax) //reg.rip
-	movq   $SYS_R1_IDLE, 0x18(%rax) //reg.rax
-	sti
-sys_proc_idle_loop:
-	hlt
-	jmp sys_proc_idle_loop
-
+	movq  $(GDT_RING_SZ+1), %r10 //+1 pour le CPL
+	imulw %di,              %r10w
+	addw  $GDT_RING_OFS,    %r10w
+	movq  %r10, 0x58(%rsp) //cs
+	addw  $8,               %r10w
+	movq  %r10,     (%rsp) //ds
+	movq  %r10, 0x70(%rsp) //ss
+	call  prires_proc_struct
+	jmp   irq_sys_ring1_end
 
 irq14://#PF: Page Fault
     save_c_reg_err
@@ -357,8 +351,3 @@ paging_refresh:
 	movq   %cr3, %rax
 	movq   %rax, %cr3
 	ret
-
-proc_idle_entry:
-	movq   $SYS_R1_IDLE, %rax
-proc_idle_syscall:
-	int    $SYSCALL_R1_VEC

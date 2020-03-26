@@ -38,6 +38,6 @@
 #define GDT_FLAG_L (1<<1)
 
 //Segment Selector (Index, Privilege)
-#define SEG_SEL(I, P) (I|P)
+#define SEG_SEL(I, P) ((I)|(P))
 
 #endif

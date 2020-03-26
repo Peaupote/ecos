@@ -8,30 +8,34 @@
 #include <kernel/kutil.h>
 #include <kernel/gdt.h>
 #include <util/misc.h>
+#include <kernel/int.h>
+
+#define AUX_STACK_SIZE 0x1000
 
 //TODO: vrai système de fichier
 extern uint8_t edummy_args[];
 off_t edummy_pos;
-void edummy_open() {
+int edummy_open(
+		const char *fname __attribute__((unused)),
+		enum chann_mode mode __attribute__((unused)) ) {
 	edummy_pos = 0;
+	return 0;
 }
-void edummy_read() {
-    proc_t *p  = state.st_proc + state.st_curr_pid;
-    uint8_t *d = (uint8_t*)p->p_reg.rsi;
-    size_t len = p->p_reg.rdx;
+int edummy_read(int fd __attribute__((unused)), uint8_t *buf, size_t len) {
 	for (off_t i = 0; i < len; ++i)
-		d[i] = edummy_args[edummy_pos + i];
+		buf[i] = edummy_args[edummy_pos + i];
 	edummy_pos  += len;
-	p->p_reg.rax = len;
+	return len;
 }
-void edummy_close() {}
-void edummy_lseek() {
-	edummy_pos = state.st_proc[state.st_curr_pid].p_reg.rsi;
+int edummy_close(int fd __attribute__((unused))) {return 0;}
+off_t edummy_lseek(int fd __attribute__((unused)), off_t offset) {
+	return edummy_pos = offset;
 }
 
 // Zone de transfert
 // permet de conserver des données lors du changement de paging
 struct execve_tr {
+	uint8_t    stack[AUX_STACK_SIZE];
 	Elf64_Ehdr ehdr;
 	size_t     nb_sections;
 	uint_ptr   args_bg;
@@ -60,41 +64,96 @@ static inline uint_ptr tr_lim() {
 	return (uint_ptr) paging_acc_pd(PML4_PSKD + 1, 0, 0);
 }
 
-static inline void execve_tr_do_alloc_pg(uint_ptr page_v_addr) {
+
+// --Ring 0--
+void execve_tr_do_alloc_pg(uint_ptr page_v_addr) {
 	*paging_page_entry(page_v_addr) = kmem_alloc_page()
 					| PAGING_FLAG_W | PAGING_FLAG_P;
 	invalide_page(page_v_addr);
 }
+
+static inline void free_tr() {
+	for (uint16_t i = 0; i < PAGE_ENT; ++i) {
+		uint64_t e = *paging_acc_pdpt(PML4_PSKD, i);
+		if (e & PAGING_FLAG_P)
+			kmem_free_page(e & PAGE_MASK);
+	}
+	uint64_t *pd = paging_acc_pml4(PML4_PSKD);
+	kmem_free_page((*pd) & PAGE_MASK);
+	*pd = 0;
+}
+
+void proc_execve_error() {
+	proc_t* mp = state.st_proc + state.st_curr_pid;
+	pid_t ppid = mp->p_ppid;
+    proc_t *pp = state.st_proc + ppid;
+	--pp->p_nchd;
+	free_pid(state.st_curr_pid);
+
+	proc_set_curr_pid(ppid);
+	pp->p_stat = RUN;
+	rei_cast(int, pp->p_reg.rax) = -1;
+	free_tr();	
+	iret_to_proc(pp);
+}
+void proc_execve_error_2() {
+	proc_t* mp = state.st_proc + state.st_curr_pid;
+	pid_t ppid = mp->p_ppid;
+	proc_t* pp = state.st_proc + ppid;
+	kmem_free_paging(mp->p_pml4, pp->p_pml4);
+	proc_execve_error();
+}
+
+void execve_switch_pml4() {
+	phy_addr npml4 = kmem_alloc_page();
+	kmem_bind_dynamic_slot(0, npml4);
+	kmem_init_pml4(kmem_dynamic_slot(0), npml4);
+	uint64_t* npml4_v      = (uint64_t*)kmem_dynamic_slot(0);
+	npml4_v[PML4_PSKD]     = *paging_acc_pml4(PML4_PSKD);
+	npml4_v[PML4_COPY_RES] = state.st_proc[state.st_curr_pid].p_pml4
+	       | PAGING_FLAG_P | PAGING_FLAG_W;
+	pml4_to_cr3(npml4);
+	state.st_proc[state.st_curr_pid].p_pml4 = npml4;
+}
+
+// --Ring 1 -> 0 defined in int7Ecall.S
+extern void call_proc_execve_error(void);
+extern void call_proc_execve_error_2(void);
+extern void call_execve_switch_pml4(void);
+extern void call_proc_execve_end(void);
+extern uint8_t call_kmem_paging_alloc_rng(uint_ptr bg, uint_ptr ed,
+					uint16_t flags, uint16_t p_flags);
+extern void call_execve_tr_do_alloc_pg(uint_ptr page_v_addr);
+
+// --Ring 1--
+
 static inline bool execve_tr_alloc_pg(uint_ptr v_addr) {
 	v_addr &= PAGE_MASK;
 	if (v_addr >= tr_lim()) return false;
 	if ((*paging_page_entry(v_addr)) & PAGING_FLAG_P) return true;
-	execve_tr_do_alloc_pg(v_addr);
+	call_execve_tr_do_alloc_pg(v_addr);
 	return true;
 }
-bool read_bytes(proc_t* p, int fd, void* buf, size_t count) {
+
+
+bool read_bytes(int fd, void* buf, size_t count) {
 	while (count > 0) {
-		p->p_reg.rdi = fd;
-		p->p_reg.rsi = (uint64_t)buf;
-		p->p_reg.rdx = count;
-		edummy_read();
-		if (p->p_reg.rax == 0 || !~p->p_reg.rax) return false;
-		count -= p->p_reg.rax;
-		buf   += p->p_reg.rax;
+		int rt = edummy_read(fd, buf, count);
+		if (rt == 0 || !~rt) return false;
+		count -= rt;
+		buf   += rt;
 	}
 	return true;
 }
-bool execve_lseek(proc_t* p, int fd, off_t ofs) {
-	p->p_reg.rdi = fd;
-	p->p_reg.rsi = ofs;
-	edummy_lseek();
-	return ~p->p_reg.rax;
+inline bool execve_lseek(int fd, off_t ofs) {
+	return ~edummy_lseek(fd, ofs);
 }
 
-static inline bool execve_alloc_rng(uint_ptr bg, size_t sz) {
-	if (bg + sz < bg || paging_get_lvl(pgg_pml4, bg + sz) >= PML4_END_USPACE)
-		return false;
-	return !kmem_paging_alloc_rng(bg, bg + sz,
+// Chargement des sections
+bool execve_alloc_rng(uint_ptr bg, size_t sz) {
+	return bg + sz >= bg 
+		&& paging_get_lvl(pgg_pml4, bg + sz) < PML4_END_USPACE
+		&& !call_kmem_paging_alloc_rng(bg, bg + sz,
 				PAGING_FLAG_U | PAGING_FLAG_W,
 				PAGING_FLAG_U | PAGING_FLAG_W);
 }
@@ -104,27 +163,16 @@ static inline void execve_fill0(uint_ptr bg, size_t sz) {
 		*((uint8_t*)(bg + i)) = 0;
 }
 
-static inline bool execve_copy(proc_t *p, int fd,
-		uint_ptr dst, off_t src, size_t sz) {
-	if (!execve_lseek(p, fd, src)) return false;
-	while (sz > 0) {
-		p->p_reg.rdi = fd;
-		p->p_reg.rsi = dst;
-		p->p_reg.rdx = sz;
-		edummy_read();
-		if (p->p_reg.rax == 0 || !~p->p_reg.rax) return false;
-		sz  -= p->p_reg.rax;
-		dst += p->p_reg.rax;
-	}
-	return true;
+static inline bool execve_copy(int fd, uint_ptr dst, off_t src, size_t sz) {
+	return execve_lseek(fd, src) && read_bytes(fd, (void*)dst, sz);
 }
 
-static inline bool execve_read_sections(proc_t* p, int fd) {
+static inline bool execve_read_sections(int fd) {
 	for (size_t i_s = 0; i_s < trf()->ehdr.e_shnum; ++i_s) {
 		Elf64_Shdr shdr;
-		if (!execve_lseek(p, fd, 
+		if (!execve_lseek(fd, 
 					trf()->ehdr.e_shoff + i_s * trf()->ehdr.e_shentsize)
-			|| !read_bytes(p, fd, &shdr, sizeof(Elf64_Shdr))) {
+			|| !read_bytes(fd, &shdr, sizeof(Elf64_Shdr))) {
 			return false;
 		}
         if (shdr.sh_flags & (SHF_WRITE | SHF_ALLOC | SHF_EXECINSTR)){
@@ -146,12 +194,12 @@ static inline bool execve_read_sections(proc_t* p, int fd) {
 	return true;
 }
 
-static inline bool execve_load_sections(proc_t* p, int fd) {
+static inline bool execve_load_sections(int fd) {
 	for (size_t i_s = 0; i_s < trf()->nb_sections; ++i_s) {
 		struct section* s = sections() + i_s;
 		if (!execve_alloc_rng(s->dst, s->sz)) return false;
 		if (s->copy) {
-            if (!execve_copy(p, fd, s->dst, s->src, s->sz))
+            if (!execve_copy(fd, s->dst, s->src, s->sz))
 				return false;
 		} else
 			execve_fill0(s->dst, s->sz);
@@ -159,13 +207,16 @@ static inline bool execve_load_sections(proc_t* p, int fd) {
 	return true;
 }
 
+
+// Transfert des arguments
+
 int execve_count_args(char** dst, const char* args[]) {
 	const char** arg_it = args;
 	uint_ptr limp = align_to((uint_ptr)dst, PAGE_SIZE);
 	goto loop_entry;
 	do {
 		limp += PAGE_SIZE;
-loop_entry:
+	loop_entry:
 		while ((uint_ptr)dst < limp) {
 			if (! *arg_it) return arg_it - args;
 			++dst;
@@ -178,42 +229,36 @@ loop_entry:
 bool execve_copy_args(char** p_dst, int argc,
 		const char* sarg[], char* darg[], uint_ptr pt_ofs) {
 	char* dst = *p_dst;
+
 	for (int i = 0; i < argc; ++i) {
 		const char* arg_it = sarg[i];
-		darg[i] = (char*) (((uint_ptr)dst) + pt_ofs);
+		darg[i]       = (char*) (((uint_ptr)dst) + pt_ofs);
 		uint_ptr limp = align_to((uint_ptr)dst, PAGE_SIZE);
+
 		goto loop_entry;
 		do {
 			limp += PAGE_SIZE;
-loop_entry:
+		loop_entry:
 			while ((uint_ptr)dst < limp) {
 				*(dst++) = *arg_it;
 				if (! *arg_it) goto loop_exit;
 				++arg_it;
 			}
 		} while(execve_tr_alloc_pg((uint_ptr)dst));
+
 		return false;
-loop_exit:;
+		loop_exit:;
 	}
+
 	*p_dst = dst;
 	return true;
-}
-
-static inline void free_tr() {
-	for (uint16_t i = 0; i < PAGE_ENT; ++i) {
-		uint64_t e = *paging_acc_pdpt(PML4_PSKD, i);
-		if (e & PAGING_FLAG_P)
-			kmem_free_page(e & PAGE_MASK);
-	}
-	uint64_t *pd = paging_acc_pml4(PML4_PSKD);
-	kmem_free_page((*pd) & PAGE_MASK);
-	*pd = 0;
 }
 
 static inline bool execve_tr_args(const char* args[], const char* envs[]) {
 	trf()->args_bg = 0;
 	for (size_t s = 0; s < trf()->nb_sections; ++s)
-		maxa_uint_ptr(&trf()->args_bg, sections()[s].dst + sections()[s].sz);
+		maxa_uint_ptr(&trf()->args_bg,
+				sections()[s].dst + sections()[s].sz);
 	trf()->args_bg = align_to(trf()->args_bg, alignof(char**));
 
 	trf()->args_t_bg = align_to(
@@ -250,6 +295,7 @@ static inline bool execve_load_args() {
 	uint_ptr src = trf()->args_t_bg & PAGE_MASK;
 	for (uint_ptr dst = trf()->args_bg & PAGE_MASK;
 			dst < trf()->args_ed; dst += PAGE_SIZE, src += PAGE_SIZE) {
+
 		uint64_t* e = paging_page_entry(src);
 		if (paging_map_to(dst, PAGE_MASK & *e,
 					PAGING_FLAG_W | PAGING_FLAG_U,
@@ -260,122 +306,113 @@ static inline bool execve_load_args() {
 	return true;
 }
 
-static inline bool execve_load_elf64(proc_t* p, int fd,
-		const char* args[], const char* envs[],
-		phy_addr old_pml4, phy_addr* npml4,
-		uint_ptr* rip) {
+void proc_execve_entry(const char *fname, const char **argv, const char **env);
 
-	// Zone de transfert
+// --Ring 0--
+int execve(reg_t fname, reg_t argv, reg_t env) {
+	pid_t  pid = state.st_curr_pid;
+	klogf(Log_info, "syscall", "process %d called execve", (int)pid);
+    proc_t  *p = state.st_proc + pid;
+
+	pid_t epid = find_new_pid();
+	if (!~epid) return -1;
+	klogf(Log_verb, "syscall", "execve aux process: %d", (int)epid);
+
+	proc_t* ep = state.st_proc + epid;
+
+	// Allocation de la zone de transfert
 	volatile phy_addr tr_pd = kmem_alloc_page();
 	*paging_acc_pml4(PML4_PSKD) = tr_pd 
 		| PAGING_FLAG_W | PAGING_FLAG_P;
 	invalide_page((uint_ptr)paging_acc_pdpt(PML4_PSKD, 0));
 
-	for (uint16_t i = 0; i < PAGE_ENT; ++i)
-		*paging_acc_pdpt(PML4_PSKD, i) = 0;
-	for (uint_ptr i = 0; i < sizeof(struct execve_tr); i += PAGE_SIZE)
-		execve_tr_do_alloc_pg(((uint_ptr)trf()) + i);
+	uint_ptr ini_addr = 0;
+	for (; ini_addr < sizeof(struct execve_tr); ini_addr += PAGE_SIZE)
+		execve_tr_do_alloc_pg(((uint_ptr)trf()) + ini_addr);
+	for (uint16_t ini_ind = ini_addr >> PAGE_SHIFT;
+			ini_ind < PAGE_ENT; ++ini_ind)
+		*paging_acc_pdpt(PML4_PSKD, ini_ind) = 0;
+
+	// Initialisation du processus auxiliaire
+	ep->p_ppid = pid;
+	ep->p_nchd = 0;
+	ep->p_stat = RUN;
+	ep->p_ring = 1;
+	ep->p_prio = p->p_prio;
+    for (size_t i = 0; i < NFD; i++) ep->p_fds[i] = -1;
+	ep->p_pml4 = p->p_pml4;
+	ep->p_reg.rsp = (uint_ptr)trf()->stack + AUX_STACK_SIZE;
+	ep->p_reg.rip = (uint_ptr)&proc_execve_entry;
+	ep->p_reg.rdi = fname;
+	ep->p_reg.rsi = argv;
+	ep->p_reg.rdx = env;
+
+	// On arrête processus appelant en le passant en waitpid
+	p->p_stat    = WAIT;
+	p->p_reg.rax = epid;
+
+	// On bascule sur le processus auxiliaire
+	state.st_curr_pid = epid;
+	st_curr_reg = &ep->p_reg;
+	iret_to_proc(ep);
+	never_reached return 0;
+}
+
+// Ring 1
+void proc_execve_entry(const char *fname,
+		const char **args, const char **envs) {
+
+	int fd = edummy_open(fname, READ);
+	if (fd == -1) call_proc_execve_error();
 
 	// Lecture des headers du fichier ELF
 	trf()->nb_sections = 0;
-	if (!read_bytes(p, fd, (uint8_t*)&trf()->ehdr, sizeof(Elf64_Ehdr))
+	if (!read_bytes(fd, (uint8_t*)&trf()->ehdr, sizeof(Elf64_Ehdr))
 			//TODO: check
-			|| !execve_read_sections(p, fd)) {
-		free_tr();
-		return false;
+			|| !execve_read_sections(fd)) {
+		edummy_close(fd);
+		call_proc_execve_error();
 	}
 
 	// Transfert des arguments
 	if (!execve_tr_args(args, envs)) {
-		free_tr();
-		return false;
+		edummy_close(fd);
+		call_proc_execve_error();
 	}
 
-	//TODO Clear int
-	*npml4 = kmem_alloc_page();
-	kmem_bind_dynamic_slot(0, *npml4);
-	kmem_init_pml4(kmem_dynamic_slot(0), *npml4);
-	uint64_t* npml4_v      = (uint64_t*)kmem_dynamic_slot(0);
-	npml4_v[PML4_PSKD]     = tr_pd
-	       | PAGING_FLAG_P | PAGING_FLAG_W;
-	npml4_v[PML4_COPY_RES] = old_pml4
-	       | PAGING_FLAG_P | PAGING_FLAG_W;
-	pml4_to_cr3(*npml4);
+	call_execve_switch_pml4();
 
-	if (!execve_load_args() || !execve_load_sections(p, fd)) {
-		free_tr();
-		kmem_free_paging(*npml4, old_pml4);
-		*paging_acc_pml4(PML4_PSKD) = 0;
-		return false;
+	if (!execve_load_args() || !execve_load_sections(fd)) {
+		edummy_close(fd);
+		call_proc_execve_error_2();
 	}
-
-	*rip = trf()->ehdr.e_entry;
-
-	return true;
+	
+	edummy_close(fd);
+	call_proc_execve_end();
 }
 
-int execve(const char *fname __attribute__((unused)) /*TODO*/,
-		const char **argv, const char **env) {
-	klogf(Log_info, "syscall", "EXECVE");
-	pid_t pid = state.st_curr_pid;
-    proc_t *p = state.st_proc + pid;
+// Ring 0
+void proc_execve_end() {
+	proc_t* mp = state.st_proc + state.st_curr_pid;
+	proc_t* pp = state.st_proc + mp->p_ppid;
+	pp->p_reg.rip = trf()->ehdr.e_entry;
+
+	pp->p_reg.rsp = make_proc_stack();
+	pp->p_reg.rdi = trf()->argc;
+	pp->p_reg.rsi = (uint_ptr)trf()->argv;
+	pp->p_reg.rdx = (uint_ptr)trf()->envv;
+	pp->p_pml4    = mp->p_pml4;
+
+	--pp->p_nchd;
+	free_pid(state.st_curr_pid);
+	pp->p_stat = RUN;
 	
-	pid_t npid = find_new_pid(pid);
-	if (npid == pid)
-		return -1;
-
-	// TODO : real process, cli
-	proc_t *np = state.st_proc + npid;
-	np->p_stat = RUN;
-	for (int i = 0; i < NFD; ++i)
-		np->p_fds[i] = UNUSED;
-
-	state.st_curr_pid = npid;
-    st_curr_reg = &np->p_reg;
-
-	np->p_reg.rdi = p->p_reg.rdi;
-	np->p_reg.rsi = READ;
-	edummy_open();
-	int fd = (int)p->p_reg.rax;
-	if (fd == -1) {
-		np->p_stat = FREE;
-		return -1;
-	}
-
-	phy_addr npml4;
-
-	if (!execve_load_elf64(np, fd, argv, env, p->p_pml4, &npml4, 
-				&p->p_reg.rip)) {
-		np->p_reg.rdi = fd;
-		edummy_close();
-		np->p_stat = FREE;
-		return -1;
-	}
-	
-	np->p_reg.rdi = fd;
-	edummy_close();
-
-	uint64_t* stack_pd = kmem_acc_pts_entry(
-			paging_add_lvl(pgg_pd, USER_STACK_PD),
-			2, PAGING_FLAG_U | PAGING_FLAG_W);
-	*stack_pd = SPAGING_FLAG_P | PAGING_FLAG_W;
-    p->p_reg.rsp = paging_add_lvl(pgg_pd, USER_STACK_PD + 1);
-
-	p->p_reg.rdi = trf()->argc;
-	p->p_reg.rsi = (uint_ptr)trf()->argv;
-	p->p_reg.rdx = (uint_ptr)trf()->envv;
-
-	p->p_pml4    = npml4;
-	state.st_curr_pid = pid;
-    st_curr_reg  = &p->p_reg;
-	np->p_stat = FREE;
-
 	// Libération de l'ancien paging
 	kmem_free_paging_range(paging_acc_pdpt(PML4_COPY_RES, 0),
 			4, PML4_END_USPACE);
 	kmem_free_page(PAGE_MASK & *paging_acc_pml4(PML4_COPY_RES));
 
 	free_tr();
-	iret_to_proc(p);
-	never_reached return 0;
+	proc_set_curr_pid(mp->p_ppid);
+	iret_to_proc(pp);
 }
