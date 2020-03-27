@@ -8,7 +8,6 @@ BASE=home
 if [ -e $IMG ];
 then
     echo "Partition $IMG already exists";
-    dumpe2fs $IMG
     exit 0;
 fi
    

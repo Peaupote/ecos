@@ -1,10 +1,12 @@
 #include <kernel/tty.h>
 
 #include <stddef.h>
+#include <stdbool.h>
 
 #include <util/vga.h>
 #include <util/elf64.h>
 #include <libc/string.h>
+#include <util/misc.h>
 
 #include <kernel/memory/kmem.h>
 #include <kernel/proc.h>
@@ -14,32 +16,59 @@
 #include <kernel/tests.h>
 #include <fs/ext2.h>
 
-#define SB_HEIGHT 32
-#define SB_MASK 0x1f
+#define SB_MASK  0x7f
 
 #define IB_LENGTH 256
-#define IB_MASK 0xff
+#define IB_MASK  0xff
 
 //Screen Buffer
+// SB_HEIGHT       |.....|bbb|ddd|......|
+// ashift          |---->|
+// display_shift         |-->|
+// nb_lines              |------>|
 uint16_t sbuffer[SB_HEIGHT][80];
-size_t sb_ashift; //shift array
-size_t sb_display_shift;
-size_t sb_nb_lines;
+size_t   sb_ashift; //shift array
+size_t   sb_display_shift; // <= sb_nb_lines
+// < SB_HEIGHT pour éviter 0 = SB_HEIGHT lors du passage au modulo
+size_t   sb_nb_lines;
+bool     sb_dtcd; // scroll détaché
 
 //Input Buffer
-char ibuffer[IB_LENGTH];
-size_t ib_ashift;
-size_t ib_size;
-size_t ib_printed;
+char     ibuffer[IB_LENGTH];
+size_t   ib_ashift;
+size_t   ib_size;
+size_t   ib_printed;
 const size_t input_width = 80 - 2;
-size_t input_height;
-size_t input_bottom_line;
-size_t input_top_line;
+size_t   input_height;
+size_t   input_bottom_line;
+size_t   input_top_line;
 
-uint8_t input_color;
-uint8_t prompt_color;
-uint8_t vprompt_color;
-uint8_t back_color;
+uint8_t  input_color;
+uint8_t  prompt_color;
+uint8_t  vprompt_color;
+uint8_t  back_color;
+
+
+static inline size_t sb_rel_im_bg() {
+	return sb_display_shift;
+}
+static inline size_t sb_rel_im_ed() {
+	return min_size_t(sb_nb_lines, 
+			(VGA_HEIGHT - input_height + sb_display_shift) & SB_MASK);
+}
+size_t sb_new_in_height(size_t h) {
+	if (sb_dtcd) return 0;
+	size_t old_ds = sb_display_shift;
+	size_t dsp_ln = VGA_HEIGHT - h;
+	sb_display_shift = dsp_ln < sb_nb_lines
+			? sb_nb_lines - dsp_ln : 0;
+	return sb_display_shift - old_ds;
+		
+}
+static inline size_t sb_sc_ed() {
+	return sb_nb_lines - sb_display_shift;
+}
+
 
 void tty_init() {
     back_color = vga_entry_color (
@@ -55,8 +84,10 @@ void tty_init() {
     input_height = 0;
     input_bottom_line = input_top_line = ~0;
 
-    sb_ashift = 0;
+    sb_ashift   = 0;
     sb_display_shift = 0;
+	sb_nb_lines = 0;
+	sb_dtcd     = false;
 }
 
 char cmd_decomp[IB_LENGTH + 10];
@@ -132,8 +163,8 @@ size_t built_in_exec(size_t in_begin, size_t in_len) {
 }
 
 void tty_input(scancode_byte s, key_event ev) {
-    size_t  shift  = 0;
-    size_t  idx_b  = tty_buffer_cur_idx();
+	tty_seq_t sq;
+	tty_seq_init(&sq);
     uint8_t p_updt = 0;
 
     if (do_kprint) {
@@ -143,16 +174,16 @@ void tty_input(scancode_byte s, key_event ev) {
         int8_to_str_hexa(str + 12, ev.flags);
         int8_to_str_hexa(str + 17, keycode_to_printable(ev.key));
         p_updt = 1;
-        shift += tty_writestring(str);
-        shift += tty_update_prompt_pos();
+        sq.shift += tty_writestring(str);
+        sq.shift += tty_update_prompt_pos();
     }
     if (ev.key && !(ev.flags & 0x1)) {//évènement appui
         if ((ev.key&KEYS_MASK) == KEYS_ENTER) {
             p_updt = 1;
-            shift += tty_prompt_to_buffer(ib_ashift, ib_size);
-            shift += built_in_exec(ib_ashift, ib_size);
+            sq.shift += tty_prompt_to_buffer(ib_ashift, ib_size);
+            sq.shift += built_in_exec(ib_ashift, ib_size);
             ib_size = ib_printed = 0;
-            shift += tty_new_prompt();
+            sq.shift += tty_new_prompt();
         } else if(ev.key == KEY_BACKSPACE) {
             if(ib_size > 0) {
                 --ib_size;
@@ -161,7 +192,20 @@ void tty_input(scancode_byte s, key_event ev) {
                         2 + ib_size % input_width,
                         input_top_line + ib_size / input_width);
             }
-        } else {
+        } else if (ev.key == KEY_UP_ARROW) {
+			if (sb_display_shift) {
+				--sb_display_shift;
+				sb_dtcd = true;
+				tty_afficher_buffer_all();
+			}
+        } else if (ev.key == KEY_DOWN_ARROW) {
+			if (sb_sc_ed() > VGA_HEIGHT - input_height) {
+				++sb_display_shift;
+				if (sb_sc_ed() == VGA_HEIGHT - input_height)
+					sb_dtcd = false;
+				tty_afficher_buffer_all();
+			}
+		} else {
             char kchar = keycode_to_printable(ev.key);
             if (kchar && ib_size < IB_LENGTH) {
                 ibuffer[(ib_ashift + ib_size++) & IB_MASK] = kchar;
@@ -169,59 +213,47 @@ void tty_input(scancode_byte s, key_event ev) {
             }
         }
     }
-    if (p_updt) {
-        if (shift) tty_afficher_buffer_all(); //scroll
-        else tty_afficher_buffer_range(idx_b, tty_buffer_next_idx());
-    }
+    if (p_updt) tty_seq_commit(&sq);
 }
 
 void tty_afficher_buffer_range(size_t idx_begin, size_t idx_end) {
     size_t r_b = (idx_begin - sb_ashift) & SB_MASK;
     size_t r_e = (idx_end   - sb_ashift) & SB_MASK;
-    if (r_e <= sb_display_shift) return;
-    size_t it = idx_begin;
-    size_t y;
-    if (sb_display_shift > r_b){
-        y  = 0;
-        it = sb_ashift + sb_display_shift;
-    } else
-        y = r_b - sb_display_shift;
+	maxa_size_t(&r_b, sb_rel_im_bg());
+	mina_size_t(&r_e, sb_rel_im_ed());
 
-    while(it != idx_end) {
+	for (size_t it = r_b; it < r_e; ++it)
         for (size_t x = 0; x < VGA_WIDTH; ++x)
-            vga_putcentryat(sbuffer[it][x], x, y);
-        ++y;
-        it = SB_MASK & (it + 1);
-    }
+            vga_putcentryat(sbuffer[(sb_ashift + it) & SB_MASK][x], x, 
+					it - sb_display_shift);
 }
 
 void tty_afficher_buffer_all() {
-    size_t y = 0;
-    for(size_t i = 0; i + sb_display_shift < sb_nb_lines; ++i) {
-        size_t it = (sb_ashift + sb_display_shift + i)
-                        & SB_MASK;
+    size_t r_b = sb_rel_im_bg();
+    size_t r_e = sb_rel_im_ed();
+
+	for (size_t it = r_b; it < r_e; ++it)
         for (size_t x = 0; x < VGA_WIDTH; ++x)
-            vga_putcentryat(sbuffer[it][x], x, y);
-        ++y;
-    }
+            vga_putcentryat(sbuffer[(sb_ashift + it) & SB_MASK][x], x,
+					it - sb_display_shift);
 }
 
 size_t tty_new_prompt() {
+	size_t rt = 0;
     input_height = 1;
-    if (sb_nb_lines >= VGA_HEIGHT) {
+    if (sb_sc_ed() >= VGA_HEIGHT) {
         input_top_line = VGA_HEIGHT - 1;
-        sb_display_shift = 1;
-    } else {
-        input_top_line = sb_nb_lines;
-        sb_display_shift = 0;
-    }
+		rt = sb_new_in_height(1);
+    } else
+        input_top_line = sb_sc_ed();
+
     input_bottom_line = input_top_line;
 
     vga_putentryat('>', prompt_color, 0, input_top_line);
     for (size_t i=1; i<VGA_WIDTH; ++i)
         vga_putentryat(' ', input_color, i, input_top_line);
 
-    return sb_display_shift;
+    return rt;
 }
 
 static inline size_t get_input_height () {
@@ -275,7 +307,7 @@ void tty_afficher_prompt() {
         if (bt_line_0 >= VGA_HEIGHT) {
             input_bottom_line = VGA_HEIGHT - 1;
             input_top_line = input_bottom_line - input_height + 1;
-            sb_display_shift = sb_nb_lines + input_height - VGA_HEIGHT;
+			sb_new_in_height(input_height);
             tty_afficher_buffer_all(); //scroll
             tty_afficher_prompt_all();
             return;
@@ -291,23 +323,19 @@ void tty_afficher_prompt() {
 size_t tty_update_prompt_pos() {
     if (~input_top_line) {
         size_t n_top;
-        size_t n_shift;
-        size_t d_shift;
-        if (sb_nb_lines + input_height >= VGA_HEIGHT) {
+        size_t rt = 0;
+        if (sb_sc_ed() + input_height > VGA_HEIGHT) {
             n_top   = VGA_HEIGHT - input_height;
-            n_shift = sb_nb_lines + input_height - VGA_HEIGHT;
-        } else {
-            n_top = sb_nb_lines;
-            n_shift = 0;
-        }
-        d_shift = n_shift - sb_display_shift;
-        sb_display_shift = n_shift;
-        if (n_top != input_top_line) {
+			rt      = sb_new_in_height(input_height);
+        } else
+            n_top = sb_sc_ed();
+        
+		if (n_top != input_top_line) {
             input_top_line    = n_top;
             input_bottom_line = input_top_line + input_height - 1;
             tty_afficher_prompt_all();
         }
-        return d_shift;
+        return rt;
     }
     return 0;//Pas de prompt
 }
@@ -349,20 +377,28 @@ size_t tty_prompt_to_buffer(size_t in_begin, size_t in_len) {
 }
 
 size_t tty_buffer_cur_idx(){
-    return (sb_ashift + sb_nb_lines - 1) & SB_MASK;
+    return sb_ashift + sb_nb_lines - 1;
 }
 
 size_t tty_buffer_next_idx(){
-    return (sb_ashift + sb_nb_lines) & SB_MASK;
+    return sb_ashift + sb_nb_lines;
 }
 
 size_t tty_new_buffer_line(size_t* index) {
     *index = (sb_ashift + sb_nb_lines) & SB_MASK;
-    if (sb_nb_lines == VGA_HEIGHT) {
-        sb_ashift = SB_MASK & (sb_ashift + 1);
+    if (sb_nb_lines == SB_HEIGHT - 1) {
+        sb_ashift = (sb_ashift + 1) & SB_MASK;
+		if (sb_dtcd && sb_display_shift) {
+			--sb_display_shift;
+			return 0;
+		}
         return 1;
     }
     ++sb_nb_lines;
+	if (sb_sc_ed() > VGA_HEIGHT - input_height && !sb_dtcd) {
+		++sb_display_shift;
+		return 1;
+	}
     return 0;
 }
 

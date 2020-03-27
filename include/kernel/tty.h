@@ -6,6 +6,8 @@
 
 #include <kernel/keyboard.h>
 
+#define SB_HEIGHT 128
+
 void   tty_init(void);
 void   tty_input(scancode_byte scb, key_event ev);
 
@@ -39,9 +41,11 @@ static inline void tty_seq_init(tty_seq_t* s) {
 	s->shift  = 0;
 }
 static inline void tty_seq_commit(tty_seq_t* s) {
-	s->shift += tty_update_prompt_pos();
-    if (s->shift) tty_afficher_buffer_all();
-    else tty_afficher_buffer_range(s->idx_bg, tty_buffer_next_idx());
+	s->shift   += tty_update_prompt_pos();
+	size_t nidx = tty_buffer_next_idx();
+    if (s->shift || nidx - s->idx_bg >= SB_HEIGHT)
+		tty_afficher_buffer_all();
+    else tty_afficher_buffer_range(s->idx_bg, nidx);
 }
 void tty_seq_write(void* seq, const char* s, size_t len);
 
