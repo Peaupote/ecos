@@ -4,20 +4,23 @@
 #include <stdint.h>
 #include <kernel/param.h>
 
+#if defined(__is_kernel)
 typedef uint32_t dev_t;
+#else
+#include <sys/stat.h>
+#endif
 
-struct device_info {
+struct mount_info {
+    void    *sp;
     uint32_t block_size;
-    uint32_t nb_block;
-    uint32_t nb_inodes;
-    uint32_t nb_free_inodes;
+    uint32_t root_ino;
 };
 
 struct device {
-    dev_t     dev_id;
-    char      dev_mnt[256];
-    uint8_t   dev_fs;
-    void     *dev_spblk; // pointer to super block
+    dev_t             dev_id;
+    char              dev_mnt[256];
+    uint8_t           dev_fs;
+    struct mount_info dev_info;
 } devices[NDEV];
 
 #endif

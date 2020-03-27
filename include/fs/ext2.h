@@ -3,12 +3,16 @@
 
 #include <stddef.h>
 #include <stdint.h>
+#include <kernel/file.h>
 
 struct ext2_mount_info {
+    // first section common to kernel mount_info
     struct ext2_superblock *sp;
+    uint32_t                block_size;
+    uint32_t                root_ino;
+
     struct ext2_group_desc *bg;
     uint32_t                group_count;
-    uint32_t                block_size;
     uint32_t                group_size;
 };
 
@@ -266,7 +270,12 @@ struct ext2_dir_entry {
 // global
 
 int ext2_mount(void *fs, struct ext2_mount_info *info);
-struct ext2_inode *ext2_lookup(char *fname);
+uint32_t ext2_lookup(const char *fname, ino_t ino, struct ext2_mount_info*);
+int32_t  ext2_stat(ino_t ino, struct stat *st, struct ext2_mount_info *info);
+int32_t  ext2_read(ino_t ino, void *buf, off_t offset, size_t len,
+                   struct ext2_mount_info *info);
+int32_t  ext2_write(ino_t ino, void *buf, off_t offset, size_t len,
+                    struct ext2_mount_info *info);
 
 // blocks
 
@@ -303,7 +312,7 @@ ext2_iter_dir(struct ext2_inode *inode,
               size_t *len,
               struct ext2_mount_info *info);
 
-uint32_t ext2_lookup_dir(struct ext2_inode *inode, char *fname,
+uint32_t ext2_lookup_dir(struct ext2_inode *inode, const char *fname,
                          struct ext2_mount_info *info);
 
 struct ext2_dir_entry *
@@ -312,6 +321,5 @@ ext2_readdir(struct ext2_dir_entry *dir);
 struct ext2_dir_entry *
 ext2_mkdir(uint32_t parent_inode, char *dirname,
            struct ext2_mount_info *info);
-
 
 #endif

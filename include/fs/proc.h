@@ -25,12 +25,12 @@
 #define STAT_PROC_FILE 1
 #define CWD_PROC_FILE  2
 
-void *proc_mount();
-int   proc_load(void *super, char *fname, struct stat *st, char **end);
-int   proc_create(void *super, ino_t ino, char *fname);
-int   proc_seek(void*, ino_t ino, off_t pos);
-int   proc_read(void*, ino_t ino, void *buf, size_t len);
-int   proc_write(void*, ino_t ino, void *buf, size_t len);
+int   proc_mount(void*, struct mount_info*);
+int   proc_load(struct mount_info*, const char *fname, struct stat *st, char **end);
+int   proc_create(struct mount_info*, ino_t ino, char *fname);
+int   proc_seek(struct mount_info*, ino_t ino, off_t pos);
+int   proc_read(struct mount_info*, ino_t ino, void *buf, size_t len);
+int   proc_write(struct mount_info*, ino_t ino, void *buf, size_t len);
 
 struct dirent *proc_readdir(struct dirent*);
 

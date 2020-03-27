@@ -1,4 +1,7 @@
+#if defined(__is_test)
 #include <stdio.h>
+#endif
+
 #include <fs/ext2.h>
 
 struct ext2_inode *
@@ -62,7 +65,9 @@ uint32_t *ext2_get_inode_block_ptr(uint32_t block,
     uint32_t sup = EXT2_DIRECT_BLOCK;
     uint32_t *b; // indirection block
 
+#if defined(__is_test)
     printf("get inode block %d\n", block);
+#endif
 
     if (block < sup) return inode->in_block + block;
 

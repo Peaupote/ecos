@@ -156,6 +156,7 @@ void schedule_proc() {
 	// Le processus IDLE empêche que l'on arrive ici
 	never_reached
 }
+
 pid_t schedule_proc_ev() {
 	sched_add_proc(state.st_curr_pid);
 	pid_t rt = sched_pop_proc();

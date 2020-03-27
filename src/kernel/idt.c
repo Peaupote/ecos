@@ -83,25 +83,25 @@ bool pit_hdl(void) {
     static uint8_t clock = 0;
     lookup_end_sleep();
     if ((clock++ & SCHED_FREQ) == 0) {
-		pid_t pid = schedule_proc_ev();
-		if (pid != state.st_curr_pid) {
-			state.st_curr_pid = pid;
-			return true;
-		}
-	}
+        pid_t pid = schedule_proc_ev();
+        if (pid != state.st_curr_pid) {
+            state.st_curr_pid = pid;
+            return true;
+        }
+    }
 
     write_eoi();
-	return false;
+    return false;
 }
 
 void pit_hdl_switch(void) {
-	proc_t *p = switch_proc(state.st_curr_pid);
-	klogf(Log_info, "sched",
-		  "pit switch, nb R %d, run proc %d :\n" 
-		  "   rip %p, rsp %p",
-		  state.st_sched.nb_proc + 1, state.st_curr_pid,
-		  p->p_reg.rip, p->p_reg.rsp);
-	eoi_iret_to_proc(p);
+    proc_t *p = switch_proc(state.st_curr_pid);
+    klogf(Log_info, "sched",
+          "pit switch, nb R %d, run proc %d :\n"
+          "   rip %p, rsp %p",
+          state.st_sched.nb_proc + 1, state.st_curr_pid,
+          p->p_reg.rip, p->p_reg.rsp);
+    eoi_iret_to_proc(p);
 }
 
 //--#PF errcode--
@@ -114,15 +114,15 @@ void pit_hdl_switch(void) {
 
 // ! Processus partiellement sauvegardé
 void exception_PF_hdl(uint_ptr fault_vaddr, uint64_t errcode) {
-	klogf(Log_verb, "exc", "#PF on %p, errcode=%llx",
-			fault_vaddr, errcode);
-	if (!(errcode & EXC_PF_ERC_P)
-			&& paging_get_lvl(pgg_pml4, fault_vaddr) < PML4_END_USPACE) {
-		if (handle_PF(fault_vaddr))
-			kpanic("#PF handling");
-	} else //TODO: kill process
-		kpanic("#PF not handled");
-	klogf(Log_verb, "exc", "#PF handled");
+    klogf(Log_verb, "exc", "#PF on %p, errcode=%llx",
+            fault_vaddr, errcode);
+    if (!(errcode & EXC_PF_ERC_P)
+            && paging_get_lvl(pgg_pml4, fault_vaddr) < PML4_END_USPACE) {
+        if (handle_PF(fault_vaddr))
+            kpanic("#PF handling");
+    } else //TODO: kill process
+        kpanic("#PF not handled");
+    klogf(Log_verb, "exc", "#PF handled");
 }
 
 static inline void idt_int_asgn(int n, uint64_t addr, uint8_t attr,

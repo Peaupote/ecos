@@ -31,10 +31,10 @@ uint64_t sleep(uint64_t time) {
     // probably not correct here
     sleeps[i].sleep_counter = time * (1193180 / (1L << 16));
     klogf(Log_info, "syscall", "process %d sleep for %d sec",
-			state.st_curr_pid, time);
+            state.st_curr_pid, time);
 
-	schedule_proc();
-	never_reached return 0;
+    schedule_proc();
+    never_reached return 0;
 }
 
 void lookup_end_sleep(void) {

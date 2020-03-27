@@ -20,7 +20,7 @@ KBMAP=gawk -f ../../tools/keyboard_map.awk
 UDEP=vga.o string.o elf64.o
 INCLUDES=-I ../../include
 
-.PHONY: all re clean util libk test_libk tests_prg aux_prg
+.PHONY: all re clean util libk test_libk tests_prg aux_prg home_part ext2
 
 all: kernel.bin
 
@@ -44,7 +44,7 @@ keyboard_layout.s: ../../data/keyboard_azerty.txt ../../data/keyboard_qwerty.txt
 	echo "keyboard_qwerty_layout:" >> keyboard_layout.s
 	$(KBMAP) ../../data/keyboard_qwerty.txt >> keyboard_layout.s
 
-data.o:data.s tests_prg aux_prg
+data.o:data.s tests_prg aux_prg home_part
 
 UDEP_FROM_HERE=$(patsubst %,../util/64/%,$(UDEP))
 UDEP_FROM_UTIL=$(patsubst %,64/%,$(UDEP))
@@ -58,16 +58,22 @@ test_libk:
 util:
 	$(MAKE) -C ../util $(UDEP_FROM_UTIL)
 
+home_part:
+	$(MAKE) -C ../../tests/ext2 home.img
+
+ext2:
+	$(MAKE) -C ../fs/ext2 ext2.a
+
 aux_prg:
 	$(MAKE) -C aux_prg
 
 tests_prg:
 	$(MAKE) -C ../../tests/prg all
 
-kernel.bin:linker.ld ../boot/boot_data.ld $(OBJ) util libk test_libk
+kernel.bin:linker.ld ../boot/boot_data.ld $(OBJ) util libk test_libk ext2
 	$(CC) -T linker.ld -o kernel.bin $(FLAGS) $(LIBK_OBJ) \
 		$(OBJ) $(UDEP_FROM_HERE) $(TESTS_LIBK) ../libc/libk.a \
-		$(INCLUDES) -lgcc
+		../fs/ext2/ext2.a $(INCLUDES) -lgcc
 
 .depends:
 	../../tools/mkdep.sh "$(CC) $(FLAGS) $(INCLUDES)" $(SRCDEP) > .depends

@@ -8,13 +8,26 @@ int test_strlen() {
         strlen("aaaaaaaaa") == 9;
 }
 
-#define NTEST 1
+int test_memcmp() {
+    char *t1 = "abc",
+        *t2 = "aaa";
+
+    return
+        !memcmp(t1, t2, 0) &&
+        !memcmp(t1, t2, 1) &&
+        memcmp(t1, t2, 3) > 0 &&
+        memcmp(t2, t1, 3) < 0;
+}
+
+#define NTEST 2
 static char *test_name[NTEST] = {
+    "memcmp",
     "strlen"
 };
 
 typedef int (*test_func)();
 static test_func test_funcs[NTEST] = {
+    test_memcmp,
     test_strlen
 };
 
@@ -38,7 +51,7 @@ int main(void) {
     for (size_t i = 0; i < NTEST; i++) {
         pp("test %s... ", test_name[i]);
         if (!test_funcs[i]()) {
-            rc = -1;
+            rc = 1;
             pp("FAILED\n");
         } else pp("OK\n");
     }

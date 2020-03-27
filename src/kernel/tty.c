@@ -12,6 +12,7 @@
 
 #include <tests.h>
 #include <kernel/tests.h>
+#include <fs/ext2.h>
 
 #define SB_HEIGHT 32
 #define SB_MASK 0x1f
@@ -88,6 +89,18 @@ uint8_t do_kprint = 0;
 
 extern uint8_t t0_data[];
 
+int print_dir(struct ext2_dir_entry *dir) {
+    kprintf("%d (%d) %s\n", dir->d_ino, dir->d_rec_len, dir->d_name);
+    return 0;
+}
+
+void ls () {
+    struct ext2_mount_info *info = (struct ext2_mount_info*)&devices[2].dev_info;
+    struct ext2_inode *curr = ext2_get_inode(EXT2_ROOT_INO, info); // root
+    ext2_iter_dir(curr, print_dir, 0, info);
+}
+
+
 size_t built_in_exec(size_t in_begin, size_t in_len) {
     decomp_cmd(in_begin, in_len);
     char* cmd_name = cmd_decomp + cmd_decomp_idx[0];
@@ -111,8 +124,9 @@ size_t built_in_exec(size_t in_begin, size_t in_len) {
         if (!strcmp(arg1, "statut"))      test_print_statut();
         else if(!strcmp(arg1, "kheap"))   test_kheap();
         else if (!strcmp(arg1, "string")) test_string();
-    } else if (!ustrcmp(cmd_name, "ps"))
+    } else if (!strcmp(cmd_name, "ps"))
         proc_ps();
+    else if (!strncmp(cmd_name, "ls", 3)) ls();
 
     return 0;
 }

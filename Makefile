@@ -43,6 +43,7 @@ clean:
 	$(MAKE) -C src/boot   clean
 	$(MAKE) -C src/util   clean
 	$(MAKE) -C src/libc   clean
+	$(MAKE) -C src/fs     clean
 	$(MAKE) -C tests      clean
 	rm -rf *.o *.iso *.bin *.out isodir
 

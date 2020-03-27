@@ -1,4 +1,4 @@
-FLAGS?=-O1 -Wall -Wextra -std=gnu99 -fno-builtin
+FLAGS?=-O1 -Wall -Wextra -std=gnu99 -mno-red-zone
 CC=gcc
 ASFILES=
 include list.Makefile

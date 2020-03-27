@@ -1,67 +1,70 @@
 long mode:
-	Mode permettant d'accéder aux fonctionnalités 64 bits
-	https://wiki.osdev.org/X86-64
-	paging obligatoire
+    Mode permettant d'accéder aux fonctionnalités 64 bits
+    https://wiki.osdev.org/X86-64
+    paging obligatoire
 
 paging, virtual addressing:
-	association d'adresse physiques à des adresses virtuelles
-	https://wiki.osdev.org/Paging
-	la correspondance est effectuée via un "page directory" (PD) 
-	et des "page table"
-	ces tables sont des tableaux de "page directory entry" (PDE) et de 
-	"page table entry" (PTE)
-	! cache: Translation Lookaside Buffer (TLB)
-	https://wiki.osdev.org/TLB
+    association d'adresse physiques à des adresses virtuelles
+    https://wiki.osdev.org/Paging
+    la correspondance est effectuée via un "page directory" (PD)
+    et des "page table"
+    ces tables sont des tableaux de "page directory entry" (PDE) et de
+    "page table entry" (PTE)
+    ! cache: Translation Lookaside Buffer (TLB)
+    https://wiki.osdev.org/TLB
 
 Physical Address Extension(PAE)
-	https://wiki.osdev.org/Setting_Up_Paging_With_PAE
-	ajout d'une "Page-Directory-Pointer-Table" (PDPT)
+    https://wiki.osdev.org/Setting_Up_Paging_With_PAE
+    ajout d'une "Page-Directory-Pointer-Table" (PDPT)
 
 Control register(CR*)
-	registre contrôlant le fonctionnement du processeur
-	https://en.wikipedia.org/wiki/Control_register
-	https://wiki.osdev.org/CPU_Registers_x86
-	CR0:
-		0	PE	protected mode si 1, real mode sinon
-		31	PG	activation du paging
-	CR3: paging
-	CR4:
-		4	PSE page size extension (toujours actif si PAE)
-		5	PAE	physical address extension
+    registre contrôlant le fonctionnement du processeur
+    https://en.wikipedia.org/wiki/Control_register
+    https://wiki.osdev.org/CPU_Registers_x86
+    CR0:
+        0	PE	protected mode si 1, real mode sinon
+        31	PG	activation du paging
+    CR3: paging
+    CR4:
+        4	PSE page size extension (toujours actif si PAE)
+        5	PAE	physical address extension
 
 Segmentation:
-	https://wiki.osdev.org/Segmentation
-	segment registers:
-		CS      Code Segment
-		DS      Data Segment
-		SS      Stack Segment
-		ES      Extra Segment
-		FS,GS   General Purpose Segments
+    https://wiki.osdev.org/Segmentation
+    segment registers:
+        CS      Code Segment
+        DS      Data Segment
+        SS      Stack Segment
+        ES      Extra Segment
+        FS,GS   General Purpose Segments
 
 Model Specific Register (MSR):
-	https://wiki.osdev.org/MSR
-	EFER: 0xC0000080
-		8	LME	Long Mode Enable 
+    https://wiki.osdev.org/MSR
+    EFER: 0xC0000080
+        8	LME	Long Mode Enable
 
 Global Descriptor Table (GDT):
-	https://wiki.osdev.org/Global_Descriptor_Table
-	GDT descriptor
+    https://wiki.osdev.org/Global_Descriptor_Table
+    GDT descriptor
 
 ELF:
-	https://wiki.osdev.org/ELF
+    https://wiki.osdev.org/ELF
 
 FLAGS register:
-	32b: EFLAGS, 64b: RFLAGS
-	PUSHF* push ce registre
-	https://en.wikipedia.org/wiki/FLAGS_register
+    32b: EFLAGS, 64b: RFLAGS
+    PUSHF* push ce registre
+    https://en.wikipedia.org/wiki/FLAGS_register
 
 IP register:
-	instruction pointer
-	32b: EIP, 64b: RIP
+    instruction pointer
+    32b: EIP, 64b: RIP
 
 CPL:
-	current privilege level
+    current privilege level
 
 TSS:
-	Task State Segment
-	https://wiki.osdev.org/TSS
+    Task State Segment
+    https://wiki.osdev.org/TSS
+
+LIBC:
+    https://wiki.osdev.org/Creating_a_C_Library

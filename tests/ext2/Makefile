@@ -1,27 +1,36 @@
 NAME=./test_ext2.out
-CC=gcc
-FLAGS=-O1 -Wall -Wextra -std=gnu99 -fno-builtin
-FILES=$(addprefix ../../src/fs/ext2/, ext2.c inode.c dir.c) \
-	  ../../src/util/string.o
-OBJ=$(FILES:.c=.o)
+export CC=gcc
+export FLAGS=-O1 -Wall -Wextra -std=gnu99 -fno-builtin -D__is_test
 INCLUDES=-I ../../include
 
 .PHONY: run
 
+.PHONY: clean run ext2 home
+
 all:$(NAME)
 
-$(NAME): main.o $(OBJ)
-	$(CC) $(FLAGS) -o $(NAME) $(OBJ) main.o $(INCLUDES)
+ext2:
+	$(MAKE) -C ../../src/fs/ext2 ext2.a
+
+$(NAME): main.o $(OBJ) ext2
+	$(CC) $(FLAGS) -o $(NAME) ../../src/fs/ext2/ext2.a main.o $(INCLUDES)
 
 %.o:%.c
 	$(CC) $(FLAGS) -o $@ -c $< $(INCLUDES)
 
-test.img:
-	dd if=/dev/zero of=test.img bs=1M count=50
-	mke2fs test.img
+home: bio.txt
+	mkdir -p home/mpouzet
+	cp bio.txt home/mpouzet/bio.txt
+	x86_64-elf-gcc -E hello-world.S -o home/mpouzet/hello-world.s $(INCLUDES)
+	x86_64-elf-as home/mpouzet/hello-world.s -o home/mpouzet/hello-world.out
+	echo "Hello world !" > home/mpouzet/hello-world
 
-run: $(NAME) test.img
-	$(NAME) test.img
+home.img: home
+	@echo "WARNING: sudo here !"
+	sudo ./build-home.sh
+
+run: $(NAME) home.img
+	# $(NAME) home.img
 
 clean:
-	rm -f *.o *.img $(NAME) $(OBJ)
+	rm -rf *.o *.img *.out *.s home $(NAME) $(OBJ)
