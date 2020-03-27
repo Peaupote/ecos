@@ -107,9 +107,10 @@ struct reg *st_curr_reg;
 
 /**
  * Initialize state of the machine
- * and create process one
+ * create process IDLE and INIT
+ * start INIT
  */
-void init(void);
+void proc_start(void);
 
 void  sched_add_proc(pid_t);
 // Le scheduler ne doit pas être vide

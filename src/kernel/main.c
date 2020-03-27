@@ -40,7 +40,7 @@ void kernel_main(uint32_t boot_info) {
 
     tty_new_prompt();
 
-    init();
+    proc_start();
 
-    while (true) halt();
+	never_reached
 }

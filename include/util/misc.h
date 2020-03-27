@@ -38,6 +38,7 @@ GEN_FBIT(8,   uint8_t)
 	static inline void mina_##T(T* a, T b) {if(b < *a) *a = b;}
 GEN_COMP(int)
 GEN_COMP(uint64_t)
+GEN_COMP(uint32_t)
 GEN_COMP(size_t)
 GEN_COMP(uint_ptr)
 GEN_COMP(phy_addr)

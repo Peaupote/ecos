@@ -4,7 +4,6 @@
 	.global _start
 
 _start:
-	pushq $42
 	call  main
 	movq  %rax,      %rdi
 	movq  $SYS_EXIT, %rax

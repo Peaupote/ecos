@@ -29,7 +29,7 @@ void sched_init() {
 	}
 }
 
-void init() {
+void proc_start() {
 	sched_init();
 
 	// processus 0: p_idle
@@ -186,7 +186,8 @@ static inline uint8_t proc_ldr_alloc_pages(uint_ptr begin, uint_ptr end) {
 				PAGING_FLAG_U | PAGING_FLAG_W);
 }
 
-void proc_ldr_fill0(void* err_pt, Elf64_Addr dst, uint64_t sz) {
+void proc_ldr_fill0(void* err_pt, Elf64_Xword flag __attribute__((unused)),
+		Elf64_Addr dst, uint64_t sz) {
     uint8_t err = proc_ldr_alloc_pages(dst, dst + sz);
     if (err) {
 		*((uint8_t*)err_pt) = err;
@@ -197,7 +198,8 @@ void proc_ldr_fill0(void* err_pt, Elf64_Addr dst, uint64_t sz) {
         ((uint8_t*) dst)[i] = 0;
 }
 
-void proc_ldr_copy(void* err_pt, Elf64_Addr dst, void* src, uint64_t sz) {
+void proc_ldr_copy(void* err_pt, Elf64_Xword flag __attribute__((unused)),
+		Elf64_Addr dst, void* src, uint64_t sz) {
     uint8_t err = proc_ldr_alloc_pages(dst, dst + sz);
     if (err) {
 		*((uint8_t*)err_pt) = err;

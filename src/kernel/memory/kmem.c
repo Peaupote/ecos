@@ -34,18 +34,22 @@ struct PageAllocator page_alloc;
 
 
 void kmem_init_paging() {
+
 	for(uint16_t i=0; i<512; ++i)
-		laddr_pd[i] = heap_pd[i] = heap_pt0[i] = dslot_pt[i]
-			= PAGING_FLAG_W;
+		laddr_pd[i] = heap_pd[i] = heap_pt0[i] = dslot_pt[i] = 0;
+
 	laddr_pd[0] = 0 | PAGING_FLAG_S | PAGING_FLAG_W | PAGING_FLAG_P;
 	heap_pd [0] = paging_phy_addr_page((uint_ptr)heap_pt0)
                 | PAGING_FLAG_W | PAGING_FLAG_P;
+
 	*paging_acc_pdpt(PML4_KERNEL_VIRT_ADDR, KERNEL_PDPT_LADDR)
 		= paging_phy_addr_page((uint_ptr) laddr_pd)
 		| PAGING_FLAG_W | PAGING_FLAG_P;
+
 	*paging_acc_pdpt(PML4_KERNEL_VIRT_ADDR, KERNEL_PDPT_DSLOT)
 		= paging_phy_addr_page((uint_ptr) dslot_pt)
 		| PAGING_FLAG_W | PAGING_FLAG_P;
+
 	*paging_acc_pdpt(PML4_KERNEL_VIRT_ADDR, KERNEL_PDPT_HEAP)
 		= paging_phy_addr_page((uint_ptr) heap_pd)
 		| PAGING_FLAG_W | PAGING_FLAG_P;

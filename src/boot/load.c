@@ -1,6 +1,8 @@
 #include <util/multiboot.h>
 #include <util/elf64.h>
 #include <util/string.h>
+#include <util/misc.h>
+#include <util/paging.h>
 
 //Informations fournies par GRUB
 extern multiboot_info_t* mb_info;
@@ -8,7 +10,10 @@ extern multiboot_info_t* mb_info;
 extern void* kernel_entry_addr;
 extern uint32_t end_kernel;
 
-extern uint8_t KPA;
+extern uint8_t KPA[];
+extern uint8_t KPA_end[];
+
+extern uint32_t page_t_23[2*1024];
 
 const char kernel_cmd[] = "KERNEL_BIN";
 
@@ -16,28 +21,37 @@ static inline void* virt2phys(Elf64_Addr a){
     // base du kernel dans les adresses virtuelles: KVA,
     // effacée par le cast
     // KPA: adresse physique du kernel
-    return (void*)(&KPA + ((uint32_t) a));
+    return (void*)(KPA + ((uint32_t) a));
 }
 
-unsigned char* virt2phys_section(Elf64_Addr a, uint64_t sz){
-    unsigned char* p_dst = (unsigned char*) virt2phys(a);
-    uint32_t end_s = ((uint32_t) p_dst) + sz;
-    if (end_s > end_kernel) end_kernel = end_s;
+uint8_t* virt2phys_section(Elf64_Xword flags, Elf64_Addr a, uint64_t sz){
+    uint8_t* p_dst = (uint8_t*) virt2phys(a);
+	if (p_dst + sz > KPA_end) {
+		//TODO ERROR
+		while(1) asm("hlt");
+	}
+	if (flags & SHF_WRITE) {
+		for (uint32_t addr = ((uint32_t)a) & PAGE_MASK;
+				addr < (uint32_t)(a + sz);
+				addr += PAGE_SIZE)
+			page_t_23[2*(addr >> PAGE_SHIFT)] |= PAGING_FLAG_W;
+	}
+	maxa_uint32_t(&end_kernel, ((uint32_t) p_dst) + sz);
     return p_dst;
 }
 
-void simp_fill0(void* none __attribute__((unused)), Elf64_Addr dst,
-        uint64_t sz){
-    unsigned char* p_dst = virt2phys_section(dst, sz);
+void simp_fill0(void* none __attribute__((unused)), Elf64_Xword flags,
+		Elf64_Addr dst, uint64_t sz){
+    uint8_t* p_dst = virt2phys_section(flags, dst, sz);
     for(uint64_t i=0; i<sz; ++i)
         p_dst[i] = 0;
 
 }
-void simp_copy(void* none __attribute__((unused)), Elf64_Addr dst,
-        void* src, uint64_t sz){
-    unsigned char* p_dst = virt2phys_section(dst, sz);
+void simp_copy(void* none __attribute__((unused)), Elf64_Xword flags,
+		Elf64_Addr dst, void* src, uint64_t sz){
+    uint8_t* p_dst = virt2phys_section(flags, dst, sz);
     for(uint64_t i=0; i<sz; ++i)
-        p_dst[i] = ((unsigned char*) src)[i];
+        p_dst[i] = ((uint8_t*) src)[i];
 }
 
 void load_kernel64(void){

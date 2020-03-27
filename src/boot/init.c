@@ -22,7 +22,8 @@ extern uint32_t page_d_1[1024];
 //Page Tables (x2)
 extern uint32_t page_t_23[2*1024];
 
-extern uint8_t KPA;
+extern uint8_t KPA[];
+extern uint8_t kba_bgn_krn[];
 
 /*
  * On initialise 2 pages de 2MB pour couvrir les adresses:
@@ -34,7 +35,7 @@ extern uint8_t KPA;
  *
  * TODO: erreur si bit 47 set
  */
-void init_paging_directory(void){
+void init_paging_structs(void){
     uint32_t *st0[5] = {
         page_d_0,   page_d_1,
         page_dpt_0, page_dpt_1,
@@ -49,16 +50,21 @@ void init_paging_directory(void){
     //initialisation à vide
     for(size_t s=0; s<5; ++s)
         for(uint16_t i=0; i < 1024; i+=2)
-            st0[s][i] = PAGING_FLAG_W;
+            st0[s][i] = 0;
 
     //initialisation des tables:
     //	PML4_KERNEL_VIRT_ADDR,0,0; PML4_KERNEL_VIRT_ADDR,0,1
     //couvrant chacune 512 pages de 4KB
-    for(uint32_t i_pte=0; i_pte<1024; ++i_pte) {
-        page_t_23[2*i_pte]     = ((i_pte << 12) + (uint32_t)(&KPA))
-                               | F_PRS | PAGING_FLAG_G;
+    for(uint32_t i_pte = 0; i_pte<1024; ++i_pte) {
+        page_t_23[2*i_pte]     = ((i_pte << 12) + (uint32_t)KPA)
+                               | PAGING_FLAG_P | PAGING_FLAG_G;
         page_t_23[2*i_pte + 1] = 0;
     }
+
+	//Les données issues du boot sont accessibles en écriture
+	for(uint32_t i_pte = 0; i_pte*PAGE_SIZE < (uint32_t)kba_bgn_krn;
+			++i_pte)
+		page_t_23[2*i_pte] |= PAGING_FLAG_W;
 
     //Mapping identité: ajout des pages de 2MB dans le directory
     page_d_0[0] = PAGING_FLAG_S | F_PRS;
