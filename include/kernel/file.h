@@ -42,7 +42,6 @@ typedef struct vfile {
     struct stat vf_stat; // information about the file
     uint8_t     vf_cnt;  // nb of channel pointing at the file
     uint8_t     vf_mnt;
-    off_t       vf_pos;  // position in file
 } vfile_t;
 
 struct dirent {
@@ -100,9 +99,8 @@ struct fs {
 void     vfs_init();
 
 vfile_t *vfs_load(const char *path, uint32_t create);
-int      vfs_read(vfile_t *vfile, void *buf, size_t len);
-int      vfs_write(vfile_t *vfile, void *buf, size_t len);
-int      vfs_seek(vfile_t *vfile, off_t pos);
+int      vfs_read(vfile_t *vfile, void *buf, off_t pos, size_t len);
+int      vfs_write(vfile_t *vfile, void *buf, off_t pos, size_t len);
 
 
 #endif
