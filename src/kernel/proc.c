@@ -16,8 +16,8 @@
 
 char proc_state_char[5] = {'f', 's', 'w', 'R', 'Z'};
 
-extern void    proc_idle_entry(void);
-extern uint8_t proc_init[];
+extern void proc_idle_entry(void);
+extern void proc_init_entry(void);
 
 void sched_init() {
 	struct scheduler* s = &state.st_sched;
@@ -54,6 +54,9 @@ void init() {
     p_init->p_stat = RUN;
 	p_init->p_ring = 1;
 	p_init->p_prio = NB_PRIORITY_LVL - 1; //priorité maximale
+	p_init->p_pml4 = (phy_addr)NULL;
+	p_init->p_reg.rsp = (uint_ptr)NULL;
+	p_init->p_reg.rip = (uint_ptr)&proc_init_entry;
 
     // set file descriptors
     // stdin
@@ -92,12 +95,11 @@ void init() {
     vfs_init();
 
 	sched_add_proc(PID_IDLE);
-    proc_create_userspace(proc_init, p_init); //TODO in kernel
 
-    state.st_curr_pid = 1;
+    state.st_curr_pid = PID_INIT;
     st_curr_reg       = &p_init->p_reg;
 
-    klog(Log_info, "init", "Process 1 loaded. Start process 1");
+    klogf(Log_info, "init", "Start process init @ %p", p_init->p_reg.rip);
 	iret_to_proc(p_init);
 }
 

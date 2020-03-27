@@ -28,7 +28,7 @@ elf_info.out:elf_info.o util
 	$(CC) $(FLAGS) -o elf_info.out elf_info.o $(UDEP_FROM_HERE) $(INCLUDES)
 
 .depends:
-	../tools/mkdep.sh "$(CC) $(FLAGS)" $(SRCDEP) > .depends
+	../tools/mkdep.sh "$(CC) $(FLAGS) $(INCLUDES)" $(SRCDEP) > .depends
 
 include .depends
 

@@ -5,7 +5,7 @@ INCLUDES=-I ../../include
 
 .PHONY: run
 
-.PHONY: clean run ext2 home
+.PHONY: clean run ext2 home aux_prg
 
 all:$(NAME)
 
@@ -18,15 +18,15 @@ $(NAME): main.o $(OBJ) ext2
 %.o:%.c
 	$(CC) $(FLAGS) -o $@ -c $< $(INCLUDES)
 
-home: bio.txt
-	mkdir -p home/mpouzet
-	cp bio.txt home/mpouzet/bio.txt
-	x86_64-elf-gcc -E hello-world.S -o home/mpouzet/hello-world.s $(INCLUDES)
-	x86_64-elf-as home/mpouzet/hello-world.s -o home/mpouzet/hello-world.out
-	echo "Hello world !" > home/mpouzet/hello-world
+home: aux_prg
+	mkdir -p home/test
+	cp ../../src/kernel/aux_prg/init1.out home/test/init1.out
 
 home.img: home
 	./build-home.sh
+
+aux_prg:
+	$(MAKE) -C ../../src/kernel/aux_prg all
 
 run: $(NAME) home.img
 	# $(NAME) home.img

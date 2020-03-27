@@ -5,15 +5,14 @@ export FLAGS=-O1 -Wall -Wextra -std=gnu99 -nostdlib \
 			 -D__is_kernel
 export AS=x86_64-elf-as
 export AR=x86_64-elf-ar
-#include ../libc/list.Makefile
-#LIBK_FILES=$(addprfix ../libc/, $(LIBK_FILES))
 include ../../tests/libc/list.Makefile
 TESTS_LIBK:=$(addprefix ../../tests/libc/, $(TESTS_LIBK))
 CFILES=main.c memory/kmem.c idt.c gdt.c keyboard.c tty.c tests.c \
 		syscalls/sleep.c syscalls/sys.c syscalls/execve.c proc.c kutil.c \
 		memory/page_alloc.c memory/shared_pages.c memory/shared_ptr.c \
 		../fs/dummy/dummy.c ../fs/proc/proc.c file.c
-ASFILES=entry.S int.S data.S aux_prg/idle.S syscalls/int7Ecall.S
+ASFILES=entry.S int.S data.S aux_prg/idle.S aux_prg/init.S \
+		syscalls/int7Ecall.S
 SRCDEP=$(foreach file,$(ASFILES),"-MT $(file:.S=.s) $(file)") $(CFILES)
 OBJ=$(ASFILES:.S=.o) $(CFILES:.c=.o)
 KBMAP=gawk -f ../../tools/keyboard_map.awk
@@ -44,7 +43,7 @@ keyboard_layout.s: ../../data/keyboard_azerty.txt ../../data/keyboard_qwerty.txt
 	echo "keyboard_qwerty_layout:" >> keyboard_layout.s
 	$(KBMAP) ../../data/keyboard_qwerty.txt >> keyboard_layout.s
 
-data.o:data.s tests_prg aux_prg home_part
+data.o:data.s tests_prg home_part
 
 UDEP_FROM_HERE=$(patsubst %,../util/64/%,$(UDEP))
 UDEP_FROM_UTIL=$(patsubst %,64/%,$(UDEP))
@@ -63,9 +62,6 @@ home_part:
 
 ext2:
 	$(MAKE) -C ../fs/ext2 ext2.a
-
-aux_prg:
-	$(MAKE) -C aux_prg
 
 tests_prg:
 	$(MAKE) -C ../../tests/prg all

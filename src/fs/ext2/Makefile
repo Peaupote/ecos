@@ -21,7 +21,7 @@ ext2.a: $(OBJ)
 	$(AR) rcs $@ $(OBJ)
 
 .depends:
-	../../../tools/mkdep.sh "$(CC) $(FLAGS)" $(SRCDEP) > .depends
+	../../../tools/mkdep.sh "$(CC) $(FLAGS) $(INCLUDES)" $(SRCDEP) > .depends
 
 include .depends
 

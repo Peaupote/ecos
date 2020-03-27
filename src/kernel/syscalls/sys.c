@@ -14,7 +14,7 @@
  * TODO: check args domain
  */
 
-void kexit(int status) {
+void sys_exit(int status) {
     proc_t  *p = state.st_proc + state.st_curr_pid;
     pid_t ppid = p->p_ppid;
     proc_t *pp = state.st_proc + ppid;
@@ -113,7 +113,8 @@ void kexit(int status) {
         && (rei_cast(pid_t, pp->p_reg.rax) == PID_NONE
             || rei_cast(pid_t, pp->p_reg.rax) == state.st_curr_pid)) {
 
-        kmem_free_paging(p->p_pml4, pp->p_pml4);
+        kmem_free_paging(p->p_pml4,
+				pp->p_pml4 ? pp->p_pml4 : kernel_pml4);
 
         free_pid(state.st_curr_pid);
         pp->p_nchd--;
@@ -152,12 +153,12 @@ void kexit(int status) {
     never_reached
 }
 
-pid_t getpid() {
+pid_t sys_getpid() {
     klogf(Log_verb, "syscall", "getpid %d", state.st_curr_pid);
     return state.st_curr_pid;
 }
 
-pid_t getppid() {
+pid_t sys_getppid() {
     proc_t *p = &state.st_proc[state.st_curr_pid];
     klogf(Log_verb, "syscall", "getppid %d", p->p_ppid);
     return p->p_ppid;
@@ -177,7 +178,7 @@ static inline void rem_child_Z0(proc_t* p, proc_t* cp) {
     }
 }
 
-pid_t wait(int* rt_st) {
+pid_t sys_wait(int* rt_st) {
     klogf(Log_verb, "syscall", "wait");
     proc_t *p = &state.st_proc[state.st_curr_pid];
     if (~p->p_fchd) {
@@ -211,8 +212,8 @@ pid_t wait(int* rt_st) {
     }
 }
 
-pid_t waitpid(int* rt_st, pid_t cpid) {
-    if (cpid == PID_NONE) return wait(rt_st);
+pid_t sys_waitpid(int* rt_st, pid_t cpid) {
+    if (cpid == PID_NONE) return sys_wait(rt_st);
 
     pid_t mpid = state.st_curr_pid;
     proc_t  *p = state.st_proc + mpid;
@@ -248,7 +249,7 @@ pid_t waitpid(int* rt_st, pid_t cpid) {
     }
 }
 
-pid_t fork() {
+pid_t sys_fork() {
     proc_t *fp, *pp = state.st_proc + state.st_curr_pid;
 
     pid_t fpid = find_new_pid();
@@ -316,7 +317,7 @@ pid_t fork() {
     return fpid; // On retourne au parent
 }
 
-int open(const char *fname, enum chann_mode mode) {
+int sys_open(const char *fname, enum chann_mode mode) {
     proc_t *p = &state.st_proc[state.st_curr_pid];
 
     cid_t cid;
@@ -353,7 +354,7 @@ int open(const char *fname, enum chann_mode mode) {
     return -1;
 }
 
-int close(int filedes) {
+int sys_close(int filedes) {
     proc_t *p = &state.st_proc[state.st_curr_pid];
 
     // invalid file descriptor
@@ -372,7 +373,7 @@ int close(int filedes) {
     return 0;
 }
 
-int dup(int fd) {
+int sys_dup(int fd) {
     proc_t *p = &state.st_proc[state.st_curr_pid];
     int i;
 
@@ -389,7 +390,7 @@ int dup(int fd) {
     return i;
 }
 
-int pipe(int fd[2]) {
+int sys_pipe(int fd[2]) {
     proc_t *p = &state.st_proc[state.st_curr_pid];
 
     if (!fd) return -1;
@@ -425,7 +426,7 @@ int pipe(int fd[2]) {
     return 0;
 }
 
-int read(int fd, uint8_t *d, size_t len) {
+int sys_read(int fd, uint8_t *d, size_t len) {
     proc_t *p  = &state.st_proc[state.st_curr_pid];;
 
     if (!d || fd < 0 || fd > NFD || p->p_fds[fd] == -1)
@@ -453,7 +454,7 @@ int read(int fd, uint8_t *d, size_t len) {
     }
 }
 
-int write(int fd, uint8_t *s, size_t len) {
+int sys_write(int fd, uint8_t *s, size_t len) {
     proc_t *p  = &state.st_proc[state.st_curr_pid];;
 
     if (!s || fd < 0 || fd > NFD || p->p_fds[fd] == -1)
@@ -485,7 +486,7 @@ int write(int fd, uint8_t *s, size_t len) {
     }
 }
 
-off_t lseek(int fd, off_t off) {
+off_t sys_lseek(int fd, off_t off) {
     proc_t *p = &state.st_proc[state.st_curr_pid];
 
     if (fd < 0 || fd > NFD) {

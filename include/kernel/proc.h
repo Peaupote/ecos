@@ -1,7 +1,7 @@
 #ifndef _H_PROC
 #define _H_PROC
 
-#include <stddef.h>
+#include <headers/proc.h>
 
 #include "kutil.h"
 #include "gdt.h"
@@ -12,14 +12,6 @@
 
 //Emplacement de la pile des processus
 #define USER_STACK_PD 0x7FF
-
-#define PID_IDLE      0
-#define PID_INIT      1
-
-typedef int32_t  pid_t;
-#define PID_NONE (~((pid_t)0))
-typedef uint8_t  priority_t;
-typedef int32_t  cid_t;
 
 /**
  * Processus
@@ -71,15 +63,6 @@ typedef struct proc {
 /**
  * Channels
  */
-
-enum chann_mode {
-    UNUSED,
-    READ,
-    WRITE,
-    RDWR,
-    STREAM_IN,
-    STREAM_OUT
-};
 
 typedef struct channel {
     cid_t           chann_id;

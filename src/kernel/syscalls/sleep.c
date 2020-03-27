@@ -9,7 +9,7 @@ struct {
     pid_t    pid;
 } sleeps[NSLEEP];
 
-uint64_t sleep(uint64_t time) {
+uint64_t sys_sleep(uint64_t time) {
     proc_t *p = &state.st_proc[state.st_curr_pid];
     size_t i = 0;
 

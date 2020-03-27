@@ -10,7 +10,7 @@ call_\fun :
 	retq
 .endm
 
-clwr proc_execve_error
+clwr proc_execve_error_1
 clwr proc_execve_error_2
 clwr execve_switch_pml4
 clwr proc_execve_end

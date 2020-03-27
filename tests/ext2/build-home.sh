@@ -5,12 +5,8 @@
 IMG=home.img
 BASE=home
 
-if [ -e $IMG ];
-then
-    echo "Partition $IMG already exists";
-    exit 0;
-fi
-   
+rm -f $IMG
+
 echo "Creating partition $IMG";
 dd if=/dev/zero of=$IMG bs=64K count=1;
 mke2fs $IMG
@@ -20,7 +16,7 @@ then
 	rm -f $IMG
 fi
 
-e2mkdir ../$IMG:mpouzet \
+find ./ -type d -exec e2mkdir ../$IMG:{} \; \
 	&& find ./ -type f -exec e2cp {} ../$IMG:{} \; \
     && echo "Partition created !"
 

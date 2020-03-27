@@ -12,23 +12,23 @@ int_handlers:
 #include "int_handlers_tab.s"
 
 syscall_tab:
-    .quad sleep
-    .quad fork
-    .quad kexit
-    .quad wait
-    .quad waitpid
-    .quad getpid
-    .quad getppid
-    .quad open
-    .quad close
-    .quad dup
-    .quad pipe
-    .quad write
-    .quad read
-    .quad lseek
-    .quad execve
+    .quad sys_sleep
+    .quad sys_fork
+    .quad sys_exit
+    .quad sys_wait
+    .quad sys_waitpid
+    .quad sys_getpid
+    .quad sys_getppid
+    .quad sys_open
+    .quad sys_close
+    .quad sys_dup
+    .quad sys_pipe
+    .quad sys_write
+    .quad sys_read
+    .quad sys_lseek
+    .quad sys_execve
 syscall_ring1_tab:
-	.quad prires
+	.quad sys_prires
 
     .section .text
 .global irq_sys
@@ -305,7 +305,7 @@ irq_sys_ring1_end:
 // struct iret
 // reg save 9 quad
 // ds  save 1 quad
-prires:
+sys_prires:
 	movq  $(GDT_RING_SZ+1), %r10 //+1 pour le CPL
 	imulw %di,              %r10w
 	addw  $GDT_RING_OFS,    %r10w

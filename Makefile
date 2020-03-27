@@ -32,11 +32,12 @@ start: $(ISO)
 	qemu-system-x86_64 -cdrom $(ISO) -monitor stdio | tee qemu.out
 
 depends:
-	$(MAKE) -C src/kernel .depends
-	$(MAKE) -C src/boot   .depends
-	$(MAKE) -C src/util    clean-depends
-	$(MAKE) -C src/libc   .depends
-	$(MAKE) -C tests      .depends
+	$(MAKE) -B -C src/kernel         .depends
+	$(MAKE) -B -C src/kernel/aux_prg .depends
+	$(MAKE) -B -C src/boot           .depends
+	$(MAKE) -B -C src/util      clean-depends
+	$(MAKE) -B -C src/libc           .depends
+	$(MAKE) -B -C tests              .depends
 
 clean:
 	$(MAKE) -C src/kernel clean

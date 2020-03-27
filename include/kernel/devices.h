@@ -1,14 +1,12 @@
 #ifndef _H_DEV
 #define _H_DEV
 
+#include <headers/devices.h>
+
 #include <stdint.h>
 #include <kernel/param.h>
 
-#if defined(__is_kernel)
-typedef uint32_t dev_t;
-#else
-#include <sys/stat.h>
-#endif
+//TODO #include <sys/stat.h>
 
 struct mount_info {
     void    *sp;
