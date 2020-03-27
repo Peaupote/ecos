@@ -157,36 +157,17 @@ vfile_t *vfs_load(const char *filename, uint32_t create) {
     memcpy(&state.st_files[free].vf_stat, &st, sizeof(struct stat));
     state.st_files[free].vf_stat.st_dev = dev->dev_id;
     state.st_files[free].vf_cnt = 0;
-    state.st_files[free].vf_pos = 0;
     return state.st_files + free;
 }
 
-int vfs_read(vfile_t *vfile, void *buf, size_t len) {
+int vfs_read(vfile_t *vfile, void *buf, off_t pos, size_t len) {
     struct device *dev = devices + vfile->vf_stat.st_dev;
-    int32_t rc = fst[dev->dev_fs].fs_read(vfile->vf_stat.st_ino,
-                                         buf, vfile->vf_pos,
-                                         len, &dev->dev_info);
-    if (rc < 0) {
-        klogf(Log_error, "vfs", "error %d on read", rc);
-        return rc;
-    }
-
-    vfile->vf_pos += rc;
-    return rc;
+    return  fst[dev->dev_fs].fs_read(vfile->vf_stat.st_ino,
+                                    buf, pos, len, &dev->dev_info);
 }
 
-int vfs_write(vfile_t *vfile, void *buf, size_t len) {
+int vfs_write(vfile_t *vfile, void *buf, off_t pos, size_t len) {
     struct device *dev = devices + vfile->vf_stat.st_dev;
-    int32_t rc = fst[dev->dev_fs].fs_write(vfile->vf_stat.st_ino,
-                                          buf, vfile->vf_pos,
-                                          len, &dev->dev_info);
-    if (rc < 0) return rc;
-    vfile->vf_pos += rc;
-    return rc;
-}
-
-int vfs_seek(vfile_t *vfile, off_t pos) {
-    // TODO : add checks regarding file size
-    vfile->vf_pos = pos;
-    return 0;
+    return fst[dev->dev_fs].fs_write(vfile->vf_stat.st_ino,
+                                    buf, pos, len, &dev->dev_info);
 }
