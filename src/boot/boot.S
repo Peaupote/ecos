@@ -56,7 +56,7 @@ kernel_entry_addr: //adresse physique
     .section space_for_kernel
 .global KPA           //Adresse physique du kernel
 .balign 0x1000        //alignement à la page 4KB
-KPA: .skip 0x200000   //2MB
+KPA: .skip 0x280000   //2.5MB
 
 
     .section .text

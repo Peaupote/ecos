@@ -26,8 +26,7 @@ home: bio.txt
 	echo "Hello world !" > home/mpouzet/hello-world
 
 home.img: home
-	@echo "WARNING: sudo here !"
-	sudo ./build-home.sh
+	./build-home.sh
 
 run: $(NAME) home.img
 	# $(NAME) home.img

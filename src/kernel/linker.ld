@@ -46,4 +46,5 @@ SECTIONS
         *(COMMON)
         *(.bss)
     }
+	ASSERT(. <= KVA + kba_end + 2M, "taille du kernel")
 }

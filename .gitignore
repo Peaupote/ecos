@@ -11,3 +11,4 @@ isodir
 *.img
 *.a
 tests/ext2/home
+src/libc/sys.S
