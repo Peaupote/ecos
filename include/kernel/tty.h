@@ -8,7 +8,12 @@
 
 #define SB_HEIGHT 128
 
-void   tty_init(void);
+enum tty_mode {
+	ttym_def, ttym_panic
+};
+
+void   tty_init(enum tty_mode);
+void   tty_set_mode(enum tty_mode);
 void   tty_input(scancode_byte scb, key_event ev);
 
 //L'affichage du prompt doit être mis à jour (tty_update_prompt_pos)

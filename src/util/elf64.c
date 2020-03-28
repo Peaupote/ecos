@@ -86,7 +86,7 @@ Elf64_Addr elf_load(struct elf_loader el, void* el_i, void* elf_begin){
 
     for(size_t i=0; i<ehdr->e_shnum; ++i){
         Elf64_Shdr* shdr = (Elf64_Shdr*)(shdrs + i * ehdr->e_shentsize);
-        if (shdr->sh_flags & (SHF_WRITE | SHF_ALLOC | SHF_EXECINSTR)){
+        if (shdr->sh_flags & SHF_ALLOC){
             if(shdr->sh_type == SHT_NOBITS) //.bss
                 (*el.fill0)(el_i, shdr->sh_flags,
 						shdr->sh_addr, shdr->sh_size);

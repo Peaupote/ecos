@@ -31,6 +31,7 @@ struct section {
 	uint_ptr   dst;
 	size_t     sz;
 	bool       copy;
+	bool       write;
 	off_t      src;
 };
 
@@ -132,12 +133,12 @@ inline bool execve_lseek(int fd, off_t ofs) {
 }
 
 // Chargement des sections
-bool execve_alloc_rng(uint_ptr bg, size_t sz) {
+bool execve_alloc_rng(bool write, uint_ptr bg, size_t sz) {
+	uint16_t   f  = PAGING_FLAG_U;
+	if (write) f |= PAGING_FLAG_W;
 	return bg + sz >= bg 
 		&& paging_get_lvl(pgg_pml4, bg + sz) < PML4_END_USPACE
-		&& !call_kmem_paging_alloc_rng(bg, bg + sz,
-				PAGING_FLAG_U | PAGING_FLAG_W,
-				PAGING_FLAG_U | PAGING_FLAG_W);
+		&& !call_kmem_paging_alloc_rng(bg, bg + sz, f, f);
 }
 
 static inline void execve_fill0(uint_ptr bg, size_t sz) {
@@ -157,13 +158,14 @@ static inline bool execve_read_sections(int fd) {
 			|| !read_bytes(fd, &shdr, sizeof(Elf64_Shdr))) {
 			return false;
 		}
-        if (shdr.sh_flags & (SHF_WRITE | SHF_ALLOC | SHF_EXECINSTR)){
+        if (shdr.sh_flags & SHF_ALLOC){
 			size_t n_s = trf()->nb_sections;
 			if (!execve_tr_alloc_pg( (uint_ptr)(sections() + (n_s + 1)) - 1))
 				return false;
 			struct section* s = sections() + n_s;
-			s->dst = shdr.sh_addr;
-			s->sz  = shdr.sh_size;
+			s->dst   = shdr.sh_addr;
+			s->sz    = shdr.sh_size;
+			s->write = shdr.sh_flags & SHF_WRITE;
             if (shdr.sh_type == SHT_NOBITS) //.bss
 				s->copy = false;
 			else {
@@ -179,7 +181,7 @@ static inline bool execve_read_sections(int fd) {
 static inline bool execve_load_sections(int fd) {
 	for (size_t i_s = 0; i_s < trf()->nb_sections; ++i_s) {
 		struct section* s = sections() + i_s;
-		if (!execve_alloc_rng(s->dst, s->sz)) return false;
+		if (!execve_alloc_rng(s->write, s->dst, s->sz)) return false;
 		if (s->copy) {
             if (!execve_copy(fd, s->dst, s->src, s->sz))
 				return false;

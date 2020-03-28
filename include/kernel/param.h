@@ -19,8 +19,9 @@
 
 // Nombre de priorités (nice) dans le scheduler
 // Au sein du kernel la meilleure priorité est NB_PRIORITY_LVL-1, la pire 0
+// On réserve la priorité NB_PRIORITY_LVL-1 au processus STOP
 // NB_PRIORITY_LVL <= 64
-#define NB_PRIORITY_LVL 40
+#define NB_PRIORITY_LVL 41
 
 /**
  * Dont touch too much here

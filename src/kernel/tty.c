@@ -70,24 +70,41 @@ static inline size_t sb_sc_ed() {
 }
 
 
-void tty_init() {
+void tty_init(enum tty_mode m) {
     back_color = vga_entry_color (
                 VGA_COLOR_LIGHT_GREY, VGA_COLOR_BLACK);
     input_color = vga_entry_color (
                 VGA_COLOR_LIGHT_GREY, VGA_COLOR_BLACK);
-    prompt_color = vga_entry_color (
-                VGA_COLOR_LIGHT_BLUE, VGA_COLOR_BLACK);
-    vprompt_color = vga_entry_color (
-                VGA_COLOR_BLUE, VGA_COLOR_BLACK);
 
     ib_printed = ib_size = ib_ashift = 0;
     input_height = 0;
     input_bottom_line = input_top_line = ~0;
-
+    
     sb_ashift   = 0;
     sb_display_shift = 0;
 	sb_nb_lines = 0;
 	sb_dtcd     = false;
+
+	tty_set_mode(m);
+}
+
+void tty_set_mode(enum tty_mode m) {
+	switch (m) {
+	case ttym_def:
+		prompt_color = vga_entry_color (
+					VGA_COLOR_LIGHT_BLUE, VGA_COLOR_BLACK);
+		vprompt_color = vga_entry_color (
+					VGA_COLOR_BLUE, VGA_COLOR_BLACK);
+		break;
+	case ttym_panic:
+		prompt_color = vga_entry_color (
+					VGA_COLOR_LIGHT_RED, VGA_COLOR_BLACK);
+		vprompt_color = vga_entry_color (
+					VGA_COLOR_RED, VGA_COLOR_BLACK);
+		break;
+	}
+	if (~input_top_line)
+    	vga_putentryat('>', prompt_color, 0, input_top_line);
 }
 
 char cmd_decomp[IB_LENGTH + 10];
@@ -131,6 +148,12 @@ void ls () {
     ext2_iter_dir(curr, print_dir, 0, info);
 }
 
+uint_ptr read_ptr(const char str[]) {
+	if (str[0] == 'k')
+		return int64_of_str_hexa(str+1) 
+			+ paging_add_lvl(pgg_pml4, PML4_KERNEL_VIRT_ADDR);
+	return int64_of_str_hexa(str);
+}
 
 size_t built_in_exec(size_t in_begin, size_t in_len) {
     decomp_cmd(in_begin, in_len);
@@ -138,7 +161,7 @@ size_t built_in_exec(size_t in_begin, size_t in_len) {
     if (!strcmp(cmd_name, "tprint"))
         return tty_writestring("test print");
     else if (!strcmp(cmd_name, "memat")) {
-        uint_ptr ptr = int64_of_str_hexa(cmd_decomp + cmd_decomp_idx[1]);
+        uint_ptr ptr = read_ptr(cmd_decomp + cmd_decomp_idx[1]);
         char data_str[3];
         data_str[2] = '\0';
         int8_to_str_hexa(data_str, *(uint8_t*)ptr);

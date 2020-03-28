@@ -1,39 +1,22 @@
-export TRG=test
+export TRG=host
 export CC=gcc
 export FLAGS=-O2 -Wall -Wextra -std=gnu99 -fno-builtin
-SRCDEP=elf_info.c
-UDEP=elf64.o string.o
-INCLUDES=-I ../include
 
-.PHONY: all util clean libc ext2
+.PHONY: all clean libc ext2 unit
 
-all: elf_info.out util libc ext2
+all: libc ext2 unit
 
-%.o:%.c
-	$(CC) $(FLAGS) -o $@ -c $< $(INCLUDES)
-
-UDEP_FROM_HERE=$(patsubst %,../src/util/test/%,$(UDEP))
-UDEP_FROM_UTIL=$(patsubst %,test/%,$(UDEP))
-
-util:
-	$(MAKE) -C ../src/util $(UDEP_FROM_UTIL)
+unit:
+	$(MAKE) -C unit run
 
 ext2:
-	$(MAKE) -C ./ext2 all
+	$(MAKE) -C ext2 all
 
 libc:
 	$(MAKE) -C libc run
 
-elf_info.out:elf_info.o util
-	$(CC) $(FLAGS) -o elf_info.out elf_info.o $(UDEP_FROM_HERE) $(INCLUDES)
-
-.depends:
-	../tools/mkdep.sh "$(CC) $(FLAGS) $(INCLUDES)" $(SRCDEP) > .depends
-
-include .depends
-
 clean:
-	rm -f *.out *.o .depends
+	rm -f *.out *.o
 	$(MAKE) -C prg  clean
 	$(MAKE) -C unit clean
 	$(MAKE) -C ext2 clean

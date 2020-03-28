@@ -53,10 +53,24 @@ void proc_start() {
 	p_init->p_nchd = 1;
     p_init->p_stat = RUN;
 	p_init->p_ring = 1;
-	p_init->p_prio = NB_PRIORITY_LVL - 1; //priorité maximale
+	p_init->p_prio = NB_PRIORITY_LVL - 2; //priorité maximale
 	p_init->p_pml4 = (phy_addr)NULL;
 	p_init->p_reg.rsp = (uint_ptr)NULL;
 	p_init->p_reg.rip = (uint_ptr)&proc_init_entry;
+
+	// processus 2: stop, utilisé en cas de panic
+    proc_t *p_stop = &state.st_proc[PID_STOP];
+    p_stop->p_ppid = PID_STOP;
+	p_stop->p_prsb = p_stop->p_nxsb = PID_NONE;
+	p_stop->p_fchd = PID_STOP;
+	p_stop->p_nchd = 1;
+    p_stop->p_stat = WAIT;
+	p_stop->p_ring = 0;
+	p_stop->p_prio = NB_PRIORITY_LVL - 1;
+	p_stop->p_pml4 = (phy_addr)NULL;
+	p_stop->p_reg.rsp = (uint_ptr)kernel_stack_top;
+	p_stop->p_reg.rip = (uint_ptr)&proc_idle_entry;
+
 
     // set file descriptors
     // stdin
@@ -75,7 +89,8 @@ void proc_start() {
     state.st_chann[2].chann_acc  = 1;
 
     // set unused file desc
-    for (size_t i = 0; i < NFD; i++) p_idle->p_fds[i] = -1;
+    for (size_t i = 0; i < NFD; i++)
+		p_idle->p_fds[i] = p_stop->p_fds[i] = -1;
     for (size_t i = 3; i < NFD; i++) p_init->p_fds[i] = -1;
 
     // set chann to free
@@ -85,8 +100,8 @@ void proc_start() {
     }
 
     // set all remaining slots to free processus
-	state.st_free_proc = 2;
-    for (pid_t pid = 2; pid < NPROC; pid++) {
+	state.st_free_proc = 3;
+    for (pid_t pid = 3; pid < NPROC; pid++) {
         state.st_proc[pid].p_stat = FREE;
 		state.st_proc[pid].p_nxfr = pid + 1;
 	}

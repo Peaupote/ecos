@@ -44,6 +44,8 @@ syscall_ring1_tab:
 .global invalide_page
 .global paging_refresh
 
+.global kpanic_do_stop
+
 .extern st_curr_reg
 .extern common_hdl
 .extern keyboard_hdl
@@ -54,6 +56,7 @@ syscall_ring1_tab:
 .extern exception_PF_hdl
 .extern pit_hdl
 .extern pit_hdl_switch
+.extern panic_rsp
 
 // Sauvegarde des registres associés au processus courant (st_curr_reg)
 // Utilise la valeur actuelle des registres ainsi qu'une structure d'iret
@@ -351,3 +354,13 @@ paging_refresh:
 	movq   %cr3, %rax
 	movq   %rax, %cr3
 	ret
+
+kpanic_do_stop:
+	movabs $panic_rsp,   %r10
+	movq   %rsp,        (%r10)
+	movabs $st_curr_reg, %r10
+	movq   (%r10),       %r10
+	movq   %rsp,    0x10(%r10)
+	sti
+1:  hlt
+	jmp 1b

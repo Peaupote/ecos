@@ -3,6 +3,7 @@
 
 #define PID_IDLE      0
 #define PID_INIT      1
+#define PID_STOP      2
 
 #include <stddef.h>
 #include <stdint.h>

@@ -1,6 +1,6 @@
-TRG_LIST=32 64 test
+TRG_LIST=32 64 host
 # Default Target:
-TRG?=test
+TRG?=host
 CC?=gcc
 FLAGS?=-O2 -Wall -Wextra -std=gnu99
 INCLUDES=-I ../../include

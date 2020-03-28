@@ -26,8 +26,8 @@ extern uint8_t KPA[];
 extern uint8_t kba_bgn_krn[];
 
 /*
- * On initialise 2 pages de 2MB pour couvrir les adresses:
- * 0x00000000 -- 0x003fffff
+ * On initialise 3 pages de 2MB pour couvrir les adresses:
+ * 0x00000000 -- 0x005fffff
  * en les mappant aux adresses physiques identiques
  *
  * On initialise 2 pages de 2MB pour couvrir les adresses virtuelles du kernel:
@@ -67,10 +67,12 @@ void init_paging_structs(void){
 		page_t_23[2*i_pte] |= PAGING_FLAG_W;
 
     //Mapping identité: ajout des pages de 2MB dans le directory
-    page_d_0[0] = PAGING_FLAG_S | F_PRS;
+    page_d_0[0] = 0       | PAGING_FLAG_S | F_PRS;
     page_d_0[1] = 0;
     page_d_0[2] = (1<<21) | PAGING_FLAG_S | F_PRS;
     page_d_0[3] = 0;
+    page_d_0[4] = (2<<21) | PAGING_FLAG_S | F_PRS;
+    page_d_0[5] = 0;
 
     //Kernel: ajout des 2 tables dans le directory
     page_d_1[0] = ((uint32_t) page_t_23      ) | F_PRS;
