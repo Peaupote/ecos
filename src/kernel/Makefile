@@ -12,7 +12,7 @@ TESTS_LIBK:=$(addprefix ../../tests/libc/, $(TESTS_LIBK))
 CFILES=main.c memory/kmem.c idt.c gdt.c keyboard.c tty.c tests.c \
 		syscalls/sleep.c syscalls/sys.c syscalls/execve.c proc.c kutil.c \
 		memory/page_alloc.c memory/shared_pages.c memory/shared_ptr.c \
-		../fs/dummy/dummy.c ../fs/proc/proc.c file.c
+		../fs/proc/proc.c ../fs/pipe.c file.c
 ASFILES=entry.S int.S data.S aux_prg/idle.S syscalls/int7Ecall.S
 SRCDEP=$(foreach file,$(ASFILES),"-MT $(file:.S=.s) $(file)") $(CFILES)
 OBJ=$(ASFILES:.S=.o) $(CFILES:.c=.o)

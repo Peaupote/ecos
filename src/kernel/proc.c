@@ -13,6 +13,7 @@
 #include <kernel/kutil.h>
 #include <kernel/gdt.h>
 #include <util/misc.h>
+#include <fs/proc.h>
 
 char proc_state_char[5] = {'f', 's', 'w', 'R', 'Z'};
 
@@ -20,56 +21,40 @@ extern void    proc_idle_entry(void);
 extern uint8_t proc_init[];
 
 void sched_init() {
-	struct scheduler* s = &state.st_sched;
-	s->pres    = 0;
-	s->nb_proc = 0;
-	for (size_t p = 0; p < NB_PRIORITY_LVL; ++p) {
-		s->files[p].first = PID_NONE;
-		s->files[p].last  = PID_NONE;
-	}
+    struct scheduler* s = &state.st_sched;
+    s->pres    = 0;
+    s->nb_proc = 0;
+    for (size_t p = 0; p < NB_PRIORITY_LVL; ++p) {
+        s->files[p].first = PID_NONE;
+        s->files[p].last  = PID_NONE;
+    }
 }
 
 void init() {
-	sched_init();
+    sched_init();
 
-	// processus 0: p_idle
+    // processus 0: p_idle
     proc_t *p_idle = &state.st_proc[PID_IDLE];
     p_idle->p_ppid = PID_IDLE;
-	p_idle->p_prsb = p_idle->p_nxsb = PID_NONE;
-	p_idle->p_fchd = PID_IDLE;
-	p_idle->p_nchd = 1;
+    p_idle->p_prsb = p_idle->p_nxsb = PID_NONE;
+    p_idle->p_fchd = PID_IDLE;
+    p_idle->p_nchd = 1;
     p_idle->p_stat = RUN;
-	p_idle->p_ring = 0;
-	p_idle->p_prio = 0; //priorité minimale
-	p_idle->p_pml4 = (phy_addr)NULL;
-	p_idle->p_reg.rsp = (uint_ptr)kernel_stack_top;
-	p_idle->p_reg.rip = (uint_ptr)&proc_idle_entry;
+    p_idle->p_ring = 0;
+    p_idle->p_prio = 0; //priorité minimale
+    p_idle->p_pml4 = (phy_addr)NULL;
+    p_idle->p_reg.rsp = (uint_ptr)kernel_stack_top;
+    p_idle->p_reg.rip = (uint_ptr)&proc_idle_entry;
 
     // processus 1: init
     proc_t *p_init = &state.st_proc[PID_INIT];
     p_init->p_ppid = PID_INIT;
-	p_init->p_prsb = p_init->p_nxsb = PID_NONE;
-	p_init->p_fchd = PID_INIT;
-	p_init->p_nchd = 1;
+    p_init->p_prsb = p_init->p_nxsb = PID_NONE;
+    p_init->p_fchd = PID_INIT;
+    p_init->p_nchd = 1;
     p_init->p_stat = RUN;
-	p_init->p_ring = 1;
-	p_init->p_prio = NB_PRIORITY_LVL - 1; //priorité maximale
-
-    // set file descriptors
-    // stdin
-    p_init->p_fds[0] = 0;
-    state.st_chann[0].chann_mode = STREAM_IN;
-    state.st_chann[0].chann_acc  = 1;
-
-    // stdout
-    p_init->p_fds[1] = 1;
-    state.st_chann[1].chann_mode = STREAM_OUT;
-    state.st_chann[1].chann_acc  = 1;
-
-    // stderr
-    p_init->p_fds[1] = 2;
-    state.st_chann[2].chann_mode = STREAM_OUT;
-    state.st_chann[2].chann_acc  = 1;
+    p_init->p_ring = 1;
+    p_init->p_prio = NB_PRIORITY_LVL - 1; //priorité maximale
 
     // set unused file desc
     for (size_t i = 0; i < NFD; i++) p_idle->p_fds[i] = -1;
@@ -82,114 +67,116 @@ void init() {
     }
 
     // set all remaining slots to free processus
-	state.st_free_proc = 2;
+    state.st_free_proc = 2;
     for (pid_t pid = 2; pid < NPROC; pid++) {
         state.st_proc[pid].p_stat = FREE;
-		state.st_proc[pid].p_nxfr = pid + 1;
-	}
-	state.st_proc[NPROC - 1].p_nxfr = PID_NONE;
+        state.st_proc[pid].p_nxfr = pid + 1;
+    }
+    state.st_proc[NPROC - 1].p_nxfr = PID_NONE;
 
     vfs_init();
 
-	sched_add_proc(PID_IDLE);
+    sched_add_proc(PID_IDLE);
     proc_create_userspace(proc_init, p_init); //TODO in kernel
 
     state.st_curr_pid = 1;
     st_curr_reg       = &p_init->p_reg;
 
+    proc_create(1);
+    proc_alloc_std_streams(1);
     klog(Log_info, "init", "Process 1 loaded. Start process 1");
-	iret_to_proc(p_init);
+    iret_to_proc(p_init);
 }
 
 void sched_add_proc(pid_t pid) {
-	proc_t     *p = state.st_proc + pid;
-	priority_t pr = p->p_prio;
-	pid_t     prl = state.st_sched.files[pr].last;
-	
-	klogf(Log_verb, "sched", "add %d @ %d", (int)pid, (int)pr);
+    proc_t     *p = state.st_proc + pid;
+    priority_t pr = p->p_prio;
+    pid_t     prl = state.st_sched.files[pr].last;
 
-	++state.st_sched.nb_proc;
-	p->p_nxpf = PID_NONE;
-	if (~prl)
-		state.st_proc[prl].p_nxpf = pid;
-	else {
-		state.st_sched.files[pr].first = pid;
-		state.st_sched.pres |= ((uint64_t)1) << pr;
-	}
-	state.st_sched.files[pr].last = pid;
+    klogf(Log_verb, "sched", "add %d @ %d", (int)pid, (int)pr);
+
+    ++state.st_sched.nb_proc;
+    p->p_nxpf = PID_NONE;
+    if (~prl)
+        state.st_proc[prl].p_nxpf = pid;
+    else {
+        state.st_sched.files[pr].first = pid;
+        state.st_sched.pres |= ((uint64_t)1) << pr;
+    }
+    state.st_sched.files[pr].last = pid;
 }
 
 pid_t sched_pop_proc() {
-	struct scheduler* s = &state.st_sched;
-	priority_t pr = find_bit_64(s->pres, 1, 6);
-	pid_t     pid = s->files[pr].first;
-	pid_t      nx = state.st_proc[pid].p_nxpf;
-	klogf(Log_verb, "sched", "rem %d @ %d", (int)pid, (int)pr);
-	--s->nb_proc;
-	s->files[pr].first = nx;
-	if (!~nx) {
-		s->files[pr].last = PID_NONE;
-		s->pres &= ~(((uint64_t)1) << pr);
-	}
-	return pid;
+    struct scheduler* s = &state.st_sched;
+    priority_t pr = find_bit_64(s->pres, 1, 6);
+    pid_t     pid = s->files[pr].first;
+    pid_t      nx = state.st_proc[pid].p_nxpf;
+    klogf(Log_verb, "sched", "rem %d @ %d", (int)pid, (int)pr);
+    --s->nb_proc;
+    s->files[pr].first = nx;
+    if (!~nx) {
+        s->files[pr].last = PID_NONE;
+        s->pres &= ~(((uint64_t)1) << pr);
+    }
+    return pid;
 }
 
 int hit = 0;
 
 void schedule_proc() {
     if (state.st_sched.pres) {
-		kAssert(state.st_sched.nb_proc > 0);
+        kAssert(state.st_sched.nb_proc > 0);
         // pick a new process to run
         pid_t pid = sched_pop_proc();
         proc_t *p = switch_proc(pid);
 
         klogf(Log_info, "sched",
               "nb R %d, run proc %d :\n"
-			  "   rip %p, rsp %p",
+              "   rip %p, rsp %p",
               state.st_sched.nb_proc + 1, pid,
               p->p_reg.rip,
               p->p_reg.rsp);
-		
-		iret_to_proc(p);
+
+        iret_to_proc(p);
     }
-	
-	// Le processus IDLE empêche que l'on arrive ici
-	never_reached
+
+    // Le processus IDLE empêche que l'on arrive ici
+    never_reached
 }
 
 pid_t schedule_proc_ev() {
-	sched_add_proc(state.st_curr_pid);
-	pid_t rt = sched_pop_proc();
-	klogf(Log_verb, "sched",
-		  "nb waiting %d choose proc %d",
-		  state.st_sched.nb_proc + 1,
-		  state.st_curr_pid);
-	return rt;
+    sched_add_proc(state.st_curr_pid);
+    pid_t rt = sched_pop_proc();
+    klogf(Log_verb, "sched",
+          "nb waiting %d choose proc %d",
+          state.st_sched.nb_proc + 1,
+          state.st_curr_pid);
+    return rt;
 }
 
 proc_t *switch_proc(pid_t pid) {
     proc_t *p   = state.st_proc + pid;
     state.st_curr_pid = pid;
     st_curr_reg = &p->p_reg;
-	
-	if (p->p_pml4) pml4_to_cr3(p->p_pml4);
+
+    if (p->p_pml4) pml4_to_cr3(p->p_pml4);
 
     return p;
 }
 
 
 static inline uint8_t proc_ldr_alloc_pages(uint_ptr begin, uint_ptr end) {
-	return kmem_paging_alloc_rng(begin, end,
-				PAGING_FLAG_U | PAGING_FLAG_W,
-				PAGING_FLAG_U | PAGING_FLAG_W);
+    return kmem_paging_alloc_rng(begin, end,
+                PAGING_FLAG_U | PAGING_FLAG_W,
+                PAGING_FLAG_U | PAGING_FLAG_W);
 }
 
 void proc_ldr_fill0(void* err_pt, Elf64_Addr dst, uint64_t sz) {
     uint8_t err = proc_ldr_alloc_pages(dst, dst + sz);
     if (err) {
-		*((uint8_t*)err_pt) = err;
-		return;
-	}
+        *((uint8_t*)err_pt) = err;
+        return;
+    }
     //TODO: use quad
     for (size_t i=0; i<sz; ++i)
         ((uint8_t*) dst)[i] = 0;
@@ -198,9 +185,9 @@ void proc_ldr_fill0(void* err_pt, Elf64_Addr dst, uint64_t sz) {
 void proc_ldr_copy(void* err_pt, Elf64_Addr dst, void* src, uint64_t sz) {
     uint8_t err = proc_ldr_alloc_pages(dst, dst + sz);
     if (err) {
-		*((uint8_t*)err_pt) = err;
-		return;
-	}
+        *((uint8_t*)err_pt) = err;
+        return;
+    }
     for (size_t i=0; i<sz; ++i)
         ((uint8_t*) dst)[i] = ((uint8_t*) src)[i];
 }
@@ -222,8 +209,8 @@ uint8_t proc_create_userspace(void* prg_elf, proc_t *proc) {
 
     //On est désormais dans le paging du processus
     proc->p_reg.rsp = make_proc_stack();
-    
-	err = 0;
+
+    err = 0;
     proc->p_reg.rip = elf_load(proc_ldr, &err, prg_elf);
     if (err) return 2;
 
@@ -233,12 +220,12 @@ uint8_t proc_create_userspace(void* prg_elf, proc_t *proc) {
 }
 
 void proc_ps() {
-	for (pid_t pid = 0; pid < NPROC; pid++) {
-		proc_t* p = state.st_proc + pid;
-		if (p->p_stat != FREE)
-			kprintf("%cpid=%d st=%c ppid=%d pr=%d\n",
-					pid==state.st_curr_pid ? '*' : ' ',
-					(int)pid, (int)proc_state_char[p->p_stat],
-					(int)p->p_ppid, (int)p->p_prio);
-	}
+    for (pid_t pid = 0; pid < NPROC; pid++) {
+        proc_t* p = state.st_proc + pid;
+        if (p->p_stat != FREE)
+            kprintf("%cpid=%d st=%c ppid=%d pr=%d\n",
+                    pid==state.st_curr_pid ? '*' : ' ',
+                    (int)pid, (int)proc_state_char[p->p_stat],
+                    (int)p->p_ppid, (int)p->p_prio);
+    }
 }

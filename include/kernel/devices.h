@@ -19,8 +19,11 @@ struct mount_info {
 struct device {
     dev_t             dev_id;
     char              dev_mnt[256];
+    uint8_t           dev_free;
     uint8_t           dev_fs;
     struct mount_info dev_info;
 } devices[NDEV];
+
+struct device *find_device(const char *path);
 
 #endif

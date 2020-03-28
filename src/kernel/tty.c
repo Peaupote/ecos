@@ -89,15 +89,23 @@ uint8_t do_kprint = 0;
 
 extern uint8_t t0_data[];
 
-int print_dir(struct ext2_dir_entry *dir) {
+int print_dir(struct dirent *dir) {
     kprintf("%d (%d) %s\n", dir->d_ino, dir->d_rec_len, dir->d_name);
     return 0;
 }
 
+#include <fs/proc.h>
 void ls () {
-    struct ext2_mount_info *info = (struct ext2_mount_info*)&devices[2].dev_info;
-    struct ext2_inode *curr = ext2_get_inode(EXT2_ROOT_INO, info); // root
-    ext2_iter_dir(curr, print_dir, 0, info);
+    struct dirent *dir = vfs_opendir(cmd_decomp + cmd_decomp_idx[1]);
+    if (!dir) {
+        kprintf("%s don't exist\n", cmd_decomp + cmd_decomp_idx[1]);
+        return;
+    }
+
+    while (dir->d_ino) {
+        print_dir(dir);
+        dir = proc_readdir(dir);
+    }
 }
 
 

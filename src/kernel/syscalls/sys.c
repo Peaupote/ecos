@@ -2,12 +2,14 @@
 
 #include <stdint.h>
 
+#include <libc/string.h>
 #include <kernel/int.h>
 #include <kernel/proc.h>
 #include <kernel/kutil.h>
 #include <kernel/memory/shared_pages.h>
 #include <util/elf64.h>
 #include <util/misc.h>
+#include <fs/proc.h>
 
 /**
  * Syscalls
@@ -285,11 +287,10 @@ pid_t fork() {
     fp->p_prio  = pp->p_prio;
 
     pp->p_nchd++; // one more child
-
-    // TODO clean
-    uint64_t *a = (uint64_t*)&fp->p_reg;
-    uint64_t *b = (uint64_t*)&pp->p_reg;
-    for (size_t i = 0; i < 18; i++) a[i] = b[i];
+    memcpy(&fp->p_reg, &pp->p_reg, sizeof(struct reg));
+    /* uint64_t *a = (uint64_t*)&fp->p_reg; */
+    /* uint64_t *b = (uint64_t*)&pp->p_reg; */
+    /* for (size_t i = 0; i < 18; i++) a[i] = b[i]; */
 
     fp->p_pml4 = kmem_alloc_page();
     kmem_fork_paging(fp->p_pml4);
@@ -306,6 +307,7 @@ pid_t fork() {
         }
     }
 
+    proc_create(fpid);
     fp->p_reg.rax = 0;
 
     sched_add_proc(fpid);
@@ -366,6 +368,7 @@ int close(int filedes) {
 
     chann_t *c = &state.st_chann[p->p_fds[filedes]];
     if (c->chann_mode != UNUSED && --c->chann_acc == 0) {
+        vfs_close(c->chann_vfile);
         c->chann_mode = UNUSED;
     }
 

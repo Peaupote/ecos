@@ -21,5 +21,6 @@ void abort(void);
 void exit(int status);
 #endif
 
+int sprintf(char *str, const char *format, ...);
 
 #endif

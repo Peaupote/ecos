@@ -3,7 +3,7 @@
 
     .section .data
 fname1:
-    .string "/home/mpouzet/hello-world"
+    .string "/home/1/stat"
 fname2:
     .string "/home/mpouzet/hello-world.s"
 fname3:
@@ -65,47 +65,10 @@ _start:
 
     // save file descriptor some place safe
     movq    %rax, %r15
-    read_print
+//    read_print
 
     movq    %r15, %rdi
     movq    $SYS_CLOSE, %rax
-    int     $0x80
-
-    sleep
-
-    // cat /home/mpouzet/hello-world.s
-    movq    $fname2, %rdi
-    movq    $1, %rsi
-    movq    $SYS_OPEN, %rax
-    int     $0x80
-
-    // save file descriptor some place safe
-    movq    %rax, %r15
-    read_print
-
-    movq    %r15, %rdi
-    movq    $SYS_CLOSE, %rax
-    int     $0x80
-
-    sleep
-
-    // cat /home/mpouzet/bio.txt
-    movq    $fname3, %rdi
-    movq    $1, %rsi
-    movq    $SYS_OPEN, %rax
-    int     $0x80
-
-    // save file descriptor some place safe
-    movq    %rax, %r15
-    read_print
-    read_print
-
-    movq    %r15, %rdi
-    movq    $SYS_CLOSE, %rax
-    int     $0x80
-
-    movq    $0, %rdi
-    movq    $SYS_EXIT, %rax
     int     $0x80
 
 1:

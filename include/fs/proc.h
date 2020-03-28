@@ -10,28 +10,56 @@
  *   - /proc/pid
  *     - /proc/pid/stat process status
  *     - /proc/pid/cwd
- *
- * Inodes numbers are allocated as follow
- * /proc          : 0
- * /proc/pid      : pid * (1 + NB_PROC_FILE)
- * /proc/pid/stat : pid * (1 + NB_PROC_FILE) + 1
- * /proc/pid/cwd  : pid * (1 + NB_PROC_FILE) + 2
+ *     - /proc/pid/fd   files opened by process
  *
  */
 
+#include <kernel/proc.h>
 #include <kernel/file.h>
 
-#define NB_PROC_FILE   3
-#define STAT_PROC_FILE 1
-#define CWD_PROC_FILE  2
+#define PROC_NBLOCKS    256
+#define PROC_BLOCK_SIZE 1024
+#define PROC_BITMAP_SIZE (PROC_NBLOCKS >> 3)
 
-int   proc_mount(void*, struct mount_info*);
-int   proc_load(struct mount_info*, const char *fname, struct stat *st, char **end);
-int   proc_create(struct mount_info*, ino_t ino, char *fname);
-int   proc_seek(struct mount_info*, ino_t ino, off_t pos);
-int   proc_read(struct mount_info*, ino_t ino, void *buf, size_t len);
-int   proc_write(struct mount_info*, ino_t ino, void *buf, size_t len);
+uint8_t proc_block_bitmap[PROC_BITMAP_SIZE];
 
+struct proc_block {
+    char    content[PROC_BLOCK_SIZE];
+} proc_blocks[PROC_NBLOCKS];
+
+// ino 0 means end of dirent list
+#define PROC_NULL_INO 0
+#define PROC_ROOT_INO 1
+
+#define PROC_NBLOCK 15
+#define PROC_NINODES (NPROC * 2)
+struct proc_inode {
+    uint16_t in_type;
+    uint16_t in_uid;
+    uint32_t in_size;
+
+    uint32_t in_ctime;
+    uint32_t in_mtime;
+
+    uint16_t in_gid;
+    uint16_t in_hard;
+
+    // pointers to auxiliary memory if necessary
+    void    *in_block[PROC_NBLOCK];
+} proc_inodes[PROC_NINODES];
+
+int proc_mount(void*, struct mount_info *info);
+uint32_t proc_lookup(const char *fname, ino_t parent, struct mount_info*);
+int      proc_stat(ino_t ino, struct stat *st, struct mount_info*);
+int      proc_read(ino_t ino, void*, off_t, size_t, struct mount_info*);
+int      proc_write(ino_t ino, void*, off_t, size_t, struct mount_info*);
+uint32_t proc_touch(ino_t, const char*, uint16_t, struct mount_info*);
+uint32_t proc_mkdir(ino_t, const char*, uint16_t, struct mount_info*);
+
+struct dirent *proc_opendir(ino_t, struct mount_info *);
 struct dirent *proc_readdir(struct dirent*);
+
+uint32_t proc_create(pid_t pid);
+uint32_t proc_alloc_std_streams(pid_t pid);
 
 #endif

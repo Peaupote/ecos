@@ -5,7 +5,7 @@ ENTRY(kernel_entry)
 
 INCLUDE ../boot/boot_data.ld
 
-/* adresse virtuelle du kernel, 
+/* adresse virtuelle du kernel,
  * oblige à utiliser des références plus grandes:
  * flag -mcmodel=large de gcc*/
 KVA = 0x80 << 39;
@@ -24,7 +24,7 @@ SECTIONS
     . = KVA + kba_end;
     .text BLOCK(4K) : ALIGN(4K)
     {
-		entry.o(.text)
+        entry.o(.text)
         *(.text)
     }
 
@@ -46,5 +46,5 @@ SECTIONS
         *(COMMON)
         *(.bss)
     }
-	ASSERT(. <= KVA + kba_end + 2M, "taille du kernel")
+    ASSERT(. <= KVA + kba_end + 2M, "taille du kernel")
 }

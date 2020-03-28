@@ -147,3 +147,23 @@ int printf(const char *fmt, ...) {
     return cnt;
 }
 #endif
+
+static void
+sprint(void *ptr, const char *s, size_t len) {
+    char **str = (char**)ptr;
+    while (len--) {
+        *((*str)++) = *s++;
+    }
+}
+
+int sprintf(char *str, const char *fmt, ...) {
+    if (!str) return 0;
+
+    va_list params;
+    va_start(params, fmt);
+    int cnt = fpprintf(&sprint, &str, fmt, params);
+    *str = 0;
+    va_end(params);
+
+    return cnt;
+}

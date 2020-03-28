@@ -74,4 +74,6 @@ char *strncpy(char *dest, const char *src, size_t n);
 
 char *index(const char *s, int c);
 
+char *strtok(char *str, const char *delim);
+
 #endif

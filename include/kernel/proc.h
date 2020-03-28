@@ -50,18 +50,18 @@ struct reg {
 
 typedef struct proc {
     pid_t            p_ppid;     // parent pid
-	union {
-		pid_t        p_nxpf;     // if in a file: next in priority file
-		pid_t        p_nxfr;     // if FREE: next free
-		pid_t        p_nxzb;     // if ZOMB: next ZOMB sibling 
-	};
-	pid_t            p_prsb;     // prev sibling
-	pid_t            p_nxsb;     // next sibling
-	pid_t        	 p_fchd;     // first child
+    union {
+        pid_t        p_nxpf;     // if in a file: next in priority file
+        pid_t        p_nxfr;     // if FREE: next free
+        pid_t        p_nxzb;     // if ZOMB: next ZOMB sibling
+    };
+    pid_t            p_prsb;     // prev sibling
+    pid_t            p_nxsb;     // next sibling
+    pid_t            p_fchd;     // first child
     uint64_t         p_nchd;     // number of child processus
-	//TODO: bit field
+    //TODO: bit field
     enum proc_state  p_stat;     // current status of the processus
-	uint8_t          p_ring;     // ring level (2 bits)
+    uint8_t          p_ring;     // ring level (2 bits)
     priority_t       p_prio;     // priority of the process
     int              p_fds[NFD]; // table of file descriptors
     phy_addr         p_pml4;     // paging
@@ -95,15 +95,15 @@ typedef struct channel {
 
 // Contient les processus en mode RUN à l'exception du processus courant
 struct scheduler {
-	// le bit p est set ssi un processus de priorité p est présent
-	uint64_t    pres;
-	// contient les processus de chaque priorités
-	struct {
-		pid_t   first;
-		pid_t   last;
-	} files[NB_PRIORITY_LVL];
-	// nombre de processus dans la structure
-	size_t      nb_proc;
+    // le bit p est set ssi un processus de priorité p est présent
+    uint64_t    pres;
+    // contient les processus de chaque priorités
+    struct {
+        pid_t   first;
+        pid_t   last;
+    } files[NB_PRIORITY_LVL];
+    // nombre de processus dans la structure
+    size_t      nb_proc;
 };
 
 /**
@@ -112,8 +112,8 @@ struct scheduler {
 
 struct {
     pid_t       st_curr_pid;          // pid of current running process
-	struct scheduler st_sched;
-	pid_t       st_free_proc;         // head of the free linked list
+    struct scheduler st_sched;
+    pid_t       st_free_proc;         // head of the free linked list
     proc_t      st_proc[NPROC];       // table containing all processes
     chann_t     st_chann[NCHAN];      // table containing all channels
     vfile_t     st_files[NFILE];      // table containing all opened files
@@ -149,10 +149,10 @@ extern void iret_to_userspace(uint64_t cs_ze);
 extern void eoi_iret_to_userspace(uint64_t cs_ze);
 
 static inline void iret_to_proc(const proc_t* p) {
-	iret_to_userspace(gdt_ring_lvl(p->p_ring));
+    iret_to_userspace(gdt_ring_lvl(p->p_ring));
 }
 static inline void eoi_iret_to_proc(const proc_t* p) {
-	eoi_iret_to_userspace(gdt_ring_lvl(p->p_ring));
+    eoi_iret_to_userspace(gdt_ring_lvl(p->p_ring));
 }
 
 proc_t *switch_proc(pid_t pid);
@@ -160,18 +160,18 @@ proc_t *switch_proc(pid_t pid);
 void proc_ps();
 
 static inline pid_t find_new_pid() {
-	pid_t pid = state.st_free_proc;
-	if (~pid)
-		state.st_free_proc = state.st_proc[pid].p_nxfr;
-	else
-		klogf(Log_error, "proc", "can't find a new pid");
-	return pid;
+    pid_t pid = state.st_free_proc;
+    if (~pid)
+        state.st_free_proc = state.st_proc[pid].p_nxfr;
+    else
+        klogf(Log_error, "proc", "can't find a new pid");
+    return pid;
 }
 
 static inline void free_pid(pid_t p) {
-	state.st_proc[p].p_nxfr = state.st_free_proc;
-	state.st_free_proc = p;
-	state.st_proc[p].p_stat = FREE;
+    state.st_proc[p].p_nxfr = state.st_free_proc;
+    state.st_free_proc = p;
+    state.st_proc[p].p_stat = FREE;
 }
 
 static inline void proc_set_curr_pid(pid_t pid) {
@@ -181,10 +181,19 @@ static inline void proc_set_curr_pid(pid_t pid) {
 
 
 static inline uintptr_t make_proc_stack() {
-	*kmem_acc_pts_entry(paging_add_lvl(pgg_pd, USER_STACK_PD),
-							2, PAGING_FLAG_U | PAGING_FLAG_W)
-		= SPAGING_FLAG_P | PAGING_FLAG_W;
-	return paging_add_lvl(pgg_pd, USER_STACK_PD + 1);
+    *kmem_acc_pts_entry(paging_add_lvl(pgg_pd, USER_STACK_PD),
+                            2, PAGING_FLAG_U | PAGING_FLAG_W)
+        = SPAGING_FLAG_P | PAGING_FLAG_W;
+    return paging_add_lvl(pgg_pd, USER_STACK_PD + 1);
+}
+
+static inline cid_t free_chann() {
+    cid_t cid;
+    for (cid = 0; cid < NCHAN; cid++) {
+        if (state.st_chann[cid].chann_mode == UNUSED) break;
+    }
+
+    return cid;
 }
 
 #endif

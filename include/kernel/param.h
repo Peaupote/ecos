@@ -10,6 +10,7 @@
 #define NHEAP 16   // number of enqued processes
 #define NFILE 1024 // number of virtual files
 #define NDEV  32   // number of devices mounted
+#define NPIPE 32   // number of pipes
 
 #define NSLEEP 128 // number of parralled sleep allowed
 
@@ -21,6 +22,9 @@
 // Au sein du kernel la meilleure priorité est NB_PRIORITY_LVL-1, la pire 0
 // NB_PRIORITY_LVL <= 64
 #define NB_PRIORITY_LVL 40
+
+// maximum number of chars accumulated in a pipe
+#define PIPE_SZ 2048
 
 /**
  * Dont touch too much here
