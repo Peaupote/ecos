@@ -8,12 +8,15 @@
 #include <stddef.h>
 #include <stdint.h>
 
+#if defined(__is_test)
+#else
 typedef int32_t  pid_t;
 
 #define PID_NONE (~((pid_t)0))
 
 typedef uint8_t  priority_t;
 typedef int32_t  cid_t;
+#endif
 
 enum chann_mode {
     UNUSED,

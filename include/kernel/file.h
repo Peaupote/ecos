@@ -65,7 +65,7 @@ typedef int (fs_rdwr_t)(ino_t, void*, off_t, size_t, struct mount_info*);
 /**
  * Returns a pointer to the first element in the directory
  */
-typedef struct dirent * (fs_opendir)(ino_t, struct mount_info*);
+typedef struct dirent *(fs_opendir_t)(ino_t, struct mount_info*);
 
 typedef struct dirent *(fs_readdir_t)(struct dirent*);
 
@@ -78,7 +78,7 @@ struct fs {
     fs_rdwr_t     *fs_write;
     fs_create_t   *fs_touch;
     fs_create_t   *fs_mkdir;
-    fs_opendir    *fs_opendir;
+    fs_opendir_t  *fs_opendir;
     fs_readdir_t  *fs_readdir;
 } fst [NFST];
 
@@ -94,6 +94,7 @@ int      vfs_write(vfile_t *vfile, void *buf, off_t pos, size_t len);
 vfile_t *vfs_touch(const char *parent, const char *fname, mode_t perm);
 vfile_t *vfs_mkdir(const char *parent, const char *fname, mode_t perm);
 
-struct dirent *vfs_opendir(const char *fname);
+vfile_t *vfs_opendir(const char *fname, struct dirent **dir);
+struct dirent *vfs_readdir(struct dirent *dir, vfile_t *vfile);
 
 #endif

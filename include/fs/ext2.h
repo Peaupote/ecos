@@ -322,4 +322,6 @@ struct ext2_dir_entry *
 ext2_mkdir(uint32_t parent_inode, char *dirname,
            struct ext2_mount_info *info);
 
+struct ext2_dir_entry *ext2_opendir(uint32_t ino, struct ext2_mount_info *);
+
 #endif

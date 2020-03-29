@@ -349,5 +349,7 @@ uint32_t proc_alloc_std_streams(pid_t pid) {
     state.st_chann[cid_err].chann_acc   = 1;
     p->p_fds[2] = cid_err;
 
-    return vf->vf_stat.st_ino;
+    uint32_t ino = vf->vf_stat.st_ino;
+    vfs_close(vf);
+    return ino;
 }

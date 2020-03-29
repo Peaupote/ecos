@@ -44,7 +44,7 @@ void vfs_init() {
     fst[EXT2_FS].fs_write   = (fs_rdwr_t*)&ext2_write;
     fst[EXT2_FS].fs_touch   = 0; // not implemeted yet
     fst[EXT2_FS].fs_mkdir   = 0; // not implemented yet
-    fst[EXT2_FS].fs_opendir = 0; // not implemented yet
+    fst[EXT2_FS].fs_opendir = (fs_opendir_t*)&ext2_opendir;
     fst[EXT2_FS].fs_readdir = (fs_readdir_t*)&ext2_readdir;
 
     vfs_mount("/proc", PROC_FS, 0);
@@ -163,13 +163,18 @@ vfile_t *vfs_load(const char *filename, uint32_t create) {
 
     size_t free = 0;
     for (size_t i = 0; i < NFILE; i++) {
+        if (!state.st_files[i].vf_cnt) continue;
+
+        kprintf("%d is open\n", i);
+
         if (state.st_files[i].vf_stat.st_ino == st.st_ino &&
             state.st_files[i].vf_stat.st_dev == dev->dev_id) {
             klogf(Log_info, "vfs", "file %s is already open", fname);
+            state.st_files[free].vf_cnt++;
             return state.st_files + i;
         }
 
-        if (!free && !state.st_files[i].vf_cnt) free = i;
+        if (!free) free = i;
     }
 
     if (free == NFILE) {
@@ -179,7 +184,7 @@ vfile_t *vfs_load(const char *filename, uint32_t create) {
 
     memcpy(&state.st_files[free].vf_stat, &st, sizeof(struct stat));
     state.st_files[free].vf_stat.st_dev = dev->dev_id;
-    state.st_files[free].vf_cnt = 0;
+    state.st_files[free].vf_cnt = 1;
     return state.st_files + free;
 }
 
@@ -196,7 +201,11 @@ int vfs_write(vfile_t *vfile, void *buf, off_t pos, size_t len) {
 }
 
 int vfs_close(vfile_t *vf) {
-    if (vf) vf->vf_cnt = 0;
+    if (vf) {
+        klogf(Log_info, "vfs", "close file %d (device %d)",
+              vf->vf_stat.st_ino, vf->vf_stat.st_dev);
+        vf->vf_cnt--;
+    }
     return 0;
 }
 
@@ -250,17 +259,25 @@ vfile_t *vfs_mkdir(const char *parent, const char *fname, mode_t perm) {
     return vfs_alloc(dev, parent, fname, perm, fs->fs_mkdir);
 }
 
-struct dirent *vfs_opendir(const char *fname) {
+vfile_t *vfs_opendir(const char *fname, struct dirent **dir) {
     vfile_t *vfile = vfs_load(fname, 0);
-    struct dirent *dir = 0;
 
-    if (!vfile || !(vfile->vf_stat.st_mode&TYPE_DIR)) goto ret;
+    if (vfile) {
+        if (!(vfile->vf_stat.st_mode&TYPE_DIR)) {
+            vfs_close(vfile);
+            return 0;
+        }
 
+        struct device *dev = devices + vfile->vf_stat.st_dev;
+        struct fs *fs = fst + dev->dev_fs;
+        *dir = fs->fs_opendir(vfile->vf_stat.st_ino, &dev->dev_info);
+    }
+
+    return vfile;
+}
+
+struct dirent *vfs_readdir(struct dirent *dir, vfile_t *vfile) {
     struct device *dev = devices + vfile->vf_stat.st_dev;
     struct fs *fs = fst + dev->dev_fs;
-    dir = fs->fs_opendir(vfile->vf_stat.st_ino, &dev->dev_info);
-
-ret:
-    vfs_close(vfile);
-    return dir;
+    return fs->fs_readdir(dir);
 }

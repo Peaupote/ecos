@@ -1,6 +1,6 @@
 NAME=./test_ext2.out
 export CC=gcc
-export FLAGS=-O1 -Wall -Wextra -std=gnu99 -fno-builtin -D__is_test
+export FLAGS=-O2 -Wall -Wextra -std=gnu99 -fno-builtin -D__is_test
 INCLUDES=-I ../../include
 
 .PHONY: run
@@ -12,11 +12,11 @@ all:$(NAME)
 ext2:
 	$(MAKE) -C ../../src/fs/ext2 ext2.a
 
-$(NAME): main.o $(OBJ) ext2
-	$(CC) $(FLAGS) -o $(NAME) ../../src/fs/ext2/ext2.a main.o $(INCLUDES)
+$(NAME): main.c ext2
+	$(CC) $(FLAGS) -o $(NAME) ../../src/fs/ext2/*.o main.c $(INCLUDES)
 
-%.o:%.c
-	$(CC) $(FLAGS) -o $@ -c $< $(INCLUDES)
+#%.o:%.c
+#	$(CC) $(FLAGS) -o $@ -c $< $(INCLUDES)
 
 home: aux_prg
 	mkdir -p home/test
@@ -29,7 +29,7 @@ aux_prg:
 	$(MAKE) -C ../../src/kernel/aux_prg all
 
 run: $(NAME) home.img
-	# $(NAME) home.img
+	 $(NAME) home.img
 
 clean:
 	rm -rf *.o *.img *.out *.s home $(NAME) $(OBJ)
