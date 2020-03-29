@@ -1,6 +1,6 @@
-CC=x86_64-elf-gcc
-AS=x86_64-elf-as
-FLAGS=-O2 -Wall -Wextra -std=gnu99 -nostdlib -mno-red-zone \
+export CC=x86_64-elf-gcc
+export AS=x86_64-elf-as
+export FLAGS=-O2 -Wall -Wextra -std=gnu99 -nostdlib -mno-red-zone \
 	  -fno-builtin -ffreestanding -D__is_libc 
 CFILES=init1.c
 OUT=$(CFILES:.c=.out)

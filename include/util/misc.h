@@ -44,4 +44,14 @@ GEN_COMP(uint_ptr)
 GEN_COMP(phy_addr)
 #undef GEN_COMP
 
+#define GEN_ALIGN(N,T,U) \
+	static inline T N(T addr, U align) {\
+		return (addr % align)\
+			? addr + align - (addr % align)\
+			: addr;\
+	}
+GEN_ALIGN(align_to, uint_ptr, uint64_t)
+GEN_ALIGN(align_to_size, size_t, size_t)
+#undef GEN_ALIGN
+
 #endif

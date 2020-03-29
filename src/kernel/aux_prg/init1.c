@@ -7,7 +7,7 @@ int main() {
 
     char msg[] = "Hello world !\n";
     write(1, (uint8_t*)msg, 14);
-    printf("Hello world !\n");
+    printf("printf: Hello world !\n");
 
     return 0;
 }

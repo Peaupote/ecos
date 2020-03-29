@@ -133,9 +133,8 @@ inline bool execve_lseek(int fd, off_t ofs) {
 }
 
 // Chargement des sections
-bool execve_alloc_rng(bool write, uint_ptr bg, size_t sz) {
-	uint16_t   f  = PAGING_FLAG_U;
-	if (write) f |= PAGING_FLAG_W;
+bool execve_alloc_rng(uint_ptr bg, size_t sz) {
+	uint16_t   f  = PAGING_FLAG_U | PAGING_FLAG_W;
 	return bg + sz >= bg 
 		&& paging_get_lvl(pgg_pml4, bg + sz) < PML4_END_USPACE
 		&& !call_kmem_paging_alloc_rng(bg, bg + sz, f, f);
@@ -181,7 +180,7 @@ static inline bool execve_read_sections(int fd) {
 static inline bool execve_load_sections(int fd) {
 	for (size_t i_s = 0; i_s < trf()->nb_sections; ++i_s) {
 		struct section* s = sections() + i_s;
-		if (!execve_alloc_rng(s->write, s->dst, s->sz)) return false;
+		if (!execve_alloc_rng(s->dst, s->sz)) return false;
 		if (s->copy) {
             if (!execve_copy(fd, s->dst, s->src, s->sz))
 				return false;

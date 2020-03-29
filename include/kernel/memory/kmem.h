@@ -33,12 +33,6 @@ extern struct MemBlockTree  khep_alloc;
 void     kmem_init_paging();
 void     kmem_init_alloc(uint32_t boot_info);
 
-static inline uint_ptr align_to(uint_ptr addr, uint64_t align) {
-    return (addr % align)
-        ? addr + align - (addr % align)
-        : addr;
-}
-
 // --Dynamic slots--
 // Permet de mapper des pages physiques dans l'espace virtuel
 // Emplacements globaux, conservés lors du changement de pml4
@@ -91,6 +85,7 @@ void  kfree_page(void* v_addr);
 
 // --Paging--
 
+//flags doit contenir PAGING_FLAG_W
 uint64_t* kmem_acc_pts_entry(uint_ptr v_addr, uint8_t rlvl, uint16_t flags);
 
 void kmem_print_paging(uint_ptr v_addr);

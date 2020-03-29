@@ -6,7 +6,7 @@
 #include <util/multiboot.h>
 #include <kernel/kutil.h>
 #include <kernel/tty.h>
-#include <util/vga.h>
+#include <util/misc.h>
 
 #include <kernel/memory/page_alloc.h>
 #include <kernel/memory/shared_ptr.h>
@@ -195,6 +195,7 @@ uint16_t kmem_bind_dynamic_range(uint16_t num,
 }
 
 uint64_t* kmem_acc_pts_entry(uint_ptr v_addr, uint8_t rlvl, uint16_t flags) {
+	kAssert(flags & PAGING_FLAG_W);
 	uint64_t query_addr =
 		(uint64_t) paging_acc_pml4(paging_get_lvl(pgg_pml4, v_addr));
 
@@ -238,7 +239,7 @@ void kmem_print_paging(uint_ptr v_addr) {
 
 uint8_t paging_map_to(uint_ptr v_addr, phy_addr p_addr,
 		uint16_t flags, uint16_t p_flags) {
-	uint64_t* query = kmem_acc_pts_entry(v_addr, 1, flags);
+	uint64_t* query = kmem_acc_pts_entry(v_addr, 1, flags | PAGING_FLAG_W);
 	if (!query) return ~0;
 	if ( (*query) & PAGING_FLAG_P) return 1; //Déjà assignée
 	*query = p_addr | p_flags | PAGING_FLAG_P;
@@ -247,7 +248,7 @@ uint8_t paging_map_to(uint_ptr v_addr, phy_addr p_addr,
 
 uint8_t kmem_paging_alloc(uint_ptr v_addr,
 		uint16_t flags, uint16_t p_flags) {
-	uint64_t* query = kmem_acc_pts_entry(v_addr, 1, flags);
+	uint64_t* query = kmem_acc_pts_entry(v_addr, 1, flags | PAGING_FLAG_W);
 	if (!query) return ~0;
 	if ( (*query) & PAGING_FLAG_P) {
 		*query |= p_flags;
@@ -258,7 +259,7 @@ uint8_t kmem_paging_alloc(uint_ptr v_addr,
 }
 uint8_t kmem_paging_alloc_rng(uint_ptr bg, uint_ptr ed,
 		uint16_t flags, uint16_t p_flags) {
-	for (uint_ptr it = bg & PAGE_MASK; it < ed; ++it) {
+	for (uint_ptr it = bg & PAGE_MASK; it < ed; it += PAGE_SIZE) {
 		uint8_t err = kmem_paging_alloc(it, flags, p_flags);
 		if (err >= 2) return err;
 	}
