@@ -74,7 +74,8 @@ uint32_t *ext2_get_inode_block_ptr(uint32_t block,
     inf = sup;
     sup += info->block_size >> 2;
     if (block < sup) {
-        b = ext2_get_block(inode->in_block[13], info);
+        b = ext2_get_block(inode->in_block[12], info);
+        /* kprintf("block %d => %d => %d\n", block, block - inf, b[block-inf]); */
         return b + block - inf;
     }
 

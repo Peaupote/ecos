@@ -83,6 +83,7 @@ int ext2_read(ino_t ino, void *buf, off_t pos, size_t len,
     char *block = ext2_get_inode_block(block_nb, inode, info);
     char *dst = (char*)buf;
 
+
     size_t i;
     for (i = 0; i < len && pos < inode->in_size; i++) {
         *dst++ = block[pos++ % info->block_size];

@@ -187,9 +187,13 @@ vfile_t *vfs_load(const char *filename, uint32_t create) {
 }
 
 int vfs_read(vfile_t *vfile, void *buf, off_t pos, size_t len) {
+    klogf(Log_verb, "vfs", "read ino %d (device %d) offset %d len %d (size %d)",
+          vfile->vf_stat.st_ino, vfile->vf_stat.st_dev, pos, len,
+          vfile->vf_stat.st_size);
     struct device *dev = devices + vfile->vf_stat.st_dev;
-    return  fst[dev->dev_fs].fs_read(vfile->vf_stat.st_ino,
-                                    buf, pos, len, &dev->dev_info);
+    int rc = fst[dev->dev_fs].fs_read(vfile->vf_stat.st_ino,
+                                     buf, pos, len, &dev->dev_info);
+    return rc;
 }
 
 int vfs_write(vfile_t *vfile, void *buf, off_t pos, size_t len) {

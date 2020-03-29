@@ -116,7 +116,7 @@ void sys_exit(int status) {
             || rei_cast(pid_t, pp->p_reg.rax) == state.st_curr_pid)) {
 
         kmem_free_paging(p->p_pml4,
-				pp->p_pml4 ? pp->p_pml4 : kernel_pml4);
+                pp->p_pml4 ? pp->p_pml4 : kernel_pml4);
 
         free_pid(state.st_curr_pid);
         pp->p_nchd--;
@@ -436,8 +436,8 @@ int sys_read(int fd, uint8_t *d, size_t len) {
         return -1;
 
     chann_t *chann = &state.st_chann[p->p_fds[fd]];
-    klogf(Log_verb, "syscall", "process %d read on %d",
-            state.st_curr_pid, fd);
+    klogf(Log_verb, "syscall", "process %d read %d on %d",
+          state.st_curr_pid, len, fd);
 
     vfile_t *vfile = chann->chann_vfile;
 
@@ -447,6 +447,8 @@ int sys_read(int fd, uint8_t *d, size_t len) {
     case RDWR:
         rc = vfs_read(vfile, d, chann->chann_pos, len);
         if (rc > 0) chann->chann_pos += rc;
+        klogf(Log_verb, "syscall", "%d char readed (pos %d)",
+              rc, chann->chann_pos);
         return rc;
 
     case STREAM_IN:

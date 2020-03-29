@@ -277,9 +277,6 @@ uint32_t proc_create(pid_t pid) {
         chann_t *c = state.st_chann + p->p_fds[i];
         if (c->chann_mode == UNUSED) continue;
 
-        kprintf("chann %d ino %d\n", c->chann_id,
-                c->chann_vfile->vf_stat.st_ino);
-
         sprintf(buf, "%d", i);
         proc_fill_dirent(dir, c->chann_vfile->vf_stat.st_ino, buf);
         dir = proc_readdir(dir);
