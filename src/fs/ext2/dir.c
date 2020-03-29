@@ -38,22 +38,22 @@ ext2_iter_dir(struct ext2_inode *inode,
         len_in_block += dir->d_rec_len;
     } while (len < inode->in_size);
 
+    if (len == inode->in_size) return 0;
+
     if (read) *read = len;
     return dir;
 }
 
-
 static const char *lookup_name;
 static int cmp_dir_name(struct ext2_dir_entry* dir) {
-    if (!strncmp(dir->d_name, lookup_name, 255)) return -1;
+    if (!strncmp(dir->d_name, lookup_name, 256)) return -1;
     return 0;
 }
 
 uint32_t ext2_lookup_dir(struct ext2_inode *inode, const char *fname,
                          struct ext2_mount_info *info) {
     lookup_name = fname;
-    struct ext2_dir_entry *entry = ext2_iter_dir(inode, cmp_dir_name,
-                                                 0, info);
+    struct ext2_dir_entry *entry = ext2_iter_dir(inode, cmp_dir_name, 0, info);
     // TODO : binary search
     return entry ? entry->d_ino : 0;
 }
@@ -105,6 +105,17 @@ struct ext2_dir_entry * ext2_mkdir(uint32_t inode, char *dirname,
     printf("%d (%d) %*s\n", dir->d_ino, dir->d_rec_len,
            dir->d_name_len, dir->d_name);
 #endif
+
+    return dir;
+}
+
+struct ext2_dir_entry *
+ext2_opendir(uint32_t ino, struct ext2_mount_info *info) {
+    struct ext2_inode *inode = ext2_get_inode(ino, info);
+    struct ext2_dir_entry *dir = 0;
+    if (inode->in_type&EXT2_TYPE_DIR) {
+        dir = (struct ext2_dir_entry*)ext2_get_inode_block(0, inode, info);
+    }
 
     return dir;
 }

@@ -50,23 +50,23 @@ uint8_t  back_color;
 
 
 static inline size_t sb_rel_im_bg() {
-	return sb_display_shift;
+    return sb_display_shift;
 }
 static inline size_t sb_rel_im_ed() {
-	return min_size_t(sb_nb_lines, 
-			(VGA_HEIGHT - input_height + sb_display_shift) & SB_MASK);
+    return min_size_t(sb_nb_lines,
+            (VGA_HEIGHT - input_height + sb_display_shift) & SB_MASK);
 }
 size_t sb_new_in_height(size_t h) {
-	if (sb_dtcd) return 0;
-	size_t old_ds = sb_display_shift;
-	size_t dsp_ln = VGA_HEIGHT - h;
-	sb_display_shift = dsp_ln < sb_nb_lines
-			? sb_nb_lines - dsp_ln : 0;
-	return sb_display_shift - old_ds;
-		
+    if (sb_dtcd) return 0;
+    size_t old_ds = sb_display_shift;
+    size_t dsp_ln = VGA_HEIGHT - h;
+    sb_display_shift = dsp_ln < sb_nb_lines
+            ? sb_nb_lines - dsp_ln : 0;
+    return sb_display_shift - old_ds;
+
 }
 static inline size_t sb_sc_ed() {
-	return sb_nb_lines - sb_display_shift;
+    return sb_nb_lines - sb_display_shift;
 }
 
 
@@ -79,32 +79,32 @@ void tty_init(enum tty_mode m) {
     ib_printed = ib_size = ib_ashift = 0;
     input_height = 0;
     input_bottom_line = input_top_line = ~0;
-    
+
     sb_ashift   = 0;
     sb_display_shift = 0;
-	sb_nb_lines = 0;
-	sb_dtcd     = false;
+    sb_nb_lines = 0;
+    sb_dtcd     = false;
 
-	tty_set_mode(m);
+    tty_set_mode(m);
 }
 
 void tty_set_mode(enum tty_mode m) {
-	switch (m) {
-	case ttym_def:
-		prompt_color = vga_entry_color (
-					VGA_COLOR_LIGHT_BLUE, VGA_COLOR_BLACK);
-		vprompt_color = vga_entry_color (
-					VGA_COLOR_BLUE, VGA_COLOR_BLACK);
-		break;
-	case ttym_panic:
-		prompt_color = vga_entry_color (
-					VGA_COLOR_LIGHT_RED, VGA_COLOR_BLACK);
-		vprompt_color = vga_entry_color (
-					VGA_COLOR_RED, VGA_COLOR_BLACK);
-		break;
-	}
-	if (~input_top_line)
-    	vga_putentryat('>', prompt_color, 0, input_top_line);
+    switch (m) {
+    case ttym_def:
+        prompt_color = vga_entry_color (
+                    VGA_COLOR_LIGHT_BLUE, VGA_COLOR_BLACK);
+        vprompt_color = vga_entry_color (
+                    VGA_COLOR_BLUE, VGA_COLOR_BLACK);
+        break;
+    case ttym_panic:
+        prompt_color = vga_entry_color (
+                    VGA_COLOR_LIGHT_RED, VGA_COLOR_BLACK);
+        vprompt_color = vga_entry_color (
+                    VGA_COLOR_RED, VGA_COLOR_BLACK);
+        break;
+    }
+    if (~input_top_line)
+        vga_putentryat('>', prompt_color, 0, input_top_line);
 }
 
 char cmd_decomp[IB_LENGTH + 10];
@@ -138,29 +138,35 @@ uint8_t do_kprint = 0;
 extern uint8_t t0_data[];
 
 int print_dir(struct dirent *dir) {
-    kprintf("%d (%d) %s\n", dir->d_ino, dir->d_rec_len, dir->d_name);
+    kprintf("(%d) %s\n", dir->d_ino, dir->d_name);
     return 0;
 }
 
 #include <fs/proc.h>
 void ls () {
-    struct dirent *dir = vfs_opendir(cmd_decomp + cmd_decomp_idx[1]);
-    if (!dir) {
+    struct dirent *dir;
+    vfile_t *vf = vfs_opendir(cmd_decomp + cmd_decomp_idx[1], &dir);
+    if (!vf) {
         kprintf("%s don't exist\n", cmd_decomp + cmd_decomp_idx[1]);
         return;
     }
 
-    while (dir->d_ino) {
+    size_t size = 0;
+    while (size < vf->vf_stat.st_size) {
         print_dir(dir);
-        dir = proc_readdir(dir);
+        size += dir->d_rec_len;
+
+        dir = vfs_readdir(dir, vf);
     }
+
+    vfs_close(vf);
 }
 
 uint_ptr read_ptr(const char str[]) {
-	if (str[0] == 'k')
-		return int64_of_str_hexa(str+1) 
-			+ paging_add_lvl(pgg_pml4, PML4_KERNEL_VIRT_ADDR);
-	return int64_of_str_hexa(str);
+    if (str[0] == 'k')
+        return int64_of_str_hexa(str+1)
+            + paging_add_lvl(pgg_pml4, PML4_KERNEL_VIRT_ADDR);
+    return int64_of_str_hexa(str);
 }
 
 size_t built_in_exec(size_t in_begin, size_t in_len) {
@@ -194,8 +200,8 @@ size_t built_in_exec(size_t in_begin, size_t in_len) {
 }
 
 void tty_input(scancode_byte s, key_event ev) {
-	tty_seq_t sq;
-	tty_seq_init(&sq);
+    tty_seq_t sq;
+    tty_seq_init(&sq);
     uint8_t p_updt = 0;
 
     if (do_kprint) {
@@ -224,19 +230,19 @@ void tty_input(scancode_byte s, key_event ev) {
                         input_top_line + ib_size / input_width);
             }
         } else if (ev.key == KEY_UP_ARROW) {
-			if (sb_display_shift) {
-				--sb_display_shift;
-				sb_dtcd = true;
-				tty_afficher_buffer_all();
-			}
+            if (sb_display_shift) {
+                --sb_display_shift;
+                sb_dtcd = true;
+                tty_afficher_buffer_all();
+            }
         } else if (ev.key == KEY_DOWN_ARROW) {
-			if (sb_sc_ed() > VGA_HEIGHT - input_height) {
-				++sb_display_shift;
-				if (sb_sc_ed() == VGA_HEIGHT - input_height)
-					sb_dtcd = false;
-				tty_afficher_buffer_all();
-			}
-		} else {
+            if (sb_sc_ed() > VGA_HEIGHT - input_height) {
+                ++sb_display_shift;
+                if (sb_sc_ed() == VGA_HEIGHT - input_height)
+                    sb_dtcd = false;
+                tty_afficher_buffer_all();
+            }
+        } else {
             char kchar = keycode_to_printable(ev.key);
             if (kchar && ib_size < IB_LENGTH) {
                 ibuffer[(ib_ashift + ib_size++) & IB_MASK] = kchar;
@@ -250,31 +256,31 @@ void tty_input(scancode_byte s, key_event ev) {
 void tty_afficher_buffer_range(size_t idx_begin, size_t idx_end) {
     size_t r_b = (idx_begin - sb_ashift) & SB_MASK;
     size_t r_e = (idx_end   - sb_ashift) & SB_MASK;
-	maxa_size_t(&r_b, sb_rel_im_bg());
-	mina_size_t(&r_e, sb_rel_im_ed());
+    maxa_size_t(&r_b, sb_rel_im_bg());
+    mina_size_t(&r_e, sb_rel_im_ed());
 
-	for (size_t it = r_b; it < r_e; ++it)
+    for (size_t it = r_b; it < r_e; ++it)
         for (size_t x = 0; x < VGA_WIDTH; ++x)
-            vga_putcentryat(sbuffer[(sb_ashift + it) & SB_MASK][x], x, 
-					it - sb_display_shift);
+            vga_putcentryat(sbuffer[(sb_ashift + it) & SB_MASK][x], x,
+                    it - sb_display_shift);
 }
 
 void tty_afficher_buffer_all() {
     size_t r_b = sb_rel_im_bg();
     size_t r_e = sb_rel_im_ed();
 
-	for (size_t it = r_b; it < r_e; ++it)
+    for (size_t it = r_b; it < r_e; ++it)
         for (size_t x = 0; x < VGA_WIDTH; ++x)
             vga_putcentryat(sbuffer[(sb_ashift + it) & SB_MASK][x], x,
-					it - sb_display_shift);
+                    it - sb_display_shift);
 }
 
 size_t tty_new_prompt() {
-	size_t rt = 0;
+    size_t rt = 0;
     input_height = 1;
     if (sb_sc_ed() >= VGA_HEIGHT) {
         input_top_line = VGA_HEIGHT - 1;
-		rt = sb_new_in_height(1);
+        rt = sb_new_in_height(1);
     } else
         input_top_line = sb_sc_ed();
 
@@ -338,7 +344,7 @@ void tty_afficher_prompt() {
         if (bt_line_0 >= VGA_HEIGHT) {
             input_bottom_line = VGA_HEIGHT - 1;
             input_top_line = input_bottom_line - input_height + 1;
-			sb_new_in_height(input_height);
+            sb_new_in_height(input_height);
             tty_afficher_buffer_all(); //scroll
             tty_afficher_prompt_all();
             return;
@@ -357,11 +363,11 @@ size_t tty_update_prompt_pos() {
         size_t rt = 0;
         if (sb_sc_ed() + input_height > VGA_HEIGHT) {
             n_top   = VGA_HEIGHT - input_height;
-			rt      = sb_new_in_height(input_height);
+            rt      = sb_new_in_height(input_height);
         } else
             n_top = sb_sc_ed();
-        
-		if (n_top != input_top_line) {
+
+        if (n_top != input_top_line) {
             input_top_line    = n_top;
             input_bottom_line = input_top_line + input_height - 1;
             tty_afficher_prompt_all();
@@ -419,17 +425,17 @@ size_t tty_new_buffer_line(size_t* index) {
     *index = (sb_ashift + sb_nb_lines) & SB_MASK;
     if (sb_nb_lines == SB_HEIGHT - 1) {
         sb_ashift = (sb_ashift + 1) & SB_MASK;
-		if (sb_dtcd && sb_display_shift) {
-			--sb_display_shift;
-			return 0;
-		}
+        if (sb_dtcd && sb_display_shift) {
+            --sb_display_shift;
+            return 0;
+        }
         return 1;
     }
     ++sb_nb_lines;
-	if (sb_sc_ed() > VGA_HEIGHT - input_height && !sb_dtcd) {
-		++sb_display_shift;
-		return 1;
-	}
+    if (sb_sc_ed() > VGA_HEIGHT - input_height && !sb_dtcd) {
+        ++sb_display_shift;
+        return 1;
+    }
     return 0;
 }
 

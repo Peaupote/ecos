@@ -8,7 +8,6 @@
 #include "devices.h"
 
 typedef void * block_t;
-typedef uint64_t off_t;
 
 #define TYPE_FIFO 0x1000
 #define TYPE_CHAR 0x2000
@@ -18,8 +17,12 @@ typedef uint64_t off_t;
 #define TYPE_SYM  0xa000
 #define TYPE_SOCK 0xc000
 
+#if defined(__is_test)
+#include <sys/stat.h>
+#else
+typedef uint64_t off_t;
 typedef int32_t  ino_t;
-typedef uint32_t mode_t;
+typedef uint16_t mode_t;
 typedef uint16_t nlink_t;
 typedef uint32_t blksize_t;
 typedef uint32_t blkcnt_t;
@@ -39,5 +42,5 @@ struct stat {
     uint32_t st_ctime;
     uint32_t st_mtime;
 };
-
+#endif
 #endif
