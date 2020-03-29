@@ -40,7 +40,7 @@ depends:
 	$(MAKE) -B -C src/boot           .depends
 	$(MAKE) -B -C src/util      clean-depends
 	$(MAKE) -B -C src/libc           .depends
-	$(MAKE) -B -C tests              .depends
+	$(MAKE)    -C tests               depends
 	$(MAKE) -B -C tools              .depends
 
 clean:

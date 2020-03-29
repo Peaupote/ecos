@@ -11,7 +11,9 @@ LIBC_CFILES=string/memcmp.c \
 	  string/index.c \
 	  stdio/printf.c \
 	  stdio/putchar.c \
-	  stdio/puts.c
+	  stdio/puts.c \
+	  stdlib/malloc.c \
+	  unistd/brk.c
 LIBC_FILES=$(LIBC_CFILES) $(LIBC_AS_FILES)
 LIBC_OBJ=$(LIBC_FILES:%.c=%.libc.o) $(LIBC_AS_FILES:%.s=%.libc.o)
 

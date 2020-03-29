@@ -5,13 +5,25 @@
 #include <time.h>
 
 void test_init(const char *n){
+#ifndef TEST_SEED
 	unsigned sd = time(0);
+#else
+	unsigned sd = TEST_SEED;
+#endif
 	printf("TEST %s seed=%x\n", n, sd);
 	srand(sd);
 }
 
 int rand_rng(int min, int max) {
 	return min + (rand() % (max - min + 1));
+}
+
+void rand_perm(size_t sz, size_t* dst) {
+	for (size_t i = 0; i < sz; ++i) {
+		size_t j = rand_rng(0, i);
+		dst[i] = dst[j];
+		dst[j] = i;
+	}
 }
 
 uint64_t rand64() {

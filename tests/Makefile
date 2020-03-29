@@ -2,7 +2,7 @@ export TRG=host
 export CC=gcc
 export FLAGS=-O2 -Wall -Wextra -std=gnu99 -fno-builtin
 
-.PHONY: all clean libc ext2 unit
+.PHONY: all clean libc ext2 unit depends
 
 all: libc ext2 unit
 
@@ -14,6 +14,9 @@ ext2:
 
 libc:
 	$(MAKE) -C libc run
+
+depends:
+	$(MAKE) -B -C unit .depends
 
 clean:
 	rm -f *.out *.o
