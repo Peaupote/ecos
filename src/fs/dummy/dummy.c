@@ -6,7 +6,7 @@
 #define SZ (sizeof(dummy_block_t) * 1024)
 static char device[SZ];
 static uint64_t offset = 0;
-static const int nb_dir = BUFSIZE / sizeof(struct dirent);
+static const size_t nb_dir = BUFSIZE / sizeof(struct dirent);
 
 int dummy_mount(void *partition __attribute__((unused)),
                 struct mount_info *info) {

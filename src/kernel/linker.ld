@@ -46,5 +46,10 @@ SECTIONS
         *(COMMON)
         *(.bss)
     }
-    ASSERT(. <= KVA + kba_end + 2M, "taille du kernel")
+    /* !: peut ne pas prendre en compte d'éventuelles sections rajoutés
+     * après, vérification complète par tools/check_elf.sh */
+    kernel_size = . - KVA;
+    ASSERT(kernel_size <= 3M, "taille du kernel")
 }
+
+kernel_uplim = KVA + 3M;

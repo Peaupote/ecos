@@ -9,6 +9,8 @@
 
 #define KEY_KP_ENTER	0x9C
 #define KEY_ALTGR		0xB8
+#define KEY_UP_ARROW	0xC8
+#define KEY_DOWN_ARROW  0xD0
 
 #define KEYS_MASK		0x7F
 #define KEYS_ENTER		0x1C

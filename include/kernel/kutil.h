@@ -25,6 +25,7 @@ void klog (enum klog_level lvl, const char *head, const char *msg);
 void klogf(enum klog_level lvl, const char *head, const char *msgf, ...);
 
 void kpanic(const char *msg);
+void kpanicf(const char *msg, const char *fmt, ...);
 void kpanic_ct(const char *msg);
 void kassert(uint8_t, const char *msg);
 

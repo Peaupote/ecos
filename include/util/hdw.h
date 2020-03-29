@@ -3,6 +3,8 @@
 
 // --Control Registers--
 
+//Write Protect
+#define CR0_WP 16
 //Paging
 #define CR0_PG 31
 

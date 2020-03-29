@@ -1,6 +1,6 @@
-TRG_LIST=32 64 test
+TRG_LIST=32 64 host
 # Default Target:
-TRG?=test
+TRG?=host
 CC?=gcc
 FLAGS?=-O2 -Wall -Wextra -std=gnu99
 INCLUDES=-I ../../include
@@ -12,7 +12,7 @@ $(TRG)/%.o:%.c
 
 $(TRG)/.depends:
 	mkdir -p $(TRG)
-	../../tools/mkdep.sh "$(CC) $(FLAGS)"\
+	../../tools/mkdep.sh "$(CC) $(FLAGS) $(INCLUDES)"\
 		$(foreach file,$(SRCDEP),"-MT $(TRG)/$(file) $(file)")\
 		> $(TRG)/.depends
 

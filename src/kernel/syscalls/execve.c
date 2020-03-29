@@ -10,27 +10,9 @@
 #include <util/misc.h>
 #include <kernel/int.h>
 
-#define AUX_STACK_SIZE 0x1000
+#include <libc/sys.h>
 
-//TODO: vrai système de fichier
-extern uint8_t edummy_args[];
-off_t edummy_pos;
-int edummy_open(
-		const char *fname __attribute__((unused)),
-		enum chann_mode mode __attribute__((unused)) ) {
-	edummy_pos = 0;
-	return 0;
-}
-int edummy_read(int fd __attribute__((unused)), uint8_t *buf, size_t len) {
-	for (off_t i = 0; i < len; ++i)
-		buf[i] = edummy_args[edummy_pos + i];
-	edummy_pos  += len;
-	return len;
-}
-int edummy_close(int fd __attribute__((unused))) {return 0;}
-off_t edummy_lseek(int fd __attribute__((unused)), off_t offset) {
-	return edummy_pos = offset;
-}
+#define AUX_STACK_SIZE 0x1000
 
 // Zone de transfert
 // permet de conserver des données lors du changement de paging
@@ -49,6 +31,7 @@ struct section {
 	uint_ptr   dst;
 	size_t     sz;
 	bool       copy;
+	bool       write;
 	off_t      src;
 };
 
@@ -83,7 +66,7 @@ static inline void free_tr() {
 	*pd = 0;
 }
 
-void proc_execve_error() {
+void proc_execve_error_1() {
 	proc_t* mp = state.st_proc + state.st_curr_pid;
 	pid_t ppid = mp->p_ppid;
     proc_t *pp = state.st_proc + ppid;
@@ -101,7 +84,7 @@ void proc_execve_error_2() {
 	pid_t ppid = mp->p_ppid;
 	proc_t* pp = state.st_proc + ppid;
 	kmem_free_paging(mp->p_pml4, pp->p_pml4);
-	proc_execve_error();
+	proc_execve_error_1();
 }
 
 void execve_switch_pml4() {
@@ -117,7 +100,7 @@ void execve_switch_pml4() {
 }
 
 // --Ring 1 -> 0 defined in int7Ecall.S
-extern void call_proc_execve_error(void);
+extern void call_proc_execve_error_1(void);
 extern void call_proc_execve_error_2(void);
 extern void call_execve_switch_pml4(void);
 extern void call_proc_execve_end(void);
@@ -138,7 +121,7 @@ static inline bool execve_tr_alloc_pg(uint_ptr v_addr) {
 
 bool read_bytes(int fd, void* buf, size_t count) {
 	while (count > 0) {
-		int rt = edummy_read(fd, buf, count);
+		int rt = read(fd, buf, count);
 		if (rt == 0 || !~rt) return false;
 		count -= rt;
 		buf   += rt;
@@ -146,16 +129,16 @@ bool read_bytes(int fd, void* buf, size_t count) {
 	return true;
 }
 inline bool execve_lseek(int fd, off_t ofs) {
-	return ~edummy_lseek(fd, ofs);
+	return ~lseek(fd, ofs);
 }
 
 // Chargement des sections
-bool execve_alloc_rng(uint_ptr bg, size_t sz) {
+bool execve_alloc_rng(bool write, uint_ptr bg, size_t sz) {
+	uint16_t   f  = PAGING_FLAG_U;
+	if (write) f |= PAGING_FLAG_W;
 	return bg + sz >= bg 
 		&& paging_get_lvl(pgg_pml4, bg + sz) < PML4_END_USPACE
-		&& !call_kmem_paging_alloc_rng(bg, bg + sz,
-				PAGING_FLAG_U | PAGING_FLAG_W,
-				PAGING_FLAG_U | PAGING_FLAG_W);
+		&& !call_kmem_paging_alloc_rng(bg, bg + sz, f, f);
 }
 
 static inline void execve_fill0(uint_ptr bg, size_t sz) {
@@ -175,13 +158,14 @@ static inline bool execve_read_sections(int fd) {
 			|| !read_bytes(fd, &shdr, sizeof(Elf64_Shdr))) {
 			return false;
 		}
-        if (shdr.sh_flags & (SHF_WRITE | SHF_ALLOC | SHF_EXECINSTR)){
+        if (shdr.sh_flags & SHF_ALLOC){
 			size_t n_s = trf()->nb_sections;
 			if (!execve_tr_alloc_pg( (uint_ptr)(sections() + (n_s + 1)) - 1))
 				return false;
 			struct section* s = sections() + n_s;
-			s->dst = shdr.sh_addr;
-			s->sz  = shdr.sh_size;
+			s->dst   = shdr.sh_addr;
+			s->sz    = shdr.sh_size;
+			s->write = shdr.sh_flags & SHF_WRITE;
             if (shdr.sh_type == SHT_NOBITS) //.bss
 				s->copy = false;
 			else {
@@ -197,7 +181,7 @@ static inline bool execve_read_sections(int fd) {
 static inline bool execve_load_sections(int fd) {
 	for (size_t i_s = 0; i_s < trf()->nb_sections; ++i_s) {
 		struct section* s = sections() + i_s;
-		if (!execve_alloc_rng(s->dst, s->sz)) return false;
+		if (!execve_alloc_rng(s->write, s->dst, s->sz)) return false;
 		if (s->copy) {
             if (!execve_copy(fd, s->dst, s->src, s->sz))
 				return false;
@@ -309,7 +293,7 @@ static inline bool execve_load_args() {
 void proc_execve_entry(const char *fname, const char **argv, const char **env);
 
 // --Ring 0--
-int execve(reg_t fname, reg_t argv, reg_t env) {
+int sys_execve(reg_t fname, reg_t argv, reg_t env) {
 	pid_t  pid = state.st_curr_pid;
 	klogf(Log_info, "syscall", "process %d called execve", (int)pid);
     proc_t  *p = state.st_proc + pid;
@@ -362,32 +346,32 @@ int execve(reg_t fname, reg_t argv, reg_t env) {
 void proc_execve_entry(const char *fname,
 		const char **args, const char **envs) {
 
-	int fd = edummy_open(fname, READ);
-	if (fd == -1) call_proc_execve_error();
+	int fd = open(fname, READ);
+	if (fd == -1) call_proc_execve_error_1();
 
 	// Lecture des headers du fichier ELF
 	trf()->nb_sections = 0;
 	if (!read_bytes(fd, (uint8_t*)&trf()->ehdr, sizeof(Elf64_Ehdr))
 			//TODO: check
 			|| !execve_read_sections(fd)) {
-		edummy_close(fd);
-		call_proc_execve_error();
+		close(fd);
+		call_proc_execve_error_1();
 	}
 
 	// Transfert des arguments
 	if (!execve_tr_args(args, envs)) {
-		edummy_close(fd);
-		call_proc_execve_error();
+		close(fd);
+		call_proc_execve_error_1();
 	}
 
 	call_execve_switch_pml4();
 
 	if (!execve_load_args() || !execve_load_sections(fd)) {
-		edummy_close(fd);
+		close(fd);
 		call_proc_execve_error_2();
 	}
 	
-	edummy_close(fd);
+	close(fd);
 	call_proc_execve_end();
 }
 

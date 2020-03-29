@@ -22,7 +22,7 @@ static inline void ptr_to_str(char *out, void *ptr){
 #endif
 }
 
-uint64_t int64_of_str_hexa(char* src);
+uint64_t int64_of_str_hexa(const char src[]);
 
 static inline char hexa_digit(uint8_t p){
     return (p<10 ? '0': ('A'-10)) + p;

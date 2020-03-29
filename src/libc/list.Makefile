@@ -15,7 +15,8 @@ LIBC_CFILES=string/memcmp.c \
 LIBC_FILES=$(LIBC_CFILES) $(LIBC_AS_FILES)
 LIBC_OBJ=$(LIBC_FILES:%.c=%.libc.o) $(LIBC_AS_FILES:%.s=%.libc.o)
 
-LIBK_FILES=string/memcmp.c \
+LIBK_AS_FILES=sys.s
+LIBK_CFILES=string/memcmp.c \
 	  string/memcpy.c \
 	  string/memset.c \
 	  string/memmove.c \
@@ -26,4 +27,5 @@ LIBK_FILES=string/memcmp.c \
 	  string/strncmp.c \
 	  string/index.c \
 	  stdio/printf.c
-LIBK_OBJ=$(LIBK_FILES:%.c=%.libk.o)
+LIBK_FILES=$(LIBK_CFILES) $(LIBK_AS_FILES)
+LIBK_OBJ=$(LIBK_FILES:%.c=%.libk.o) $(LIBK_AS_FILES:%.s=%.libk.o)

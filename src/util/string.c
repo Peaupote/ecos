@@ -59,7 +59,7 @@ uint8_t hexa_digit_of_char_tb1[16 * 3 - 9 - 1] =
      ~0,10,11,12, 13,14,15,~0, ~0,~0,~0,~0, ~0,~0,~0,~0,
      ~0,~0,~0,~0, ~0,~0,~0};
 
-uint64_t int64_of_str_hexa(char* src) {
+uint64_t int64_of_str_hexa(const char src[]) {
     uint64_t rt = 0;
     for(uint8_t d = hexa_digit_of_char(*src); d != (uint8_t)~0;
             d = hexa_digit_of_char(* ++src))

@@ -33,7 +33,7 @@ SECTIONS
         *(.bss)
 		*(space_for_kernel)
     }
-	ASSERT(.<=4M, "sortie du paging")
+	ASSERT(. <= 6M, "sortie du paging")
 }
 
 page_ml4   = KPA + kba_pml4;

@@ -25,7 +25,7 @@ run:$(TESTRUN)
 	$(foreach e,$(TESTRUN),"./$(e)" ;)
 
 .depends:
-	../../tools/mkdep.sh "$(CC) $(FLAGS)" $(TESTDEP) > .depends
+	../../tools/mkdep.sh "$(CC) $(FLAGS) $(INCLUDES)" $(TESTDEP) > .depends
 
 include .depends
 

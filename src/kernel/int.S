@@ -12,23 +12,23 @@ int_handlers:
 #include "int_handlers_tab.s"
 
 syscall_tab:
-    .quad sleep
-    .quad fork
-    .quad kexit
-    .quad wait
-    .quad waitpid
-    .quad getpid
-    .quad getppid
-    .quad open
-    .quad close
-    .quad dup
-    .quad pipe
-    .quad write
-    .quad read
-    .quad lseek
-    .quad execve
+    .quad sys_sleep
+    .quad sys_fork
+    .quad sys_exit
+    .quad sys_wait
+    .quad sys_waitpid
+    .quad sys_getpid
+    .quad sys_getppid
+    .quad sys_open
+    .quad sys_close
+    .quad sys_dup
+    .quad sys_pipe
+    .quad sys_write
+    .quad sys_read
+    .quad sys_lseek
+    .quad sys_execve
 syscall_ring1_tab:
-	.quad prires
+	.quad sys_prires
 
     .section .text
 .global irq_sys
@@ -44,6 +44,8 @@ syscall_ring1_tab:
 .global invalide_page
 .global paging_refresh
 
+.global kpanic_do_stop
+
 .extern st_curr_reg
 .extern common_hdl
 .extern keyboard_hdl
@@ -54,6 +56,7 @@ syscall_ring1_tab:
 .extern exception_PF_hdl
 .extern pit_hdl
 .extern pit_hdl_switch
+.extern panic_rsp
 
 // Sauvegarde des registres associés au processus courant (st_curr_reg)
 // Utilise la valeur actuelle des registres ainsi qu'une structure d'iret
@@ -305,7 +308,7 @@ irq_sys_ring1_end:
 // struct iret
 // reg save 9 quad
 // ds  save 1 quad
-prires:
+sys_prires:
 	movq  $(GDT_RING_SZ+1), %r10 //+1 pour le CPL
 	imulw %di,              %r10w
 	addw  $GDT_RING_OFS,    %r10w
@@ -351,3 +354,13 @@ paging_refresh:
 	movq   %cr3, %rax
 	movq   %rax, %cr3
 	ret
+
+kpanic_do_stop:
+	movabs $panic_rsp,   %r10
+	movq   %rsp,        (%r10)
+	movabs $st_curr_reg, %r10
+	movq   (%r10),       %r10
+	movq   %rsp,    0x10(%r10)
+	sti
+1:  hlt
+	jmp 1b

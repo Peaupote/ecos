@@ -17,8 +17,8 @@
 
 char proc_state_char[5] = {'f', 's', 'w', 'R', 'Z'};
 
-extern void    proc_idle_entry(void);
-extern uint8_t proc_init[];
+extern void proc_idle_entry(void);
+extern void proc_init_entry(void);
 
 void sched_init() {
     struct scheduler* s = &state.st_sched;
@@ -30,7 +30,7 @@ void sched_init() {
     }
 }
 
-void init() {
+void proc_start() {
     sched_init();
 
     // processus 0: p_idle
@@ -54,10 +54,27 @@ void init() {
     p_init->p_nchd = 1;
     p_init->p_stat = RUN;
     p_init->p_ring = 1;
-    p_init->p_prio = NB_PRIORITY_LVL - 1; //priorité maximale
+    p_init->p_prio = NB_PRIORITY_LVL - 2; //priorité maximale
+    p_init->p_pml4 = (phy_addr)NULL;
+    p_init->p_reg.rsp = (uint_ptr)NULL;
+    p_init->p_reg.rip = (uint_ptr)&proc_init_entry;
+
+    // processus 2: stop, utilisé en cas de panic
+    proc_t *p_stop = &state.st_proc[PID_STOP];
+    p_stop->p_ppid = PID_STOP;
+    p_stop->p_prsb = p_stop->p_nxsb = PID_NONE;
+    p_stop->p_fchd = PID_STOP;
+    p_stop->p_nchd = 1;
+    p_stop->p_stat = WAIT;
+    p_stop->p_ring = 0;
+    p_stop->p_prio = NB_PRIORITY_LVL - 1;
+    p_stop->p_pml4 = (phy_addr)NULL;
+    p_stop->p_reg.rsp = (uint_ptr)kernel_stack_top;
+    p_stop->p_reg.rip = (uint_ptr)&proc_idle_entry;
 
     // set unused file desc
-    for (size_t i = 0; i < NFD; i++) p_idle->p_fds[i] = -1;
+    for (size_t i = 0; i < NFD; i++)
+        p_idle->p_fds[i] = p_stop->p_fds[i] = -1;
     for (size_t i = 3; i < NFD; i++) p_init->p_fds[i] = -1;
 
     // set chann to free
@@ -67,8 +84,8 @@ void init() {
     }
 
     // set all remaining slots to free processus
-    state.st_free_proc = 2;
-    for (pid_t pid = 2; pid < NPROC; pid++) {
+    state.st_free_proc = 3;
+    for (pid_t pid = 3; pid < NPROC; pid++) {
         state.st_proc[pid].p_stat = FREE;
         state.st_proc[pid].p_nxfr = pid + 1;
     }
@@ -77,14 +94,14 @@ void init() {
     vfs_init();
 
     sched_add_proc(PID_IDLE);
-    proc_create_userspace(proc_init, p_init); //TODO in kernel
 
-    state.st_curr_pid = 1;
+    state.st_curr_pid = PID_INIT;
     st_curr_reg       = &p_init->p_reg;
 
     proc_create(1);
     proc_alloc_std_streams(1);
-    klog(Log_info, "init", "Process 1 loaded. Start process 1");
+
+    klogf(Log_info, "init", "Start process init @ %p", p_init->p_reg.rip);
     iret_to_proc(p_init);
 }
 
@@ -171,7 +188,8 @@ static inline uint8_t proc_ldr_alloc_pages(uint_ptr begin, uint_ptr end) {
                 PAGING_FLAG_U | PAGING_FLAG_W);
 }
 
-void proc_ldr_fill0(void* err_pt, Elf64_Addr dst, uint64_t sz) {
+void proc_ldr_fill0(void* err_pt, Elf64_Xword flag __attribute__((unused)),
+        Elf64_Addr dst, uint64_t sz) {
     uint8_t err = proc_ldr_alloc_pages(dst, dst + sz);
     if (err) {
         *((uint8_t*)err_pt) = err;
@@ -182,7 +200,8 @@ void proc_ldr_fill0(void* err_pt, Elf64_Addr dst, uint64_t sz) {
         ((uint8_t*) dst)[i] = 0;
 }
 
-void proc_ldr_copy(void* err_pt, Elf64_Addr dst, void* src, uint64_t sz) {
+void proc_ldr_copy(void* err_pt, Elf64_Xword flag __attribute__((unused)),
+        Elf64_Addr dst, void* src, uint64_t sz) {
     uint8_t err = proc_ldr_alloc_pages(dst, dst + sz);
     if (err) {
         *((uint8_t*)err_pt) = err;

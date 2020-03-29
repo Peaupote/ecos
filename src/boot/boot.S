@@ -32,10 +32,6 @@ forced to be within the first 8 KiB of the kernel file.
 .global mb_info
 .global kernel_entry_addr
 
-//Pour les asserts de ld
-.global end_used_bss
-.global end_space_for_kernel
-
 //Structures pour le mapping identité sur les 4 premiers MB
 .balign 0x1000
 page_dpt_0: #PDPT
@@ -55,8 +51,10 @@ kernel_entry_addr: //adresse physique
 //évite que GRUB charge le module sur une adresse utilisée
     .section space_for_kernel
 .global KPA           //Adresse physique du kernel
+.global KPA_end
 .balign 0x1000        //alignement à la page 4KB
-KPA: .skip 0x280000   //2.5MB
+KPA: .skip 0x300000   //3MB
+KPA_end:
 
 
     .section .text
@@ -76,6 +74,7 @@ _start:
     //Stack
     mov $stack_top, %esp
 
+    call init_paging_structs
     /*
      On charge le kernel ici afin d'être sûr de pouvoir accéder
      aux données fournies par GRUB
@@ -103,7 +102,6 @@ reload_seg:
     mov %ax, %gs
 
     /* --Paging-- */
-    call init_paging_directory
 
     //On active le PAE et le PGE
     movl %cr4, %eax
@@ -121,9 +119,10 @@ reload_seg:
     wrmsr
 
     //On active le paging
-    movl %cr0,   %eax
-    btsl $CR0_PG,%eax
-    movl %eax,   %cr0
+    movl %cr0, %eax
+	//+ protection des pages read only
+    orl  $((1<<CR0_PG) | (1<<CR0_WP)), %eax
+    movl %eax, %cr0
 
     /*
     Long-mode (sous-mode de compatibilité 32 bits)
@@ -148,8 +147,4 @@ reload_seg2:
     pushl %eax //IP
     retf       //Far ret
 
-/*
-Set the size of the _start symbol to the current location '.' minus its start.
-This is useful when debugging or when you implement call tracing.
-*/
 .size _start, . - _start

@@ -37,7 +37,7 @@ boot.bin: linker.ld boot_data.ld $(OBJ) util
 	grub-file --is-x86-multiboot boot.bin
 
 .depends:
-	../../tools/mkdep.sh "$(CC) $(FLAGS)" $(SRCDEP) > .depends
+	../../tools/mkdep.sh "$(CC) $(FLAGS) $(INCLUDES)" $(SRCDEP) > .depends
 
 include .depends
 

@@ -119,9 +119,11 @@ void exception_PF_hdl(uint_ptr fault_vaddr, uint64_t errcode) {
     if (!(errcode & EXC_PF_ERC_P)
             && paging_get_lvl(pgg_pml4, fault_vaddr) < PML4_END_USPACE) {
         if (handle_PF(fault_vaddr))
-            kpanic("#PF handling");
+            kpanicf("#PF handling", "on %p errcode=%llx",
+					fault_vaddr, errcode);
     } else //TODO: kill process
-        kpanic("#PF not handled");
+		kpanicf("#PF not handled", "on %p errcode=%llx",
+					fault_vaddr, errcode);
     klogf(Log_verb, "exc", "#PF handled");
 }
 
