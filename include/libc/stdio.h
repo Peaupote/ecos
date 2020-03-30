@@ -10,17 +10,19 @@ typedef void (*stringl_writer)(void*, const char*, size_t);
 
 int fpprintf(stringl_writer w, void* wi, const char* fmt, va_list ps);
 
-int putchar(int c);
+#ifndef __is_test
+int  putchar(int c);
 
 #ifndef __is_kernel
-int printf(const char *fmt, ...);
+int  printf(const char *fmt, ...);
 
-int puts(const char *s);
+int  puts(const char *s);
 
 void abort(void);
 void exit(int status);
 #endif
 
 int sprintf(char *str, const char *format, ...);
+#endif
 
 #endif

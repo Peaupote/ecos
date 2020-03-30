@@ -1,8 +1,8 @@
 #ifndef _TUTIL_H
 #define _TUTIL_H
 
-#define TEST_UNIT
-#define TESTED(N) test_##N
+#define __is_test_unit
+#include <util/test.h>
 
 #include <stddef.h>
 #include <stdint.h>

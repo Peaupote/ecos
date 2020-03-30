@@ -33,7 +33,7 @@ union SPTRAllocator {
 	union sptra_entry entries;
 };
 
-#ifndef TEST_UNIT
+#ifndef __is_test_unit
 extern union SPTRAllocator sptr_alct;
 #endif
 

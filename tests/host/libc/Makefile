@@ -1,27 +1,26 @@
 include ../vars.Makefile
 
-SRC_LIBC=../../../src/libc
+ROOT=../../..
+SRC_LIBC=$(ROOT)/src/libc
 ASFILES=
 include list.Makefile
-INCLUDES=-I ../../include
+INCLUDES=-I $(ROOT)/include
 
-.PHONY: run libc libk build_libk
+.PHONY: run libc libk
 
 all: run
 
-build_libk: $(TESTS_LIBK)
-
 %.libc.out:%.c libc
-	$(CC) $(FLAGS_LC) -o $@ $(SRC_LIBC)/$(NAME_LC).a -c $< $(INCLUDES)
+	$(CC) $(FLAGS_LC) -o $@ $< $(SRC_LIBC)/$(NAME_LC).a $(INCLUDES)
 
 %.libk.out:%.c libk
-	$(CC) $(FLAGS_LK) -o $@ $(SRC_LIBC)/$(NAME_LK).a -c $< $(INCLUDES)
+	$(CC) $(FLAGS_LK) -o $@ $< $(SRC_LIBC)/$(NAME_LK).a $(INCLUDES)
 
 libc:
-	$(MAKE) -C $(SRC_LIBC) libc.a
+	$(MAKE) -C $(SRC_LIBC) $(NAME_LC).a
 
 libk:
-	$(MAKE) -C $(SRC_LIBC) libk.a
+	$(MAKE) -C $(SRC_LIBC) $(NAME_LK).a
 
 run: $(TESTS_LIBC)
 	@echo $(TESTS_LIBC)

@@ -133,6 +133,7 @@ int fpprintf(stringl_writer w, void* wi, const char* fmt, va_list ps) {
     return count;
 }
 
+#ifndef __is_test
 #ifndef __is_kernel
 static void
 print(void *seq __attribute__((unused)), const char *s, size_t len) {
@@ -167,3 +168,4 @@ int sprintf(char *str, const char *fmt, ...) {
 
     return cnt;
 }
+#endif

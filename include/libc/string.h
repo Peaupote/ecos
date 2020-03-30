@@ -1,9 +1,10 @@
 #ifndef _H_LIBC_STRING
 #define _H_LIBC_STRING
 
+#include <util/test.h>
 #include <stddef.h>
 
-int   memcmp(const void*, const void*, size_t);
+int   TEST_D(memcmp)(const void*, const void*, size_t);
 void* memcpy(void* __restrict, const void* __restrict, size_t);
 void* memmove(void*, const void*, size_t);
 void* memset(void*, int, size_t);
@@ -53,7 +54,7 @@ char *strfry(char *string);
 /**
  * Return the length of the string s.
  */
-size_t strlen(const char *s);
+size_t TEST_D(strlen)(const char *s);
 
 /**
  * Append at most n bytes from the string src to the string dest,
@@ -64,7 +65,7 @@ char *strncat(char *dest, const char *src, size_t n);
 /**
  * Compare at most n bytes of the strings s1 and s2.
  */
-int strncmp(const char *s1, const char *s2, size_t n);
+int TEST_D(strncmp)(const char *s1, const char *s2, size_t n);
 
 /**
  * Copy at most n bytes from string src to dest,

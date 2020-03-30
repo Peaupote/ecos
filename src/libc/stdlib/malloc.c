@@ -1,10 +1,9 @@
-#ifndef TEST_UNIT
-#define TESTED(NAME) NAME
+#ifndef __is_test_unit
 #include <libc/stdlib.h>
-
 #include <libc/unistd.h>
 #endif
 
+#include <util/test.h>
 #include <util/paging.h>
 #include <util/misc.h>
 
@@ -78,7 +77,7 @@ static inline void llist_insert_before(struct free_bloc* ref,
 	b->next   = ref;
 }
 
-void* TESTED(malloc)(size_t dsize) {
+void* TEST_U(malloc)(size_t dsize) {
 	size_t size = MALLOC_MIN_DSZ + MALLOC_HD_SZ;
 	if (dsize > MALLOC_MIN_DSZ)
 		size = align_to_size(dsize + MALLOC_HD_SZ, MALLOC_ALIGN);
@@ -117,7 +116,7 @@ void* TESTED(malloc)(size_t dsize) {
 	return (void*)(MALLOC_HD_SZ + (uint_ptr)rt_hd);
 }
 
-void TESTED(free)(void* ptr) {
+void TEST_U(free)(void* ptr) {
 	free_bloc_t*      b = (free_bloc_t*) ptr;
 	uint32_t        bsz = MBLOC_SIZE_MASK & *bloc_head(b);
 	free_bloc_t* insert = &root;

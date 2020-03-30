@@ -3,7 +3,7 @@
 #include <util/misc.h>
 
 #include <util/paging.h>
-#ifndef TEST_UNIT
+#ifndef __is_test_unit
 #include <kernel/kutil.h>
 #endif
 

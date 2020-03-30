@@ -1,11 +1,13 @@
-#include <libc/stdio.h>
+#include <util/test.h>
+
 #include <libc/string.h>
+#include <stdio.h>
 
 int test_strlen() {
     return
-        strlen("") == 0 &&
-        strlen("a") == 1 &&
-        strlen("aaaaaaaaa") == 9;
+        TEST_D(strlen)("") == 0 &&
+        TEST_D(strlen)("a") == 1 &&
+        TEST_D(strlen)("aaaaaaaaa") == 9;
 }
 
 int test_memcmp() {
@@ -13,10 +15,10 @@ int test_memcmp() {
         *t2 = "aaa";
 
     return
-        !memcmp(t1, t2, 0) &&
-        !memcmp(t1, t2, 1) &&
-        memcmp(t1, t2, 3) > 0 &&
-        memcmp(t2, t1, 3) < 0;
+        !TEST_D(memcmp)(t1, t2, 0) &&
+        !TEST_D(memcmp)(t1, t2, 1) &&
+         TEST_D(memcmp)(t1, t2, 3) > 0 &&
+         TEST_D(memcmp)(t2, t1, 3) < 0;
 }
 
 #define NTEST 2
@@ -55,6 +57,6 @@ int main(void) {
             pp("FAILED\n");
         } else pp("OK\n");
     }
-
+	return 0;
     return rc;
 }

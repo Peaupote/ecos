@@ -23,7 +23,7 @@ all:$(TESTRUN) run
 	$(ROOT)/tools/test_section.sh ../../ "$@"
 
 %.o:%.c
-	$(CC) $(FLAGS_AUX) -o $@ -c $<
+	$(CC) $(FLAGS_AUX) -o $@ -c $< $(INCLUDES)
 
 %.out:%.c $(OBJ)
 	$(CC) $(FLAGS_T) -o $@ $< $(OBJ) $(INCLUDES)
