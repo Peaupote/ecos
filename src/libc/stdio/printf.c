@@ -133,7 +133,7 @@ int fpprintf(stringl_writer w, void* wi, const char* fmt, va_list ps) {
     return count;
 }
 
-#if defined(__is_libc)
+#ifndef __is_kernel
 static void
 print(void *seq __attribute__((unused)), const char *s, size_t len) {
     while (len--) putchar(*s++);

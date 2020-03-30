@@ -12,7 +12,7 @@ int fpprintf(stringl_writer w, void* wi, const char* fmt, va_list ps);
 
 int putchar(int c);
 
-#if defined(__is_libc)
+#ifndef __is_kernel
 int printf(const char *fmt, ...);
 
 int puts(const char *s);

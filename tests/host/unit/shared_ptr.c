@@ -16,7 +16,7 @@ struct {
 	uint8_t vect[0x1000];
 } data;
 #define sptr_alct data.sptr
-#include "../../src/kernel/memory/shared_ptr.c"
+#include <src/kernel/memory/shared_ptr.c>
 
 void dump_tree_rec(uint64_t i, size_t ind) {
 	test_infoi("%llx\n", i);

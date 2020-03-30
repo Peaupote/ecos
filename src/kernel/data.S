@@ -9,5 +9,5 @@
 
 .align 0x20
 home_partition:
-    .incbin "../../tests/ext2/home.img"
+    .incbin "../../tests/run/home.img"
 .align 0x20

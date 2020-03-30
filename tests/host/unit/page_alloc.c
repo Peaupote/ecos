@@ -2,7 +2,7 @@
 
 typedef uint64_t phy_addr;
 
-#include "../../src/kernel/memory/page_alloc.c"
+#include <src/kernel/memory/page_alloc.c>
 
 void test_find_8(uint64_t v, uint8_t sz) {
     uint8_t rt = find_bit_64(v, sz, 3);

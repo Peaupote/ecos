@@ -9,7 +9,7 @@ void* sbrk(intptr_t increment);
 void  malloc_init();
 void* malloc(size_t dsize);
 void  free(void* ptr);
-#include "../../src/libc/stdlib/malloc.c"
+#include <src/libc/stdlib/malloc.c>
 
 #define TEST_BUFFER_SIZE 0x2000
 #define TEST_NB_ALLOC    50

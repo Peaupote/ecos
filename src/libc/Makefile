@@ -1,9 +1,10 @@
-CC?=gcc
-AS?=as
-AR?=ar
-LFLAGS?=-O2 -g -Wall -Wextra -std=gnu99 \
-		-nostdlib -mcmodel=large -ffreestanding \
-		-mno-red-zone
+NAME_LC?=libc
+NAME_LK?=libk
+CC?=x86_64-elf-gcc
+AS?=x86_64-elf-as
+AR?=x86_64-elf-ar
+include ../../vars.Makefile
+
 include list.Makefile
 SRCDEP=$(LIBC_FILES) $(LIBK_FILES)
 INCLUDES=-I ../../include
@@ -18,28 +19,28 @@ all: libc.a libk.a
 	$(CC) -E $? -o $@ $(INCLUDES)
 
 sys.S:sys-as.awk ../../include/kernel/sys.h
-	awk -f sys-as.awk < ../../include/headers/sys.h > sys.S
+	awk -f sys-as.awk ../../include/headers/sys.h > sys.S
 
-%.libc.o:%.s
+%.$(NAME_LC).o:%.s
 	$(AS) -c $? -o $@ $(INCLUDES)
 
-%.libc.o:%.c
-	$(CC) $(LFLAGS) -D__is_libc -c $? -o $@ $(INCLUDES)
+%.$(NAME_LC).o:%.c
+	$(CC) $(FLAGS_LC) -c $? -o $@ $(INCLUDES)
 
-%.libk.o:%.s
+%.$(NAME_LK).o:%.s
 	$(AS) -c $? -o $@ $(INCLUDES)
 
-%.libk.o:%.c
-	$(CC) $(LFLAGS) -D__is_libk -c $? -o $@ $(INCLUDES)
+%.$(NAME_LK).o:%.c
+	$(CC) $(FLAGS_LK) -c $? -o $@ $(INCLUDES)
 
-libc.a: $(LIBC_OBJ)
+$(NAME_LC).a: $(LIBC_OBJ)
 	$(AR) rcs $@ $(LIBC_OBJ)
 
-libk.a: $(LIBK_OBJ)
+$(NAME_LK).a: $(LIBK_OBJ)
 	$(AR) rcs $@ $(LIBK_OBJ)
 
 .depends:
-	../../tools/mkdep.sh "$(CC) $(LFLAGS) $(INCLUDES)" $(SRCDEP) > .depends
+	../../tools/mkdep.sh "$(CC) $(FLAGS_L) $(INCLUDES)" $(SRCDEP) > .depends
 
 include .depends
 

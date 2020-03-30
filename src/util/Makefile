@@ -2,17 +2,18 @@ TRG_LIST=32 64 host
 # Default Target:
 TRG?=host
 CC?=gcc
-FLAGS?=-O2 -Wall -Wextra -std=gnu99
+FLAGS_U?=-O2 -Wall -Wextra -std=gnu99
+
 INCLUDES=-I ../../include
 SRCDEP=vga.c string.c elf64.c
 
 $(TRG)/%.o:%.c
 	mkdir -p $(TRG)
-	$(CC) $(FLAGS) -o $@ -c $< $(INCLUDES)
+	$(CC) $(FLAGS_U) -o $@ -c $< $(INCLUDES)
 
 $(TRG)/.depends:
 	mkdir -p $(TRG)
-	../../tools/mkdep.sh "$(CC) $(FLAGS) $(INCLUDES)"\
+	../../tools/mkdep.sh "$(CC) $(FLAGS_U) $(INCLUDES)"\
 		$(foreach file,$(SRCDEP),"-MT $(TRG)/$(file) $(file)")\
 		> $(TRG)/.depends
 

@@ -12,7 +12,6 @@
 #include <kernel/proc.h>
 #include <kernel/int.h>
 
-#include <tests.h>
 #include <kernel/tests.h>
 #include <fs/ext2.h>
 
@@ -191,7 +190,6 @@ size_t built_in_exec(size_t in_begin, size_t in_len) {
         char *arg1 = cmd_decomp + cmd_decomp_idx[1];
         if (!strcmp(arg1, "statut"))      test_print_statut();
         else if(!strcmp(arg1, "kheap"))   test_kheap();
-        else if (!strcmp(arg1, "string")) test_string();
     } else if (!strcmp(cmd_name, "ps"))
         proc_ps();
     else if (!strncmp(cmd_name, "ls", 3)) ls();
