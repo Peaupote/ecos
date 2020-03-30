@@ -1,13 +1,12 @@
-#include <util/test.h>
-
-#include <libc/string.h>
 #include <stdio.h>
+
+#include "import-c.h"
 
 int test_strlen() {
     return
-        TEST_D(strlen)("") == 0 &&
-        TEST_D(strlen)("a") == 1 &&
-        TEST_D(strlen)("aaaaaaaaa") == 9;
+        my_strlen("") == 0 &&
+        my_strlen("a") == 1 &&
+        my_strlen("aaaaaaaaa") == 9;
 }
 
 int test_memcmp() {
@@ -15,10 +14,10 @@ int test_memcmp() {
         *t2 = "aaa";
 
     return
-        !TEST_D(memcmp)(t1, t2, 0) &&
-        !TEST_D(memcmp)(t1, t2, 1) &&
-         TEST_D(memcmp)(t1, t2, 3) > 0 &&
-         TEST_D(memcmp)(t2, t1, 3) < 0;
+        !my_memcmp(t1, t2, 0) &&
+        !my_memcmp(t1, t2, 1) &&
+         my_memcmp(t1, t2, 3) > 0 &&
+         my_memcmp(t2, t1, 3) < 0;
 }
 
 #define NTEST 2

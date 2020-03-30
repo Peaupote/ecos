@@ -10,7 +10,6 @@ typedef void (*stringl_writer)(void*, const char*, size_t);
 
 int fpprintf(stringl_writer w, void* wi, const char* fmt, va_list ps);
 
-#ifndef __is_test
 int  putchar(int c);
 
 #ifndef __is_kernel
@@ -23,6 +22,5 @@ void exit(int status);
 #endif
 
 int sprintf(char *str, const char *format, ...);
-#endif
 
 #endif
