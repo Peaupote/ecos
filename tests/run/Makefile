@@ -1,12 +1,17 @@
+ROOT=../..
+
+.PHONY:clean sys home
+
 home: sys
 	mkdir -p home/test
-	cp ../../src/sys/init1.out home/test/init1.out
+	cp $(ROOT)/src/sys/init1.out home/test/init1.out
 
 home.img: home
-	./build-home.sh
+	$(ROOT)/tools/build-ext2.sh home home.img
 
 sys:
-	$(MAKE) -C ../../src/sys all
+	$(MAKE) -C $(ROOT)/src/sys all
 
 clean:
 	rm -rf *.o *.img *.out *.s home
+	$(MAKE) -C prg clean

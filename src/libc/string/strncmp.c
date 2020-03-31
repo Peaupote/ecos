@@ -9,7 +9,9 @@ int strncmp(const char *lhs, const char *rhs, size_t len) {
         ++lhs;
         ++rhs;
     }
-    if(*rhs) return -1;
-    if(*lhs) return  1;
+	if (~len) {
+		if(*rhs) return -1;
+		if(*lhs) return  1;
+	}
     return 0;
 }

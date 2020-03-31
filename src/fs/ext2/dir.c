@@ -1,15 +1,13 @@
 #include <stddef.h>
-#include <fs/ext2.h>
-#include <libc/string.h>
 
-#if defined(__is_test)
-#include <stdio.h>
+#include <fs/ext2.h>
 #include <string.h>
-#endif
 
 #if defined(__is_kernel)
 #include <kernel/kutil.h>
 #endif
+
+#include <util/test.h>
 
 struct ext2_dir_entry *
 ext2_iter_dir(struct ext2_inode *inode,
@@ -26,9 +24,7 @@ ext2_iter_dir(struct ext2_inode *inode,
         if (len_in_block == info->block_size) {
             len_in_block = 0;
             dir = ext2_get_inode_block(++nbblk, inode, info);
-#if defined(__is_test)
-            printf("switch block\n");
-#endif
+            test_printf("switch block\n");
         } else dir = ext2_readdir(dir);
     start:
 
@@ -101,10 +97,8 @@ struct ext2_dir_entry * ext2_mkdir(uint32_t inode, char *dirname,
     struct ext2_group_desc *group = info->bg + g;
     group->g_dir_count++;
 
-#if defined(__is_test)
-    printf("%d (%d) %*s\n", dir->d_ino, dir->d_rec_len,
+    test_printf("%d (%d) %*s\n", dir->d_ino, dir->d_rec_len,
            dir->d_name_len, dir->d_name);
-#endif
 
     return dir;
 }

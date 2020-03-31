@@ -1,13 +1,16 @@
 #ifndef _TUTIL_H
 #define _TUTIL_H
 
-#define __is_test_unit
 #include <util/test.h>
 
 #include <stddef.h>
 #include <stdint.h>
 
-#define kAssert(P) kassert(P, #P)
+#define STR_HELPER(x) #x
+#define STR(x) STR_HELPER(x)
+#define kAssert(P) tassert(P, __FILE__":"STR(__LINE__)" "#P)
+#define tAssert(P) tassert(P, __FILE__":"STR(__LINE__)" "#P)
+#define kassert(...) tassert(__VA_ARGS__)
 
 void test_init(const char *n);
 int rand_rng(int min, int max);
@@ -24,7 +27,7 @@ enum klog_level {
 
 void kpanic(const char* p);
 void kpanic_ct(const char* p);
-void kassert(uint8_t, const char *msg);
+void tassert(uint8_t, const char *msg);
 void klog (enum klog_level lvl, const char *head, const char *msg);
 void klogf(enum klog_level lvl, const char *head, const char *msgf, ...);
 

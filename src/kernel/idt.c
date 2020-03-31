@@ -70,11 +70,9 @@ const char *error_desc[NEXCEPTION + 1] = {
 };
 
 void common_hdl(uint8_t num, uint64_t errcode) {
-    const char *desc = error_desc[num < NEXCEPTION ? num : NEXCEPTION];
-    klogf(Log_error, "error", "%s: error code %llx", desc, errcode);
-    clear_interrupt_flag();
-    while(1) halt();
     // TODO : something
+    const char *desc = error_desc[num < NEXCEPTION ? num : NEXCEPTION];
+    kpanicf("exception", "%s: error code %llx", desc, errcode);
 }
 
 

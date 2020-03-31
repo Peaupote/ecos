@@ -50,6 +50,7 @@ clean:
 	$(MAKE) -C src/libc   clean
 	$(MAKE) -C src/fs     clean
 	$(MAKE) -C tests/host clean
+	$(MAKE) -C tests/run  clean
 	$(MAKE) -C tools      clean
 	rm -rf *.o *.iso *.bin *.out isodir
 

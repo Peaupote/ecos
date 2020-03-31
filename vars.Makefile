@@ -1,5 +1,6 @@
 export NAME_LC?=libc
 export NAME_LK?=libk
+export TSFX?=
 
 #Communs
 FLAGS_C?=-O1 -Wall -Wextra -std=gnu99 -nostdlib -mno-red-zone
