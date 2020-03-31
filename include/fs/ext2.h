@@ -132,6 +132,7 @@ static inline uint32_t ext2_frag_size(struct ext2_superblock *sp) {
 }
 
 static inline uint32_t ext2_group_count(struct ext2_superblock *sp) {
+    if (sp->s_blocks_count <= sp->s_blocks_per_group) return 1;
     return sp->s_blocks_count / sp->s_blocks_per_group +
         (sp->s_blocks_count % sp->s_blocks_per_group != 0 ? 1 : 0);
 }
@@ -280,17 +281,23 @@ int32_t  ext2_write(ino_t ino, void *buf, off_t offset, size_t len,
 // blocks
 
 uint32_t ext2_block_alloc(struct ext2_mount_info *info);
+void     ext2_block_free(uint32_t block, struct ext2_mount_info *info);
 
 // inodes
 
 struct ext2_inode *
 ext2_get_inode(uint32_t inode, struct ext2_mount_info *info);
 
-uint32_t
-ext2_lookup_free_inode(struct ext2_mount_info *info);
+uint32_t ext2_lookup_free_inode(struct ext2_mount_info *info);
 
-uint32_t
-ext2_alloc_inode(uint16_t type, uint16_t uid, struct ext2_mount_info *);
+uint32_t ext2_inode_free(uint32_t inode, struct ext2_mount_info *info);
+
+uint32_t ext2_alloc_inode_block(struct ext2_inode *inode,
+                                uint32_t blknb, uint32_t block,
+                                struct ext2_mount_info *info);
+
+uint32_t ext2_touch(uint32_t parent, const char *fname, uint16_t type,
+                    struct ext2_mount_info *info);
 
 uint32_t *ext2_get_inode_block_ptr(uint32_t block,
                                    struct ext2_inode *inode,
@@ -309,7 +316,6 @@ block_t ext2_get_inode_block(uint32_t block,
 struct ext2_dir_entry *
 ext2_iter_dir(struct ext2_inode *inode,
               int (*iterator)(struct ext2_dir_entry*),
-              size_t *len,
               struct ext2_mount_info *info);
 
 uint32_t ext2_lookup_dir(struct ext2_inode *inode, const char *fname,
@@ -318,9 +324,11 @@ uint32_t ext2_lookup_dir(struct ext2_inode *inode, const char *fname,
 struct ext2_dir_entry *
 ext2_readdir(struct ext2_dir_entry *dir);
 
-struct ext2_dir_entry *
-ext2_mkdir(uint32_t parent_inode, char *dirname,
-           struct ext2_mount_info *info);
+uint32_t ext2_add_dirent(struct ext2_inode *parent, uint32_t file,
+                         const char *fname, struct ext2_mount_info*);
+
+uint32_t ext2_mkdir(uint32_t parent, const char *dirname, uint16_t type,
+                    struct ext2_mount_info *info);
 
 struct ext2_dir_entry *ext2_opendir(uint32_t ino, struct ext2_mount_info *);
 

@@ -54,7 +54,7 @@ typedef int (fs_stat_t)(ino_t ino, struct stat*, struct mount_info *info);
  * returns inode of new file
  */
 typedef uint32_t (fs_create_t)(ino_t parent, const char *fname, uint16_t type,
-                              struct mount_info *info);
+                               struct mount_info *info);
 
 /**
  * Read/Write in file specified by given ino

@@ -15,8 +15,8 @@ static struct ext2_mount_info info;
 static uint32_t curr_ino;
 static struct ext2_inode *curr;
 
-static void print_type(uint8_t type) {
-    printf("type : (%x) ", type);
+static void print_type(uint16_t type) {
+    printf("type : ");
     switch (type&0xf000) {
     case EXT2_TYPE_DIR: printf("directory\n"); break;
     case EXT2_TYPE_REG: printf("regular file\n"); break;
@@ -38,6 +38,10 @@ static void print_inode(struct ext2_inode *inode) {
 }
 
 int print_dir(struct ext2_dir_entry *dir) {
+    if (!dir) {
+        printf("dir null\n");
+        return 0;
+    }
     printf("%d (%d) %*s\n", dir->d_ino, dir->d_rec_len,
            dir->d_name_len, dir->d_name);
     return 0;
@@ -49,7 +53,20 @@ void ls () {
         exit(1);
     }
 
-    ext2_iter_dir(curr, print_dir, 0, &info);
+    ext2_iter_dir(curr, print_dir, &info);
+}
+
+void touch() {
+    if (!(curr->in_type&EXT2_TYPE_DIR)) exit(1);
+
+    char *s = strtok(line, " \n");
+    if (!(s = strtok(0, " \n"))) {
+        fprintf(stderr, "usage: touch file\n");
+        return;
+    }
+
+    if (!ext2_touch(curr_ino, s, 0640, &info))
+        fprintf(stderr, "fail\n");
 }
 
 void print_stat() {
@@ -59,7 +76,7 @@ void print_stat() {
 void cd () {
     char *s1 = strchr(line, ' ');
     if (!s1) {
-        printf("usage: cd [dir]\n");
+        printf("usage: cd dir\n");
         return;
     }
 
@@ -91,7 +108,10 @@ void cmd_mkdir() {
     char *s = strtok(line, " ");
 
     for (s = strtok(0, " "); s; s = strtok(0, " ")) {
-        ext2_mkdir(curr_ino, s, &info);
+        if (!ext2_mkdir(curr_ino, s, 0640, &info)) {
+            fprintf(stderr, "fail\n");
+            return;
+        }
     }
 }
 
@@ -211,11 +231,12 @@ int main(int argc, char *argv[]) {
         }
 
         if (!strncmp(line, "ls", 2)) ls();
-        else if (!strncmp(line, "cd", 2)) cd(line);
+        else if (!strncmp(line, "cd", 2)) cd();
         else if (!strncmp(line, "stat", 4)) print_stat();
         else if (!strncmp(line, "mkdir", 5)) cmd_mkdir();
         else if (!strncmp(line, "save", 4)) save();
         else if (!strncmp(line, "dump", 4)) dump();
+        else if (!strncmp(line, "touch", 4)) touch();
         else if (!strncmp(line, "\n", 1)) {}
         else {
             printf("unkonwn command %s", line);

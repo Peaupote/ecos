@@ -21,26 +21,27 @@ ext2_lookup_free_inode(struct ext2_mount_info *info) {
 
     // TODO : adapt to make block contiguous
 
-    for (group = info->bg + g;
-         g < info->group_count && group->g_free_inodes_count == 0;
-         group++, g++);
+    for (group = info->bg + g; g < info->group_count; group++, g++) {
+        if (group->g_free_inodes_count == 0) continue;
 
-    uint8_t *bitmap = ext2_get_block(group->g_inode_bitmap, info);
-    uint32_t inode, rem = 0;
+        uint8_t *bitmap = ext2_get_block(group->g_inode_bitmap, info);
+        uint32_t inode, rem = 0;
 
-    for (inode = 0; inode < info->sp->s_inodes_per_group; inode++) {
-        rem = inode & 0b111;
-        if (inode != 0 && rem == 0) bitmap++;
-        if (0 == (*bitmap & (1 << rem))) break;
+        for (inode = 0; inode < info->sp->s_inodes_per_group; inode++) {
+            rem = inode&7;
+            if (inode != 0 && rem == 0) bitmap++;
+            if (0 == (*bitmap & (1 << rem))) break;
+        }
+
+        // assert (inode < info->sp->s_inodes_per_group)
+
+        *bitmap |= 1 << rem;
+        group->g_free_inodes_count--;
+
+        return g * info->sp->s_inodes_per_group + inode + 1;
     }
 
-    // TODO : try an other group
-    if (inode == info->sp->s_inodes_per_group) return 0;
-
-    *bitmap |= 1 << rem;
-    group->g_free_inodes_count--;
-
-    return inode + 1;
+    return 0;
 }
 
 uint32_t
@@ -58,6 +59,29 @@ ext2_alloc_inode(uint16_t type, uint16_t uid,
     return ino;
 }
 
+uint32_t ext2_alloc_inode_block(struct ext2_inode *inode,
+                                uint32_t blknb, uint32_t block,
+                                struct ext2_mount_info *info) {
+    uint32_t inf = 0;
+    uint32_t sup = EXT2_DIRECT_BLOCK;
+    uint32_t *b; // indirection block
+
+    if (blknb < sup) {
+        inode->in_block[blknb] = block;
+        return block;
+    }
+
+    inf = sup;
+    sup += info->block_size >> 2;
+    if (blknb < sup) {
+        b = ext2_get_block(inode->in_block[12], info);
+        b[blknb - inf] = block;
+        return block;
+    }
+
+    return 0; // TODO : finish indirection
+}
+
 uint32_t *ext2_get_inode_block_ptr(uint32_t block,
                                    struct ext2_inode *inode,
                                    struct ext2_mount_info *info) {
@@ -65,17 +89,12 @@ uint32_t *ext2_get_inode_block_ptr(uint32_t block,
     uint32_t sup = EXT2_DIRECT_BLOCK;
     uint32_t *b; // indirection block
 
-#if defined(__is_test)
-    printf("get inode block %d\n", block);
-#endif
-
     if (block < sup) return inode->in_block + block;
 
     inf = sup;
     sup += info->block_size >> 2;
     if (block < sup) {
         b = ext2_get_block(inode->in_block[12], info);
-        /* kprintf("block %d => %d => %d\n", block, block - inf, b[block-inf]); */
         return b + block - inf;
     }
 
@@ -86,19 +105,58 @@ uint32_t ext2_get_inode_block_nb(uint32_t block,
                                  struct ext2_inode *inode,
                                  struct ext2_mount_info *info) {
     uint32_t *b = ext2_get_inode_block_ptr(block, inode, info);
-
-    if (block >= ext2_inode_block_count(inode, info->sp)) {
-        inode->in_mtime = 2; // TODO : change
-        inode->in_blocks =
-            ext2_inode_blocks(inode->in_size/info->block_size+1,info->sp);
-        *b = ext2_block_alloc(info);
-    }
-
-    return *b;
+    return b ? *b : 0;
 }
 
 block_t ext2_get_inode_block(uint32_t block,
                              struct ext2_inode *inode,
                              struct ext2_mount_info *info) {
-    return ext2_get_block(ext2_get_inode_block_nb(block, inode, info), info);
+    uint32_t b = ext2_get_inode_block_nb(block, inode, info);
+    return ext2_get_block(b, info);
+}
+
+uint32_t ext2_touch(uint32_t parent, const char *fname, uint16_t type,
+                    struct ext2_mount_info *info) {
+    uint32_t ino;
+
+    if ((ino = ext2_lookup(fname, parent, info)) &&
+        !(ext2_get_inode(ino, info)->in_type&TYPE_DIR))
+        return 0;
+
+    if (type&TYPE_DIR) return 0;
+
+    struct ext2_inode *p = ext2_get_inode(parent, info);
+    if (!(p->in_type&TYPE_DIR)) return 0;
+    if (!(ino = ext2_lookup_free_inode(info))) return 0;
+
+    if (!ext2_add_dirent(p, ino, fname, info)) return 0;
+
+    struct ext2_inode *inode = ext2_get_inode(ino, info);
+    inode->in_type = type;
+    inode->in_uid  = 0;
+    inode->in_size = 0;
+
+    inode->in_atime = 0;
+    inode->in_ctime = 0;
+    inode->in_mtime = 0;
+    inode->in_dtime = 0;
+
+    inode->in_gid    = 0;
+    inode->in_hard   = 1;
+    inode->in_blocks = 0;
+    inode->in_flags  = 0;
+    inode->in_os     = EXT2_OS_OTHER;
+
+    return ino;
+}
+
+uint32_t ext2_inode_free(uint32_t ino, struct ext2_mount_info *info) {
+    uint32_t group = ext2_inode_block_group(ino, info->sp);
+    struct ext2_group_desc *bg = info->bg + group;
+    uint8_t *bitmap = ext2_get_block(bg->g_inode_bitmap, info);
+
+    ino -= group * info->sp->s_inodes_per_group;
+    bitmap[ino >> 3] &= ~(1 << (ino & 7));
+
+    return 0;
 }

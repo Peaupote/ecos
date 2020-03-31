@@ -14,7 +14,6 @@
 struct ext2_dir_entry *
 ext2_iter_dir(struct ext2_inode *inode,
               int (*iterator)(struct ext2_dir_entry*),
-              size_t *read,
               struct ext2_mount_info *info) {
     size_t nbblk = 0, len = 0, len_in_block = 0;
     struct ext2_dir_entry *dir;
@@ -26,9 +25,6 @@ ext2_iter_dir(struct ext2_inode *inode,
         if (len_in_block == info->block_size) {
             len_in_block = 0;
             dir = ext2_get_inode_block(++nbblk, inode, info);
-#if defined(__is_test)
-            printf("switch block\n");
-#endif
         } else dir = ext2_readdir(dir);
     start:
 
@@ -40,7 +36,6 @@ ext2_iter_dir(struct ext2_inode *inode,
 
     if (len == inode->in_size) return 0;
 
-    if (read) *read = len;
     return dir;
 }
 
@@ -53,7 +48,7 @@ static int cmp_dir_name(struct ext2_dir_entry* dir) {
 uint32_t ext2_lookup_dir(struct ext2_inode *inode, const char *fname,
                          struct ext2_mount_info *info) {
     lookup_name = fname;
-    struct ext2_dir_entry *entry = ext2_iter_dir(inode, cmp_dir_name, 0, info);
+    struct ext2_dir_entry *entry = ext2_iter_dir(inode, cmp_dir_name, info);
     // TODO : binary search
     return entry ? entry->d_ino : 0;
 }
@@ -62,51 +57,111 @@ struct ext2_dir_entry *ext2_readdir(struct ext2_dir_entry *dir) {
     return (struct ext2_dir_entry*)((char*)dir + dir->d_rec_len);
 }
 
+static struct ext2_dir_entry *
+ext2_reach_end(struct ext2_inode *parent, struct ext2_mount_info *info) {
+    struct ext2_dir_entry *dir;
+    uint32_t b;
+    uint32_t blk = parent->in_size / info->block_size;
+    uint32_t off = parent->in_size % info->block_size;
 
-static int void_iterator(struct ext2_dir_entry * d __attribute__((unused))) {
-    return 0;
+    if (blk && !off) {
+        if (!(b = ext2_block_alloc(info))) return 0;
+
+        if (!ext2_alloc_inode_block(parent, blk, b, info)) {
+            ext2_block_free(b, info);
+            return 0;
+        }
+
+        dir = ext2_get_block(b, info);
+        off = 0;
+    } else {
+        for (dir = ext2_get_inode_block(blk, parent, info);
+             dir->d_ino; dir = ext2_readdir(dir));
+    }
+
+    return dir;
 }
 
-struct ext2_dir_entry * ext2_mkdir(uint32_t inode, char *dirname,
-                                   struct ext2_mount_info *info) {
-    struct ext2_inode *parent = ext2_get_inode(inode, info);
+uint32_t ext2_add_dirent(struct ext2_inode *parent, uint32_t file,
+                         const char *fname, struct ext2_mount_info *info) {
     struct ext2_dir_entry *dir;
-    size_t str_len, rec_len, len, block;
+    uint32_t name_len, rec_len;
 
-    if (!(parent->in_type&EXT2_TYPE_DIR)) return 0;
+    name_len = strlen(fname) + 1;
+    for (rec_len = EXT2_DIR_BASE_SIZE + name_len; rec_len&3; rec_len++);
 
-    str_len = strlen(dirname) + 1;
-    if (str_len > 256) return 0;
+    dir = ext2_reach_end(parent, info);
 
+    struct ext2_inode *inode = ext2_get_inode(file, info);
+    dir->d_ino       = file;
+    dir->d_file_type = inode->in_type;
+    dir->d_name_len  = name_len;
+    dir->d_rec_len   = rec_len;
+    memcpy(dir->d_name, fname, dir->d_name_len);
+    dir->d_name[dir->d_name_len] = 0;
 
-    ext2_iter_dir(parent, void_iterator, &len, info);
-    block = len / info->block_size;
+    if ((parent->in_size % info->block_size) + rec_len < info->block_size) {
+        dir = ext2_readdir(dir);
+        dir->d_ino = 0;
+    }
 
-    // alignement
-    for (rec_len = EXT2_DIR_BASE_SIZE + str_len; len&2; len++);
-
-    // move to right position
-    // and alloc a block if necessary
-    dir = ext2_get_inode_block(block, parent, info);
-
-    dir->d_ino = ext2_alloc_inode(EXT2_TYPE_DIR|0640, 0, info);
-    dir->d_name_len = str_len;
-    dir->d_rec_len = rec_len;
     parent->in_size += rec_len;
-    memcpy(dir->d_name, dirname, str_len);
 
-    // TODO : write . and .. in directory
+    return file;
+}
 
-    uint32_t g = ext2_inode_block_group(inode, info->sp);
+uint32_t ext2_mkdir(uint32_t parent, const char *dirname, uint16_t type,
+                    struct ext2_mount_info *info) {
+    struct ext2_inode *p = ext2_get_inode(parent, info);
+    struct ext2_dir_entry *dir;
+    uint32_t name_len, rec_len, ino, block;
+
+    if (!(type&EXT2_TYPE_DIR) || !(p->in_type&EXT2_TYPE_DIR)) return 0;
+
+    if (!(ino = ext2_lookup_free_inode(info))) return 0;
+    if (!(block = ext2_block_alloc(info))) {
+        ext2_inode_free(ino, info);
+        return 0;
+    }
+
+    struct ext2_inode *inode = ext2_get_inode(ino, info);
+    inode->in_block[0] = block;
+
+    dir = ext2_get_block(block, info);
+    dir->d_ino = ino;
+    dir->d_rec_len = EXT2_DIR_BASE_SIZE + 4;
+    dir->d_name_len = 1;
+    dir->d_file_type = type;
+    memcpy(dir->d_name, ".", 2);
+
+    inode->in_size += dir->d_rec_len;
+
+    dir = ext2_readdir(dir);
+    dir->d_ino = parent;
+    dir->d_rec_len = EXT2_DIR_BASE_SIZE + 4;
+    dir->d_name_len = 2;
+    dir->d_file_type = p->in_type;
+    memcpy(dir->d_name, "..", 3);
+
+    dir = ext2_readdir(dir);
+    dir->d_ino = 0;
+
+    // write in parent
+    dir = ext2_reach_end(p, info);
+    name_len = strlen(dirname);
+    for (rec_len = EXT2_DIR_BASE_SIZE + name_len; rec_len&2; rec_len++);
+
+    dir->d_ino      = ino;
+    dir->d_name_len = name_len;
+    dir->d_rec_len  = rec_len;
+    memcpy(dir->d_name, dirname, name_len);
+    p->in_size += rec_len;
+
+    uint32_t g = ext2_inode_block_group(ino, info->sp);
     struct ext2_group_desc *group = info->bg + g;
     group->g_dir_count++;
 
-#if defined(__is_test)
-    printf("%d (%d) %*s\n", dir->d_ino, dir->d_rec_len,
-           dir->d_name_len, dir->d_name);
-#endif
-
-    return dir;
+    return dir->d_ino;
 }
 
 struct ext2_dir_entry *

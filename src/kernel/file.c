@@ -42,7 +42,7 @@ void vfs_init() {
     fst[EXT2_FS].fs_stat    = (fs_stat_t*)&ext2_stat;
     fst[EXT2_FS].fs_read    = (fs_rdwr_t*)&ext2_read;
     fst[EXT2_FS].fs_write   = (fs_rdwr_t*)&ext2_write;
-    fst[EXT2_FS].fs_touch   = 0; // not implemeted yet
+    fst[EXT2_FS].fs_touch   = (fs_create_t*)ext2_touch;
     fst[EXT2_FS].fs_mkdir   = 0; // not implemented yet
     fst[EXT2_FS].fs_opendir = (fs_opendir_t*)&ext2_opendir;
     fst[EXT2_FS].fs_readdir = (fs_readdir_t*)&ext2_readdir;
@@ -86,7 +86,7 @@ vfile_t *vfs_pipe() {
     }
 
     vfile_t *vf = state.st_files + free;
-    struct pipe_inode *p = pipe_alloc();
+    /* struct pipe_inode *p = pipe_alloc(); */
 
     return vf;
 }

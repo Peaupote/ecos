@@ -26,9 +26,9 @@ int      dup(int fd);
 
 int      pipe(int fds[2]);
 
-int      write(int fd, uint8_t *s, size_t len);
+int      write(int fd, const void *s, size_t len);
 
-int      read(int fd, uint8_t *buf, size_t len);
+int      read(int fd, void *buf, size_t len);
 
 off_t    lseek(int fd, off_t offset);
 

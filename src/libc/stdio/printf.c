@@ -3,6 +3,7 @@
 #include <stdint.h>
 #include <libc/stdio.h>
 #include <libc/string.h>
+#include <libc/sys.h>
 
 static char buf[256];
 static const char *decimal_digits = "0123456789";
@@ -136,7 +137,7 @@ int fpprintf(stringl_writer w, void* wi, const char* fmt, va_list ps) {
 #if defined(__is_libc)
 static void
 print(void *seq __attribute__((unused)), const char *s, size_t len) {
-    while (len--) putchar(*s++);
+    write(1, s, len);
 }
 
 int printf(const char *fmt, ...) {

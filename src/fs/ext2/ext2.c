@@ -53,6 +53,15 @@ uint32_t ext2_block_alloc(struct ext2_mount_info *info) {
     return block + 1;
 }
 
+void ext2_block_free(uint32_t block, struct ext2_mount_info *info) {
+    uint32_t group = block / info->sp->s_blocks_per_group;
+    struct ext2_group_desc *gd = info->bg + group;
+    uint8_t *bitmap = ext2_get_block(gd->g_block_bitmap, info);
+
+    block -= group * info->sp->s_blocks_per_group;
+    bitmap[block >> 8] &= ~(1 << (block&7));
+}
+
 uint32_t ext2_lookup(const char *fname, ino_t ino,
                      struct ext2_mount_info *info) {
     struct ext2_inode *inode = ext2_get_inode(ino, info);
