@@ -17,6 +17,7 @@
 
 
 #include <stdint.h>
+#include <stdbool.h>
 
 typedef uint8_t scancode_byte;
 typedef uint8_t keycode;
@@ -31,29 +32,26 @@ extern uint8_t use_azerty;
 
 extern uint8_t keyboard_state[256 / 8];
 
-/* --État des touches--
- * bit0 à 1 si appuyée, 0 sinon */
-
-static inline uint8_t key_state(keycode k) {
-    return keyboard_state[k>>3]>>(k & 0x7);
+static inline bool key_state(keycode k) {
+    return (keyboard_state[k>>3]>>(k & 0x7)) & 1;
 }
 
 // Touches lshift / rshift, ne tiend pas compte de verr. maj.
-static inline uint8_t key_state_shift() {
-    return key_state(KEY_LSHIFT) | key_state(KEY_RSHIFT);
+static inline bool key_state_shift() {
+    return key_state(KEY_LSHIFT) || key_state(KEY_RSHIFT);
 }
 // TODO: verr. maj.
-static inline uint8_t key_state_maj() {
+static inline bool key_state_maj() {
     return key_state_shift();
 }
-static inline uint8_t key_state_altgr() {
+static inline bool key_state_altgr() {
     return key_state(KEY_ALTGR);
 }
 
 
 static inline uint8_t key_state_quad() {
-    return (key_state_maj() & 1)
-        | ((key_state_altgr() & 1) << 1);
+    return (key_state_maj() ? 1 : 0)
+        | (key_state_altgr() ? 2 : 0);
 }
 static inline unsigned char keycode_to_ascii(keycode c) {
     if (c & 0x80) return 0;

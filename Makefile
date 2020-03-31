@@ -49,6 +49,7 @@ clean:
 	$(MAKE) -C src/util   clean
 	$(MAKE) -C src/libc   clean
 	$(MAKE) -C src/fs     clean
+	$(MAKE) -C src/sys    clean
 	$(MAKE) -C tests/host clean
 	$(MAKE) -C tests/run  clean
 	$(MAKE) -C tools      clean

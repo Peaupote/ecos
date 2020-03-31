@@ -179,8 +179,10 @@ size_t built_in_exec(size_t in_begin, size_t in_len) {
         data_str[2] = '\0';
         int8_to_str_hexa(data_str, *(uint8_t*)ptr);
         return tty_writestring(data_str);
-    }
-    else if (!strcmp(cmd_name, "kprint"))
+    } else if (!strcmp(cmd_name, "pg2")) {
+        uint_ptr ptr = read_ptr(cmd_decomp + cmd_decomp_idx[1]);
+		kmem_print_paging(ptr);
+	} else if (!strcmp(cmd_name, "kprint"))
         do_kprint = !do_kprint;
     else if (!strcmp(cmd_name, "a"))
         use_azerty = 1;
@@ -229,13 +231,22 @@ void tty_input(scancode_byte s, key_event ev) {
             }
         } else if (ev.key == KEY_UP_ARROW) {
             if (sb_display_shift) {
-                --sb_display_shift;
+				size_t mv = key_state_shift() 
+						  ? (VGA_HEIGHT - input_height) : 1;
+				if (mv > sb_display_shift)
+					sb_display_shift = 0;
+				else 
+                	sb_display_shift -= mv;
                 sb_dtcd = true;
                 tty_afficher_buffer_all();
             }
         } else if (ev.key == KEY_DOWN_ARROW) {
             if (sb_sc_ed() > VGA_HEIGHT - input_height) {
-                ++sb_display_shift;
+				size_t mv = key_state_shift() 
+						  ? (VGA_HEIGHT - input_height) : 1;
+				mina_size_t(&mv,
+						sb_sc_ed() - (VGA_HEIGHT - input_height));
+                sb_display_shift += mv;
                 if (sb_sc_ed() == VGA_HEIGHT - input_height)
                     sb_dtcd = false;
                 tty_afficher_buffer_all();

@@ -3,6 +3,7 @@
 #include <stdint.h>
 #include <libc/stdio.h>
 #include <libc/string.h>
+#include <libc/sys.h>
 
 static char buf[256];
 static const char *decimal_digits = "0123456789";
@@ -135,14 +136,14 @@ int fpprintf(stringl_writer w, void* wi, const char* fmt, va_list ps) {
 
 #ifndef __is_kernel
 static void
-print(void *seq __attribute__((unused)), const char *s, size_t len) {
-    while (len--) putchar(*s++);
+print(void *none __attribute__((unused)), const char *s, size_t len) {
+    write(1, s, len); // Write to stout
 }
 
 int printf(const char *fmt, ...) {
     va_list params;
     va_start(params, fmt);
-    int cnt = fpprintf(&print, 0, fmt, params);
+    int cnt = fpprintf(&print, NULL, fmt, params);
     va_end(params);
     return cnt;
 }

@@ -211,6 +211,7 @@ void proc_ldr_copy(void* err_pt, Elf64_Xword flag __attribute__((unused)),
         ((uint8_t*) dst)[i] = ((uint8_t*) src)[i];
 }
 
+//UNUSED
 uint8_t proc_create_userspace(void* prg_elf, proc_t *proc) {
     struct elf_loader proc_ldr = {
         .fill0 = &proc_ldr_fill0,
