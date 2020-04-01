@@ -17,8 +17,12 @@ int init_ext2(void* fs) {
 	return 0;
 }
 
-void print_type(uint8_t type) {
-    printf("type : (%x) ", type);
+bool is_curr_dir() {
+    return curr->in_type & EXT2_TYPE_DIR;
+}
+
+void print_type(uint16_t type) {
+    printf("type : ");
     switch (type&0xf000) {
     case EXT2_TYPE_DIR: printf("directory\n"); break;
     case EXT2_TYPE_REG: printf("regular file\n"); break;
@@ -40,6 +44,10 @@ void print_inode(struct ext2_inode *inode) {
 }
 
 int print_dir(struct ext2_dir_entry *dir) {
+    if (!dir) {
+        printf("dir null\n");
+        return 0;
+    }
     printf("%d (%d) %*s\n", dir->d_ino, dir->d_rec_len,
            dir->d_name_len, dir->d_name);
     return 0;
@@ -51,8 +59,13 @@ int ls () {
         return 1;
     }
 
-    ext2_iter_dir(curr, print_dir, 0, &info);
+    ext2_iter_dir(curr, print_dir, &info);
 	return 0;
+}
+
+void do_touch(char* s) {
+    if (!ext2_touch(curr_ino, s, 0640, &info))
+        test_errprintf("fail\n");
 }
 
 void print_stat() {
@@ -76,8 +89,12 @@ void do_cd(const char* s) {
     curr = inode;
 }
 
-void do_mkdir(char* s) {
-	ext2_mkdir(curr_ino, s, &info);
+bool do_mkdir(char* s) {
+	if (!ext2_mkdir(curr_ino, s, 0640, &info)) {
+		test_errprintf("fail\n");
+		return false;
+	}
+	return true;
 }
 
 void* save_area(size_t* sz) {

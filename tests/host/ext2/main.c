@@ -11,10 +11,25 @@
 
 static char *line = NULL;
 
+void touch() {
+    if (!is_curr_dir()) {
+        fprintf(stderr, "not in a dir\n");
+		return;
+	}
+
+    char *s = strtok(line, " \n");
+    if (!(s = strtok(0, " \n"))) {
+        fprintf(stderr, "usage: touch file\n");
+        return;
+    }
+
+	do_touch(s);
+}
+
 void cd () {
     char *s1 = strchr(line, ' ');
     if (!s1) {
-        printf("usage: cd [dir]\n");
+        printf("usage: cd dir\n");
         return;
     }
 
@@ -32,7 +47,8 @@ void cmd_mkdir() {
     char *s = strtok(line, " ");
 
     for (s = strtok(0, " "); s; s = strtok(0, " "))
-		do_mkdir(s);
+		if (!do_mkdir(s))
+			return;
 }
 
 void save() {
@@ -130,11 +146,12 @@ int main(int argc, char *argv[]) {
 				goto exit_main;
 			}
 		}
-        else if (!strncmp(line, "cd", 2)) cd(line);
+        else if (!strncmp(line, "cd", 2)) cd();
         else if (!strncmp(line, "stat", 4)) print_stat();
         else if (!strncmp(line, "mkdir", 5)) cmd_mkdir();
         else if (!strncmp(line, "save", 4)) save();
         else if (!strncmp(line, "dump", 4)) dump();
+        else if (!strncmp(line, "touch", 4)) touch();
         else if (!strncmp(line, "\n", 1)) {}
         else {
             printf("unkonwn command %s", line);
