@@ -204,14 +204,14 @@ size_t built_in_exec(size_t in_begin, size_t in_len) {
         else if(!strcmp(arg1, "kheap"))   test_kheap();
     } else if (!strcmp(cmd_name, "ps"))
         proc_ps();
-	else if (!strcmp(cmd_name, "unblock")) {
-		pid_t pid = (pid_t)int64_of_str_hexa(
-						cmd_decomp + cmd_decomp_idx[1]);
-		int   val = ( int )int64_of_str_hexa(
-						cmd_decomp + cmd_decomp_idx[2]);
-		state.st_proc[pid].p_reg.rdi = val;
-		sched_add_proc(pid);
-	} else if (!strncmp(cmd_name, "ls", 3)) ls();
+    else if (!strcmp(cmd_name, "unblock")) {
+        pid_t pid = (pid_t)int64_of_str_hexa(
+                        cmd_decomp + cmd_decomp_idx[1]);
+        int   val = ( int )int64_of_str_hexa(
+                        cmd_decomp + cmd_decomp_idx[2]);
+        state.st_proc[pid].p_reg.rdi = val;
+        sched_add_proc(pid);
+    } else if (!strncmp(cmd_name, "ls", 3)) ls();
 
     return 0;
 }

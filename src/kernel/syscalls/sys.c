@@ -322,7 +322,7 @@ int sys_open(const char *fname, enum chann_mode mode) {
     }
 
     chann_t *c = state.st_chann + cid;
-    c->chann_vfile = vfs_load(fname, 1);
+    c->chann_vfile = vfs_load(fname);
     if (!c->chann_vfile) {
         klogf(Log_error, "sys", "process %d couldn't open %s",
                 state.st_curr_pid, fname);
@@ -411,9 +411,9 @@ int sys_pipe(int fd[2]) {
     fd[fdout] = out;
 
     cin->chann_acc   = 1;
-    cin->chann_mode  = STREAM_IN;
+    cin->chann_mode  = READ;
     cout->chann_acc  = 1;
-    cout->chann_mode = STREAM_OUT;
+    cout->chann_mode = WRITE;
 
     kAssert(false);// TODO : finish
 
@@ -427,22 +427,32 @@ ssize_t sys_read(int fd, uint8_t *d, size_t len) {
         return -1;
 
     chann_t *chann = &state.st_chann[p->p_fds[fd]];
-    klogf(Log_info, "syscall", "process %d read %d on %d (cid %d)",
+    klogf(Log_verb, "syscall", "process %d read %d on %d (cid %d)",
           state.st_curr_pid, len, fd, p->p_fds[fd]);
 
     vfile_t *vfile = chann->chann_vfile;
-
     int rc;
-    switch (chann->chann_mode) {
-    case READ:
-    case RDWR:
+
+    if (chann->chann_mode != READ && chann->chann_mode != RDWR)
+        return -1;
+
+    switch (vfile->vf_stat.st_mode&0xf000) {
+    case TYPE_REG:
+        if (chann->chann_pos == vfile->vf_stat.st_size) // EOF
+            return 0;
+
         rc = vfs_read(vfile, d, chann->chann_pos, len);
         if (rc > 0) chann->chann_pos += rc;
         klogf(Log_verb, "syscall", "%d char readed (pos %d)",
               rc, chann->chann_pos);
         return rc;
 
-    case STREAM_IN:
+    case TYPE_CHAR:
+    case TYPE_FIFO:
+        if (vfile->vf_stat.st_size == 0) {
+            wait_file(state.st_curr_pid, vfile);
+        }
+
         return vfs_read(vfile, d, 0, len);
         break;
 
@@ -464,17 +474,18 @@ ssize_t sys_write(int fd, uint8_t *s, size_t len) {
 
     size_t c = 0;
     int rc = 0;
-    switch (chann->chann_mode) {
-    case WRITE:
-    case RDWR:
+    if (chann->chann_mode != WRITE && chann->chann_mode != RDWR) return -1;
+
+    switch (vfile->vf_stat.st_mode&0xf000) {
+    case TYPE_REG:
         rc = vfs_write(vfile, s, chann->chann_pos, len);
         if (rc > 0) chann->chann_pos += rc;
         return rc;
 
-        //case STREAM_IN:
-        //    return vfs_write(vfile, s, 0, len);
+    case TYPE_FIFO:
+        return vfs_write(vfile, s, 0, len);
 
-    case STREAM_OUT:
+    case TYPE_CHAR:
         // TODO : more efficient
         for (c = 0; c < len; c++)
             kprintf("%c", *s++);
@@ -505,12 +516,12 @@ off_t sys_lseek(int fd, off_t off) {
 }
 
 int sys_debug_block(int v) {
-	if (~v) return v;
+    if (~v) return v;
 
-	//On bloque le processus actuel
-	state.st_proc[state.st_curr_pid].p_stat = BLOCK;
-	schedule_proc();
-	never_reached return -1;
+    //On bloque le processus actuel
+    state.st_proc[state.st_curr_pid].p_stat = BLOCK;
+    schedule_proc();
+    never_reached return -1;
 }
 
 uint64_t invalid_syscall() {

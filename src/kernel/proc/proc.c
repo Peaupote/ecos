@@ -140,8 +140,6 @@ pid_t sched_pop_proc() {
     return pid;
 }
 
-int hit = 0;
-
 void schedule_proc() {
     if (state.st_sched.pres) {
         kAssert(state.st_sched.nb_proc > 0);
@@ -254,9 +252,20 @@ void proc_ps() {
 
 void proc_write_stdin(char *buf, size_t len) {
     // TODO : handle differently to dont block other processes
-    vfile_t *vf = vfs_load("/proc/1/fd/0", 0);
+    vfile_t *vf = vfs_load("/proc/1/fd/0");
     if (!vf) return;
 
     vfs_write(vf, buf, 0, len);
     vfs_close(vf);
+}
+
+void wait_file(pid_t pid, vfile_t *file) {
+    klogf(Log_info, "proc", "pid %d waiting for file %d",
+          pid, file->vf_stat.st_ino);
+    proc_t *p = state.st_proc + pid;
+    p->p_stat = BLOCK;
+    p->p_nxwf = file->vf_waiting;
+    file->vf_waiting = pid;
+    schedule_proc();
+    never_reached;
 }

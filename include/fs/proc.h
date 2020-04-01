@@ -34,15 +34,7 @@ struct proc_block {
 #define PROC_NBLOCK 15
 #define PROC_NINODES (NPROC * 2)
 struct proc_inode {
-    uint16_t in_type;
-    uint16_t in_uid;
-    uint32_t in_size;
-
-    uint32_t in_ctime;
-    uint32_t in_mtime;
-
-    uint16_t in_gid;
-    uint16_t in_hard;
+    struct stat st;
 
     // pointers to auxiliary memory if necessary
     void    *in_block[PROC_NBLOCK];

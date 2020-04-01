@@ -21,6 +21,7 @@ void vfs_init() {
 
     for (size_t i = 0; i < NFILE; i++) {
         state.st_files[i].vf_cnt = 0;
+        state.st_files[i].vf_waiting = 0;
     }
 
     klogf(Log_info, "vfs", "setup proc file system");
@@ -135,7 +136,7 @@ static ino_t vfs_lookup(struct mount_info *info, struct fs *fs,
     return fs->fs_stat(ino, st, info);
 }
 
-vfile_t *vfs_load(const char *filename, uint32_t create) {
+vfile_t *vfs_load(const char *filename) {
     struct device *dev = find_device(filename);
     if (!dev) {
         klogf(Log_info, "vfs", "no mount point %s", filename);
@@ -151,26 +152,21 @@ vfile_t *vfs_load(const char *filename, uint32_t create) {
     ino_t rc = vfs_lookup(&dev->dev_info, fs, fname, &st);
 
     if (!rc) {
-        if (!create || *index(fname, '/')) {
-            klogf(Log_error, "vfs", "file %s dont exists", filename);
-            return 0;
-        }
-
-        // TODO : create
-        klogf(Log_error, "vfs", "create not implemeted yet");
-        kAssert(false);
+        klogf(Log_error, "vfs", "file %s dont exists", filename);
+        return 0;
     }
-
 
     size_t free = NFILE;
     for (size_t i = 0; i < NFILE; i++) {
-        if (state.st_files[i].vf_cnt) continue;
+        if (state.st_files[i].vf_cnt) {
+            if (state.st_files[i].vf_stat.st_ino == st.st_ino &&
+                state.st_files[i].vf_stat.st_dev == dev->dev_id) {
+                klogf(Log_info, "vfs", "file %s is already open", fname);
+                state.st_files[free].vf_cnt++;
+                return state.st_files + i;
+            }
 
-        if (state.st_files[i].vf_stat.st_ino == st.st_ino &&
-            state.st_files[i].vf_stat.st_dev == dev->dev_id) {
-            klogf(Log_info, "vfs", "file %s is already open", fname);
-            state.st_files[free].vf_cnt++;
-            return state.st_files + i;
+            continue;
         }
 
         if (i < free) free = i;
@@ -189,19 +185,35 @@ vfile_t *vfs_load(const char *filename, uint32_t create) {
 }
 
 int vfs_read(vfile_t *vfile, void *buf, off_t pos, size_t len) {
-    klogf(Log_info, "vfs", "read ino %d (device %d) offset %d len %d (size %d)",
-          vfile->vf_stat.st_ino, vfile->vf_stat.st_dev, pos, len,
-          vfile->vf_stat.st_size);
     struct device *dev = devices + vfile->vf_stat.st_dev;
-    int rc = fst[dev->dev_fs].fs_read(vfile->vf_stat.st_ino,
-                                     buf, pos, len, &dev->dev_info);
+    struct fs *fs = fst + dev->dev_fs;
+    int rc = fs->fs_read(vfile->vf_stat.st_ino, buf, pos, len, &dev->dev_info);
+    fs->fs_stat(vfile->vf_stat.st_ino, &vfile->vf_stat, &dev->dev_info);
     return rc;
 }
 
 int vfs_write(vfile_t *vfile, void *buf, off_t pos, size_t len) {
     struct device *dev = devices + vfile->vf_stat.st_dev;
-    return fst[dev->dev_fs].fs_write(vfile->vf_stat.st_ino,
-                                    buf, pos, len, &dev->dev_info);
+    struct fs *fs = fst + dev->dev_fs;
+
+    int rc = fs->fs_write(vfile->vf_stat.st_ino, buf, pos, len, &dev->dev_info);
+    fs->fs_stat(vfile->vf_stat.st_ino, &vfile->vf_stat, &dev->dev_info);
+
+    // TODO : what happend for waiting ps if error ?
+    if (rc > 0) {
+        proc_t *p;
+        pid_t npid;
+        for (pid_t pid = vfile->vf_waiting; pid > 0; pid = npid) {
+            p = state.st_proc + pid;
+            npid = p->p_nxwf;
+            sched_add_proc(pid);
+            klogf(Log_info, "vfs", "write unblock %d", pid);
+        }
+
+        vfile->vf_waiting = -1;
+    }
+
+    return rc;
 }
 
 int vfs_close(vfile_t *vf) {
@@ -264,7 +276,7 @@ vfile_t *vfs_mkdir(const char *parent, const char *fname, mode_t perm) {
 }
 
 vfile_t *vfs_opendir(const char *fname, struct dirent **dir) {
-    vfile_t *vfile = vfs_load(fname, 0);
+    vfile_t *vfile = vfs_load(fname);
 
     if (vfile) {
         if (!(vfile->vf_stat.st_mode&TYPE_DIR)) {
