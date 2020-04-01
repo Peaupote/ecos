@@ -258,3 +258,14 @@ void proc_write_stdin(char *buf, size_t len) {
     vfs_write(vf, buf, 0, len);
     vfs_close(vf);
 }
+
+void wait_file(pid_t pid, vfile_t *file) {
+    klogf(Log_info, "proc", "pid %d waiting for file %d",
+          pid, file->vf_stat.st_ino);
+    proc_t *p = state.st_proc + pid;
+    p->p_stat = BLOCK;
+    p->p_nxwf = file->vf_waiting;
+    file->vf_waiting = pid;
+    schedule_proc();
+    never_reached;
+}

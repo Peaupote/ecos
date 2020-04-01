@@ -23,7 +23,7 @@ enum proc_state {
     FREE,  // unused
     SLEEP, // sleeping
     WAIT,  // waiting
-	BLOCK, // blocked by a syscall
+    BLOCK, // blocked by a syscall
     RUN,   // running
     ZOMB   // just terminated
 };
@@ -48,6 +48,7 @@ typedef struct proc {
         pid_t        p_nxpf;     // if in a file: next in priority file
         pid_t        p_nxfr;     // if FREE: next free
         pid_t        p_nxzb;     // if ZOMB: next ZOMB sibling
+        pid_t        p_nxwf;     // if BLOCK: next waiting file
     };
     pid_t            p_prsb;     // prev sibling
     pid_t            p_nxsb;     // next sibling
@@ -144,23 +145,23 @@ static inline void eoi_iret_to_proc(const proc_t* p) {
 }
 
 static inline void run_proc(proc_t* p) {
-	if (p->p_stat == RUN) iret_to_proc(p);
-	else { //blocked
-		p->p_stat = RUN;
-		p->p_reg.rax = continue_syscall();
-		iret_to_proc(p);
-	}
-	never_reached
+    if (p->p_stat == RUN) iret_to_proc(p);
+    else { //blocked
+        p->p_stat = RUN;
+        p->p_reg.rax = continue_syscall();
+        iret_to_proc(p);
+    }
+    never_reached
 }
 static inline void eoi_run_proc(proc_t* p) {
-	if (p->p_stat == RUN) eoi_iret_to_proc(p);
-	else { //blocked
-		p->p_stat = RUN;
-		write_eoi();
-		p->p_reg.rax = continue_syscall();
-		iret_to_proc(p);
-	}
-	never_reached
+    if (p->p_stat == RUN) eoi_iret_to_proc(p);
+    else { //blocked
+        p->p_stat = RUN;
+        write_eoi();
+        p->p_reg.rax = continue_syscall();
+        iret_to_proc(p);
+    }
+    never_reached
 }
 
 proc_t *switch_proc(pid_t pid);
@@ -168,7 +169,7 @@ proc_t *switch_proc(pid_t pid);
 void proc_ps();
 
 void proc_write_stdin(char *buf, size_t len);
-
+void wait_file(pid_t pid, vfile_t *file);
 //
 
 static inline pid_t find_new_pid() {

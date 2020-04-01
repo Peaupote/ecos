@@ -21,6 +21,7 @@ void vfs_init() {
 
     for (size_t i = 0; i < NFILE; i++) {
         state.st_files[i].vf_cnt = 0;
+        state.st_files[i].vf_waiting = 0;
     }
 
     klogf(Log_info, "vfs", "setup proc file system");
@@ -155,16 +156,17 @@ vfile_t *vfs_load(const char *filename) {
         return 0;
     }
 
-
     size_t free = NFILE;
     for (size_t i = 0; i < NFILE; i++) {
-        if (state.st_files[i].vf_cnt) continue;
+        if (state.st_files[i].vf_cnt) {
+            if (state.st_files[i].vf_stat.st_ino == st.st_ino &&
+                state.st_files[i].vf_stat.st_dev == dev->dev_id) {
+                klogf(Log_info, "vfs", "file %s is already open", fname);
+                state.st_files[free].vf_cnt++;
+                return state.st_files + i;
+            }
 
-        if (state.st_files[i].vf_stat.st_ino == st.st_ino &&
-            state.st_files[i].vf_stat.st_dev == dev->dev_id) {
-            klogf(Log_info, "vfs", "file %s is already open", fname);
-            state.st_files[free].vf_cnt++;
-            return state.st_files + i;
+            continue;
         }
 
         if (i < free) free = i;
@@ -193,8 +195,24 @@ int vfs_read(vfile_t *vfile, void *buf, off_t pos, size_t len) {
 int vfs_write(vfile_t *vfile, void *buf, off_t pos, size_t len) {
     struct device *dev = devices + vfile->vf_stat.st_dev;
     struct fs *fs = fst + dev->dev_fs;
+
     int rc = fs->fs_write(vfile->vf_stat.st_ino, buf, pos, len, &dev->dev_info);
     fs->fs_stat(vfile->vf_stat.st_ino, &vfile->vf_stat, &dev->dev_info);
+
+    // TODO : what happend for waiting ps if error ?
+    if (rc > 0) {
+        proc_t *p;
+        pid_t npid;
+        for (pid_t pid = vfile->vf_waiting; pid > 0; pid = npid) {
+            p = state.st_proc + pid;
+            npid = p->p_nxwf;
+            sched_add_proc(pid);
+            klogf(Log_info, "vfs", "write unblock %d", pid);
+        }
+
+        vfile->vf_waiting = -1;
+    }
+
     return rc;
 }
 

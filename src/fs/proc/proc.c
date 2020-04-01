@@ -15,7 +15,7 @@ static uint32_t proc_free_block() {
 static inline void
 proc_fill_dirent(struct dirent *dir, uint32_t ino, const char *fname) {
     dir->d_ino = ino;
-    dir->d_file_type = proc_inodes[ino].in_type;
+    dir->d_file_type = proc_inodes[ino].st.st_mode;
     dir->d_name_len = strlen(fname);
     dir->d_rec_len = DIRENT_OFF + dir->d_name_len + 1;
     memcpy(dir->d_name, fname, dir->d_name_len);
@@ -27,7 +27,7 @@ proc_add_dirent(struct proc_inode *p, int32_t ino, const char *fname) {
     struct dirent *dir = (struct dirent*)p->in_block[0];
     while (dir->d_ino) dir = proc_readdir(dir);
     proc_fill_dirent(dir, ino, fname);
-    p->in_size += dir->d_rec_len;
+    p->st.st_size += dir->d_rec_len;
 
     dir = proc_readdir(dir);
     proc_fill_dirent(dir, 0, "");
@@ -43,21 +43,21 @@ static uint32_t proc_init_dir(uint32_t ino, uint32_t parent, uint16_t type) {
 
     struct dirent *dir = (struct dirent*)inode->in_block[0];
     proc_fill_dirent(dir, ino, ".");
-    inode->in_size += dir->d_rec_len;
+    inode->st.st_size += dir->d_rec_len;
 
     dir = proc_readdir(dir);
     proc_fill_dirent(dir, parent, "..");
-    inode->in_size += dir->d_rec_len;
+    inode->st.st_size += dir->d_rec_len;
 
     dir = proc_readdir(dir);
     proc_fill_dirent(dir, 0, "");
 
-    inode->in_type  = type;
-    inode->in_uid   = 0;
-    inode->in_ctime = 0; // TODO now
-    inode->in_mtime = 0;
-    inode->in_gid   = 0;
-    inode->in_hard  = 1;
+    inode->st.st_mode  = type;
+    inode->st.st_uid   = 0;
+    inode->st.st_ctime = 0; // TODO now
+    inode->st.st_mtime = 0;
+    inode->st.st_gid   = 0;
+    inode->st.st_nlink = 1;
 
     // set block b to used
     proc_block_bitmap[b >> 3] |= 1 << (b&7);
@@ -67,8 +67,8 @@ static uint32_t proc_init_dir(uint32_t ino, uint32_t parent, uint16_t type) {
 int proc_mount(void *partition __attribute__((unused)),
                struct mount_info *info) {
     for (size_t i = 0; i < NPROC; i++) {
-        proc_inodes[i].in_size = 0;
-        proc_inodes[i].in_hard = 0;
+        proc_inodes[i].st.st_size  = 0;
+        proc_inodes[i].st.st_nlink = 0;
     }
 
     memset(&proc_block_bitmap, 0, PROC_BITMAP_SIZE);
@@ -86,7 +86,7 @@ int proc_mount(void *partition __attribute__((unused)),
 uint32_t proc_lookup(const char *fname, ino_t parent,
                      struct mount_info *info) {
     struct proc_inode *inode = proc_inodes + parent;
-    if (!(inode->in_type&TYPE_DIR)) return 0;
+    if (!(inode->st.st_mode&TYPE_DIR)) return 0;
 
     size_t nbblk = 0, len = 0, len_in_block = 0;
     struct dirent *dir = (struct dirent*)inode->in_block[0];
@@ -106,9 +106,9 @@ uint32_t proc_lookup(const char *fname, ino_t parent,
 
         len += dir->d_rec_len;
         len_in_block += dir->d_rec_len;
-    } while(len < inode->in_size);
+    } while(len < inode->st.st_size);
 
-    if (len == inode->in_size) return 0;
+    if (len == inode->st.st_size) return 0;
 
     return dir->d_ino;
 }
@@ -117,31 +117,26 @@ struct dirent *proc_readdir(struct dirent *dir) {
     return (struct dirent*)((char*)dir + dir->d_rec_len);
 }
 
-int proc_stat(ino_t ino, struct stat *st, struct mount_info *info) {
-    struct proc_inode *inode = proc_inodes + ino;
-
-    st->st_ino     = ino;
-    st->st_mode    = inode->in_type;
-    st->st_nlink   = inode->in_hard;
-    st->st_uid     = inode->in_uid;
-    st->st_gid     = inode->in_gid;
-    st->st_size    = inode->in_size;
-    st->st_blksize = info->block_size;
-    st->st_blocks  = inode->in_size >> 9;
-    st->st_ctime   = inode->in_ctime;
-    st->st_mtime   = inode->in_mtime;
-
+int proc_stat(ino_t ino, struct stat *st,
+              struct mount_info *info __attribute__((unused))) {
+    memcpy(st, &proc_inodes[ino].st, sizeof(struct stat));
+    st->st_ino = ino;
     return ino;
 }
 
 int proc_read(ino_t ino, void *buf, off_t pos __attribute__((unused)),
               size_t len, struct mount_info *info __attribute__((unused))) {
     struct proc_inode *inode = proc_inodes + ino;
-    switch (inode->in_type&0xf000) {
+    int rc;
+    struct pipe_inode *pipe;
+
+    switch (inode->st.st_mode&0xf000) {
     case TYPE_CHAR:
     case TYPE_FIFO:
-        return pipe_read((struct pipe_inode*)inode->in_block[0], buf, len);
-        break;
+        pipe = (struct pipe_inode*)inode->in_block[0];
+        rc = pipe_read(pipe, buf, len);
+        pipe_stat(pipe, &inode->st);
+        return rc;
 
     default:
         kAssert(false);
@@ -152,11 +147,15 @@ int proc_read(ino_t ino, void *buf, off_t pos __attribute__((unused)),
 int proc_write(ino_t ino, void *buf, off_t pos __attribute__((unused)),
               size_t len, struct mount_info *info __attribute__((unused))) {
     struct proc_inode *inode = proc_inodes + ino;
-    switch (inode->in_type&0xf000) {
+    int rc;
+    struct pipe_inode *pipe;
+    switch (inode->st.st_mode&0xf000) {
     case TYPE_CHAR:
     case TYPE_FIFO:
-        return pipe_write((struct pipe_inode*)inode->in_block[0], buf, len);
-        break;
+        pipe = (struct pipe_inode*)inode->in_block[0];
+        rc = pipe_write(pipe, buf, len);
+        pipe_stat(pipe, &inode->st);
+        return rc;
 
     default:
         kAssert(false);
@@ -167,7 +166,7 @@ int proc_write(ino_t ino, void *buf, off_t pos __attribute__((unused)),
 static inline uint32_t proc_free_inode() {
     uint32_t ino;
     for (ino = 2; ino < PROC_NINODES; ino++) {
-        if (!proc_inodes[ino].in_hard) break;
+        if (!proc_inodes[ino].st.st_nlink) break;
     }
 
     return ino == PROC_NINODES ? 0 : ino;
@@ -179,14 +178,14 @@ uint32_t proc_touch(ino_t parent, const char *fname, uint16_t type,
 
     // test if file already exists and is not a directory
     if ((ino = proc_lookup(fname, parent, info)) &&
-        !(proc_inodes[ino].in_type&TYPE_DIR))
+        !(proc_inodes[ino].st.st_mode&TYPE_DIR))
         return 0;
 
     // dont create directories with touch
     if (type&TYPE_DIR) return 0;
 
     struct proc_inode *p = proc_inodes + parent;
-    if (!(p->in_type&TYPE_DIR)) return 0;
+    if (!(p->st.st_mode&TYPE_DIR)) return 0;
 
     if (!(ino = proc_free_inode())) return 0;
     struct proc_inode *inode = proc_inodes + ino;
@@ -197,13 +196,13 @@ uint32_t proc_touch(ino_t parent, const char *fname, uint16_t type,
 
     if (!proc_add_dirent(p, ino, fname)) return 0;
 
-    inode->in_type  = type;
-    inode->in_uid   = 0;
-    inode->in_size  = 0;
-    inode->in_ctime = 0; // TODO now
-    inode->in_mtime = 0;
-    inode->in_gid   = 0;
-    inode->in_hard  = 1;
+    inode->st.st_mode  = type;
+    inode->st.st_uid   = 0;
+    inode->st.st_size  = 0;
+    inode->st.st_ctime = 0; // TODO now
+    inode->st.st_mtime = 0;
+    inode->st.st_gid   = 0;
+    inode->st.st_nlink = 1;
 
     // set block b to used
     proc_block_bitmap[b >> 3] |= 1 << (b&7);
@@ -219,7 +218,7 @@ uint32_t proc_mkdir(ino_t parent, const char *fname, uint16_t type,
 
     // test if file already exists and is a directory
     if ((ino = proc_lookup(fname, parent, info)) &&
-        (proc_inodes[ino].in_type&TYPE_DIR)) {
+        (proc_inodes[ino].st.st_mode&TYPE_DIR)) {
         kprintf("return ino %d\n", ino);
         klogf(Log_error, "procfs", "mkdir %s already exists", fname);
         return 0;
@@ -232,7 +231,7 @@ uint32_t proc_mkdir(ino_t parent, const char *fname, uint16_t type,
     }
 
     struct proc_inode *p = proc_inodes + parent;
-    if (!(p->in_type&TYPE_DIR)) {
+    if (!(p->st.st_mode&TYPE_DIR)) {
         klogf(Log_error, "procfs", "parent (ino %d) is not a directory");
         return 0;
     }
@@ -245,7 +244,7 @@ uint32_t proc_mkdir(ino_t parent, const char *fname, uint16_t type,
     if (!proc_add_dirent(p, ino, fname)) return 0;
     if (!proc_init_dir(ino, parent, type)) return 0;
 
-    klogf(Log_info, "procfs", "mkdir %s inode %d", fname, ino);
+    klogf(Log_verb, "procfs", "mkdir %s inode %d", fname, ino);
 
     return ino;
 }
@@ -272,7 +271,7 @@ uint32_t proc_create(pid_t pid) {
     proc_t *p = state.st_proc + pid;
     struct dirent *dir = proc_opendir(rc, &dev->dev_info);
     struct proc_inode *fd = proc_inodes + rc;
-    for (size_t l = 0; l < fd->in_size;
+    for (size_t l = 0; l < fd->st.st_size;
          l += dir->d_rec_len, dir = proc_readdir(dir));
 
     for (int i = 0; i < NFD; i++) {
@@ -283,7 +282,7 @@ uint32_t proc_create(pid_t pid) {
 
         sprintf(buf, "%d", i);
         proc_fill_dirent(dir, c->chann_vfile->vf_stat.st_ino, buf);
-        fd->in_size += dir->d_rec_len;
+        fd->st.st_size += dir->d_rec_len;
         dir = proc_readdir(dir);
 
         // TODO problem if not same fs
@@ -310,13 +309,13 @@ uint32_t proc_alloc_std_streams(pid_t pid) {
     cid_t cid_in, cid_out, cid_err;
 
     cid_in = free_chann();
-    state.st_chann[cid_in].chann_mode = STREAM_IN;
+    state.st_chann[cid_in].chann_mode = READ;
 
     cid_out = free_chann();
-    state.st_chann[cid_out].chann_mode = STREAM_OUT;
+    state.st_chann[cid_out].chann_mode = WRITE;
 
     cid_err = free_chann();
-    state.st_chann[cid_err].chann_mode = STREAM_OUT;
+    state.st_chann[cid_err].chann_mode = WRITE;
 
     if (cid_in == NCHAN || cid_out == NCHAN || cid_out == NCHAN) {
         vfs_close(vf);
@@ -343,7 +342,7 @@ uint32_t proc_alloc_std_streams(pid_t pid) {
     inode = proc_inodes + stdin->vf_stat.st_ino;
     inode->in_block[0] = pipe_alloc();
     state.st_chann[cid_in].chann_vfile = stdin;
-    state.st_chann[cid_in].chann_mode  = STREAM_IN;
+    state.st_chann[cid_in].chann_mode  = READ;
     state.st_chann[cid_in].chann_pos   = 0;
     state.st_chann[cid_in].chann_acc   = 1;
     p->p_fds[0] = cid_in;
@@ -352,7 +351,7 @@ uint32_t proc_alloc_std_streams(pid_t pid) {
     inode = proc_inodes + stdout->vf_stat.st_ino;
     inode->in_block[0] = pipe_alloc();
     state.st_chann[cid_out].chann_vfile = stdout;
-    state.st_chann[cid_out].chann_mode  = STREAM_OUT;
+    state.st_chann[cid_out].chann_mode  = WRITE;
     state.st_chann[cid_out].chann_pos   = 0;
     state.st_chann[cid_out].chann_acc   = 1;
     p->p_fds[1] = cid_out;
@@ -361,7 +360,7 @@ uint32_t proc_alloc_std_streams(pid_t pid) {
     inode = proc_inodes + stderr->vf_stat.st_ino;
     inode->in_block[0] = pipe_alloc();
     state.st_chann[cid_err].chann_vfile = stderr;
-    state.st_chann[cid_err].chann_mode  = STREAM_OUT;
+    state.st_chann[cid_err].chann_mode  = WRITE;
     state.st_chann[cid_err].chann_pos   = 0;
     state.st_chann[cid_err].chann_acc   = 1;
     p->p_fds[2] = cid_err;

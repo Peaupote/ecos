@@ -19,9 +19,7 @@ enum chann_mode {
     UNUSED,
     READ,
     WRITE,
-    RDWR,
-    STREAM_IN,
-    STREAM_OUT
+    RDWR
 };
 
 #endif
