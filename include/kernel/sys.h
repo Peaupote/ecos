@@ -27,6 +27,8 @@ off_t    sys_lseek(int fd, off_t offset);
 
 int      sys_execve(reg_t fname, reg_t argv, reg_t env);
 
+int      sys_debug_block(int v);
+
 uint64_t invalid_syscall();
 
 void     prires_proc_struct(uint16_t new_ring);

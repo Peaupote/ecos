@@ -17,7 +17,7 @@
 #include <util/misc.h>
 #include <fs/proc.h>
 
-char proc_state_char[5] = {'f', 's', 'w', 'R', 'Z'};
+char proc_state_char[6] = {'f', 's', 'w', 'b', 'R', 'Z'};
 
 extern void proc_idle_entry(void);
 extern void proc_init_entry(void);
@@ -154,7 +154,7 @@ void schedule_proc() {
               p->p_reg.rip,
               p->p_reg.rsp);
 
-        iret_to_proc(p);
+        run_proc(p);
     }
 
     // Le processus IDLE empêche que l'on arrive ici

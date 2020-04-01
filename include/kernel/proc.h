@@ -4,6 +4,7 @@
 #include <headers/proc.h>
 
 #include "kutil.h"
+#include "int.h"
 #include "gdt.h"
 #include "param.h"
 #include "file.h"
@@ -22,10 +23,11 @@ enum proc_state {
     FREE,  // unused
     SLEEP, // sleeping
     WAIT,  // waiting
+	BLOCK, // blocked by a syscall
     RUN,   // running
     ZOMB   // just terminated
 };
-extern char proc_state_char[5];
+extern char proc_state_char[6];
 
 // offset to access in structure
 #define RFL 0
@@ -77,6 +79,7 @@ typedef struct channel {
 } chann_t;
 
 // Contient les processus en mode RUN à l'exception du processus courant
+// Ainsi que les processus BLOCK qui peuvent être repris
 struct scheduler {
     // le bit p est set ssi un processus de priorité p est présent
     uint64_t    pres;
@@ -131,12 +134,33 @@ uint8_t proc_create_userspace(void* prg_elf, proc_t *proc);
 // le DS est CS + 8
 extern void iret_to_userspace(uint64_t cs_ze);
 extern void eoi_iret_to_userspace(uint64_t cs_ze);
+extern reg_t continue_syscall();
 
 static inline void iret_to_proc(const proc_t* p) {
     iret_to_userspace(gdt_ring_lvl(p->p_ring));
 }
 static inline void eoi_iret_to_proc(const proc_t* p) {
     eoi_iret_to_userspace(gdt_ring_lvl(p->p_ring));
+}
+
+static inline void run_proc(proc_t* p) {
+	if (p->p_stat == RUN) iret_to_proc(p);
+	else { //blocked
+		p->p_stat = RUN;
+		p->p_reg.rax = continue_syscall();
+		iret_to_proc(p);
+	}
+	never_reached
+}
+static inline void eoi_run_proc(proc_t* p) {
+	if (p->p_stat == RUN) eoi_iret_to_proc(p);
+	else { //blocked
+		p->p_stat = RUN;
+		write_eoi();
+		p->p_reg.rax = continue_syscall();
+		iret_to_proc(p);
+	}
+	never_reached
 }
 
 proc_t *switch_proc(pid_t pid);

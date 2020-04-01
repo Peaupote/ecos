@@ -36,6 +36,8 @@ off_t    lseek(int fd, off_t offset);
 
 int      execve(const char *fname, const char **argv, const char **env);
 
+int      debug_block(int v);
+
 // Appel avec privilège ring 1
 
 void     r1_prires(uint16_t new_ring);

@@ -63,6 +63,6 @@ include .depends
 
 clean:
 	@echo "Clean trash files"
-	rm -f *.o *.bin .depends *.s $(OBJ)
+	rm -f *.o *.bin .depends *.s */*.s $(OBJ)
 
 re: clean $(NAME)
