@@ -4,7 +4,10 @@ ROOT=../..
 
 home: sys
 	mkdir -p home/test
+	mkdir -p home/bin
 	cp $(ROOT)/src/sys/init1.out home/test/init1.out
+	cp $(ROOT)/src/sys/sh.out home/bin/sh
+	cp $(ROOT)/src/sys/cat.out home/bin/cat
 
 home.img: home
 	$(ROOT)/tools/build-ext2.sh home home.img

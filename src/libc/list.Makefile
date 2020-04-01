@@ -9,13 +9,15 @@ LIBC_CFILES?=string/memcmp.c \
 	  string/strcmp.c \
 	  string/strncmp.c \
 	  string/index.c \
+	  string/strtok.c \
+	  string/strchr.c \
 	  stdio/printf.c \
 	  stdio/putchar.c \
 	  stdio/puts.c \
 	  stdlib/malloc.c \
 	  unistd/brk.c
 LIBC_DEP=$(foreach file,$(LIBC_CFILES),\
-		 	"-MT $(file:.c=.$(NAME_LC).o) $(file)")
+			"-MT $(file:.c=.$(NAME_LC).o) $(file)")
 LIBC_OBJ=$(LIBC_CFILES:%.c=%.$(NAME_LC).o)\
 			$(LIBC_AS_FILES:%.S=%.$(NAME_LC).o)
 
@@ -32,6 +34,6 @@ LIBK_CFILES?=string/memcmp.c \
 	  string/index.c \
 	  stdio/printf.c
 LIBK_DEP=$(foreach file,$(LIBK_CFILES),\
-		 	"-MT $(file:.c=.$(NAME_LK).o) $(file)")
+			"-MT $(file:.c=.$(NAME_LK).o) $(file)")
 LIBK_OBJ=$(LIBK_CFILES:%.c=%.$(NAME_LK).o)\
 			$(LIBK_AS_FILES:%.S=%.$(NAME_LK).o)

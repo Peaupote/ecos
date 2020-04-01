@@ -118,6 +118,7 @@ void sys_exit(int status) {
 
         proc_set_curr_pid(ppid);
         int* rt_st = rei_cast(int*, pp->p_reg.rsi);
+
         if (rt_st)
             *rt_st = status;
 
@@ -427,7 +428,7 @@ int sys_read(int fd, uint8_t *d, size_t len) {
         return -1;
 
     chann_t *chann = &state.st_chann[p->p_fds[fd]];
-    klogf(Log_verb, "syscall", "process %d read %d on %d (cid %d)",
+    klogf(Log_info, "syscall", "process %d read %d on %d (cid %d)",
           state.st_curr_pid, len, fd, p->p_fds[fd]);
 
     vfile_t *vfile = chann->chann_vfile;

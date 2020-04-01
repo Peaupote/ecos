@@ -39,7 +39,7 @@ ext2_iter_dir(struct ext2_inode *inode,
 
 static const char *lookup_name;
 static int cmp_dir_name(struct ext2_dir_entry* dir) {
-    if (!strncmp(dir->d_name, lookup_name, 256)) return -1;
+    if (!strncmp(dir->d_name, lookup_name, dir->d_name_len)) return -1;
     return 0;
 }
 

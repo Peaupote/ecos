@@ -147,7 +147,10 @@ uint8_t do_kprint = 0;
 extern uint8_t t0_data[];
 
 int print_dir(struct dirent *dir) {
-    kprintf("(%d) %s\n", dir->d_ino, dir->d_name);
+    kprintf("(%d) ", dir->d_ino);
+    for (size_t i = 0; i < dir->d_name_len; i++)
+        kprintf("%c", dir->d_name[i]);
+    kprintf("\n");
     return 0;
 }
 

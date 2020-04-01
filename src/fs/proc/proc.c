@@ -219,7 +219,6 @@ uint32_t proc_mkdir(ino_t parent, const char *fname, uint16_t type,
     // test if file already exists and is a directory
     if ((ino = proc_lookup(fname, parent, info)) &&
         (proc_inodes[ino].st.st_mode&TYPE_DIR)) {
-        kprintf("return ino %d\n", ino);
         klogf(Log_error, "procfs", "mkdir %s already exists", fname);
         return 0;
     }

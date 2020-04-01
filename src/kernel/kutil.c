@@ -8,7 +8,6 @@
 #include <kernel/proc.h>
 #include <kernel/memory/kmem.h> //low_addr
 
-
 // kprintf
 
 int vprintf(const char *fmt, va_list ps) {

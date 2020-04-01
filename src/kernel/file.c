@@ -123,7 +123,7 @@ static ino_t vfs_lookup(struct mount_info *info, struct fs *fs,
 
     while (*start) {
         memcpy(name, start, end - start);
-        name[end - start + 1] = 0;
+        name[end - start] = 0;
 
         if (!(ino = fs->fs_lookup(name, ino, info)))
             return 0;
@@ -162,7 +162,7 @@ vfile_t *vfs_load(const char *filename) {
             if (state.st_files[i].vf_stat.st_ino == st.st_ino &&
                 state.st_files[i].vf_stat.st_dev == dev->dev_id) {
                 klogf(Log_info, "vfs", "file %s is already open", fname);
-                state.st_files[free].vf_cnt++;
+                state.st_files[i].vf_cnt++;
                 return state.st_files + i;
             }
 
@@ -187,6 +187,10 @@ vfile_t *vfs_load(const char *filename) {
 int vfs_read(vfile_t *vfile, void *buf, off_t pos, size_t len) {
     struct device *dev = devices + vfile->vf_stat.st_dev;
     struct fs *fs = fst + dev->dev_fs;
+
+    klogf(Log_info, "vfs", "read %d (dev %d) pos",
+          vfile->vf_stat.st_ino, vfile->vf_stat.st_dev, pos);
+
     int rc = fs->fs_read(vfile->vf_stat.st_ino, buf, pos, len, &dev->dev_info);
     fs->fs_stat(vfile->vf_stat.st_ino, &vfile->vf_stat, &dev->dev_info);
     return rc;

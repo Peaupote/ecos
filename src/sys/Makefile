@@ -2,7 +2,7 @@ export CC=x86_64-elf-gcc
 export AS=x86_64-elf-as
 include ../../vars.Makefile
 
-CFILES=init1.c
+CFILES=init1.c sh.c cat.c
 OUT=$(CFILES:.c=.out)
 SRCDEP=$(CFILES) start.S
 INCLUDES=-I ../../include
