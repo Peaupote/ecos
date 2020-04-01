@@ -8,7 +8,7 @@
 #include <stdint.h>
 
 #include "string.h"
-#include <libc/stdio.h> // string_writer def
+#include <libc/stdio_strfuns.h> // string_writer def
 
 #define EI_NIDENT 16
 #define SHN_UNDEF 0

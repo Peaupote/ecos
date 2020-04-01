@@ -1,16 +1,20 @@
 #include <kernel/sys.h>
+
 #include <stdint.h>
 #include <stdbool.h>
 #include <stdalign.h>
+
 #include <kernel/memory/kmem.h>
 #include <kernel/memory/shared_pages.h>
-#include <util/elf64.h>
 #include <kernel/kutil.h>
 #include <kernel/gdt.h>
-#include <util/misc.h>
 #include <kernel/int.h>
 
-#include <libc/sys.h>
+#include <util/elf64.h>
+#include <util/misc.h>
+
+#include <libc/unistd.h>
+#include <libc/fcntl.h>
 
 #define AUX_STACK_SIZE 0x1000
 

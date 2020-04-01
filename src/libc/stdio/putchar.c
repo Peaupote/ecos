@@ -1,12 +1,8 @@
-#include <util/vga.h>
 #include <libc/stdio.h>
+#include <libc/unistd.h>
 
 int putchar(int p) {
-	//TODO: if libc
-#ifdef __is_kernel
-    unsigned char c = (unsigned char)p;
-    vga_putchar(c);
-    return (int)c;
-#endif
-	return p;
+	unsigned char c = (unsigned char)p;
+	write(1, &c, 1);
+	return c;
 }

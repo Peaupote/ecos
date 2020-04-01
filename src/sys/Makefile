@@ -5,7 +5,8 @@ include ../../vars.Makefile
 CFILES=init1.c
 OUT=$(CFILES:.c=.out)
 SRCDEP=$(CFILES) start.S
-INCLUDES=-I ../../include
+INCLUDE_LIBC?=-I ../../include/libc
+INCLUDES=-I ../../include $(INCLUDE_LIBC)
 
 .PHONY: all clean libc
 

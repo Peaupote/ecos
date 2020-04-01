@@ -1,6 +1,6 @@
 export TRG=host
 export CC=gcc
-export FLAGS_T=-O2 -Wall -Wextra -std=gnu99 -fno-builtin
+export FLAGS_T=-O2 -Wall -Wextra -std=gnu99 -fno-builtin -D__use_host_libc
 export FLAGS_U=$(FLAGS_T)
 
 SRCDEP=elf_info.c
