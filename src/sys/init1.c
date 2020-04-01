@@ -29,7 +29,7 @@ int main() {
 
     printf("Hello world !\n");
     char *str = "aabbccdd";
-    size_t len = strlen(str), n = 32;
+    size_t len = strlen(str);
 
     pid_t ppid = getpid(), pid;
     if ((pid = fork()) == 0) child();
@@ -40,10 +40,11 @@ int main() {
         if (fd < 0) exit(1);
 
         while(1) {
+			int n = debug_block(-1);
+			if (!n) break;
             printf("[pid %d] write %s %d times on %s\n", ppid, str, n, fname);
-            for (size_t k = 0; k < n; k++)
+            for (int k = 0; k < n; k++)
                 write(fd, str, len);
-            sleep(4);
         }
 
         close(fd);

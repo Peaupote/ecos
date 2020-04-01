@@ -27,11 +27,13 @@ syscall_tab:
     .quad sys_read
     .quad sys_lseek
     .quad sys_execve
+	.quad sys_debug_block
 syscall_ring1_tab:
 	.quad sys_prires
 
     .section .text
 .global irq_sys
+.global continue_syscall
 .global irq_sys_ring1
 .global irq_sys_ring1_call
 .global irq_keyboard
@@ -130,6 +132,18 @@ syscall_ring1_tab:
     movq   0x78(%r15), %r13
     movq   0x80(%r15), %r14
 	movq   0x88(%r15), %r15
+.endm
+
+.macro load_curr_prog_regp
+    movabs $st_curr_reg, %r15
+    movq   (%r15), %r15
+    movq   0x18(%r15), %rax
+    movq   0x28(%r15), %rcx
+    movq   0x30(%r15), %rdx
+    movq   0x38(%r15), %rsi
+    movq   0x40(%r15), %rdi
+    movq   0x50(%r15), %r8
+    movq   0x58(%r15), %r9
 .endm
 
 // Sauvegarde des registres pouvant être modifiés par un appel à une
@@ -271,9 +285,8 @@ irq_sys:
     cmpq   $NSYSCALL, %rax
     jns    incorrect_rax
 
-    movabs $syscall_tab, %rbx
-    lea    (%rbx, %rax, 8), %rax
-    movq   (%rax), %rax
+    movabs $syscall_tab, %r10
+    movq   (%r10, %rax, 8), %rax
     callq  *%rax
 
 func_end:
@@ -284,6 +297,12 @@ func_end:
 incorrect_rax:
     call invalid_syscall
     jmp  func_end
+
+continue_syscall:
+	load_curr_prog_regp
+	movabs $syscall_tab, %r10
+    movq   (%r10, %rax, 8), %rax
+	jmpq   *%rax //Appel terminal
 
 irq_sys_ring1_call:
 	callq  *%rax

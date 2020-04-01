@@ -99,7 +99,7 @@ void pit_hdl_switch(void) {
           "   rip %p, rsp %p",
           state.st_sched.nb_proc + 1, state.st_curr_pid,
           p->p_reg.rip, p->p_reg.rsp);
-    eoi_iret_to_proc(p);
+    eoi_run_proc(p);
 }
 
 //--#PF errcode--

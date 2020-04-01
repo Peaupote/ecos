@@ -504,6 +504,15 @@ off_t sys_lseek(int fd, off_t off) {
     return off;
 }
 
+int sys_debug_block(int v) {
+	if (~v) return v;
+
+	//On bloque le processus actuel
+	state.st_proc[state.st_curr_pid].p_stat = BLOCK;
+	schedule_proc();
+	never_reached return -1;
+}
+
 uint64_t invalid_syscall() {
     proc_t *p = &state.st_proc[state.st_curr_pid];
     klogf(Log_error, "syscall", "invalid syscall code %d", p->p_reg.rax);

@@ -5,8 +5,8 @@ CFILES=main.c \
 		keyboard.c \
 		tty.c \
 		tests.c \
-		proc.c \
 		file.c \
+		proc/proc.c \
 		syscalls/sleep.c \
 		syscalls/sys.c \
 		syscalls/execve.c \
