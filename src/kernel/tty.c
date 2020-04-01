@@ -12,7 +12,6 @@
 #include <kernel/proc.h>
 #include <kernel/int.h>
 
-#include <tests.h>
 #include <kernel/tests.h>
 #include <fs/ext2.h>
 
@@ -69,6 +68,7 @@ static inline size_t sb_sc_ed() {
     return sb_nb_lines - sb_display_shift;
 }
 
+static enum tty_mode tty_mode;
 
 void tty_init(enum tty_mode m) {
     back_color = vga_entry_color (
@@ -102,7 +102,16 @@ void tty_set_mode(enum tty_mode m) {
         vprompt_color = vga_entry_color (
                     VGA_COLOR_RED, VGA_COLOR_BLACK);
         break;
+
+    case ttym_debug:
+        prompt_color = vga_entry_color (
+                    VGA_COLOR_LIGHT_GREEN, VGA_COLOR_BLACK);
+        vprompt_color = vga_entry_color (
+                    VGA_COLOR_GREEN, VGA_COLOR_BLACK);
+        break;
     }
+
+    tty_mode = m;
     if (~input_top_line)
         vga_putentryat('>', prompt_color, 0, input_top_line);
 }
@@ -180,8 +189,10 @@ size_t built_in_exec(size_t in_begin, size_t in_len) {
         data_str[2] = '\0';
         int8_to_str_hexa(data_str, *(uint8_t*)ptr);
         return tty_writestring(data_str);
-    }
-    else if (!strcmp(cmd_name, "kprint"))
+    } else if (!strcmp(cmd_name, "pg2")) {
+        uint_ptr ptr = read_ptr(cmd_decomp + cmd_decomp_idx[1]);
+        kmem_print_paging(ptr);
+    } else if (!strcmp(cmd_name, "kprint"))
         do_kprint = !do_kprint;
     else if (!strcmp(cmd_name, "a"))
         use_azerty = 1;
@@ -191,7 +202,6 @@ size_t built_in_exec(size_t in_begin, size_t in_len) {
         char *arg1 = cmd_decomp + cmd_decomp_idx[1];
         if (!strcmp(arg1, "statut"))      test_print_statut();
         else if(!strcmp(arg1, "kheap"))   test_kheap();
-        else if (!strcmp(arg1, "string")) test_string();
     } else if (!strcmp(cmd_name, "ps"))
         proc_ps();
     else if (!strncmp(cmd_name, "ls", 3)) ls();
@@ -218,7 +228,16 @@ void tty_input(scancode_byte s, key_event ev) {
         if ((ev.key&KEYS_MASK) == KEYS_ENTER) {
             p_updt = 1;
             sq.shift += tty_prompt_to_buffer(ib_ashift, ib_size);
-            sq.shift += built_in_exec(ib_ashift, ib_size);
+
+            switch(tty_mode) {
+            case ttym_def:
+                proc_write_stdin(ibuffer + ib_ashift, ib_size);
+                break;
+            default:
+                sq.shift += built_in_exec(ib_ashift, ib_size);
+                break;
+            }
+
             ib_size = ib_printed = 0;
             sq.shift += tty_new_prompt();
         } else if(ev.key == KEY_BACKSPACE) {
@@ -231,16 +250,31 @@ void tty_input(scancode_byte s, key_event ev) {
             }
         } else if (ev.key == KEY_UP_ARROW) {
             if (sb_display_shift) {
-                --sb_display_shift;
+                size_t mv = key_state_shift()
+                          ? (VGA_HEIGHT - input_height) : 1;
+                if (mv > sb_display_shift)
+                    sb_display_shift = 0;
+                else
+                    sb_display_shift -= mv;
                 sb_dtcd = true;
                 tty_afficher_buffer_all();
             }
         } else if (ev.key == KEY_DOWN_ARROW) {
             if (sb_sc_ed() > VGA_HEIGHT - input_height) {
-                ++sb_display_shift;
+                size_t mv = key_state_shift()
+                          ? (VGA_HEIGHT - input_height) : 1;
+                mina_size_t(&mv,
+                        sb_sc_ed() - (VGA_HEIGHT - input_height));
+                sb_display_shift += mv;
                 if (sb_sc_ed() == VGA_HEIGHT - input_height)
                     sb_dtcd = false;
                 tty_afficher_buffer_all();
+            }
+        } else if (ev.key == KEY_TAB) {
+            switch (tty_mode) {
+            case ttym_def: tty_set_mode(ttym_debug); break;
+            case ttym_debug: tty_set_mode(ttym_def); break;
+            case ttym_panic:break;
             }
         } else {
             char kchar = keycode_to_printable(ev.key);

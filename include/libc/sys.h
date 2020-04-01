@@ -4,6 +4,8 @@
 #include <headers/proc.h>
 #include <headers/file.h>
 
+//TODO: mv to correct header
+
 uint64_t sleep(uint64_t);
 
 pid_t    wait(int* status);

@@ -10,12 +10,12 @@ typedef void (*stringl_writer)(void*, const char*, size_t);
 
 int fpprintf(stringl_writer w, void* wi, const char* fmt, va_list ps);
 
-int putchar(int c);
+int  putchar(int c);
 
-#if defined(__is_libc)
-int printf(const char *fmt, ...);
+#ifndef __is_kernel
+int  printf(const char *fmt, ...);
 
-int puts(const char *s);
+int  puts(const char *s);
 
 void abort(void);
 void exit(int status);

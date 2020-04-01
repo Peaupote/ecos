@@ -1,7 +1,9 @@
 export TRG=32
 export CC=i686-elf-gcc
-export FLAGS=-O2 -g -Wall -Wextra -std=gnu99 -nostdlib -ffreestanding
-AS=i686-elf-as
+export AS=i686-elf-as
+include ../../vars.Makefile
+export FLAGS_U=$(FLAGS_B)
+
 CFILES=init.c load.c
 ASFILES=boot.S
 SRCDEP=$(foreach file,$(ASFILES),"-MT $(file:.S=.s) $(file)") $(CFILES)
@@ -17,7 +19,7 @@ gdt.s: gdt.txt
 	cpp -P gdt.txt | gawk -f ../../tools/fillGDT.awk > gdt.s
 
 %.o:%.c
-	$(CC) $(FLAGS) -o $@ -c $< $(INCLUDES)
+	$(CC) $(FLAGS_B) -o $@ -c $< $(INCLUDES)
 
 %.s:%.S
 	$(CC) -E $< -o $@ $(INCLUDES)
@@ -32,12 +34,12 @@ util:
 	$(MAKE) -C ../util $(UDEP_FROM_UTIL)
 
 boot.bin: linker.ld boot_data.ld $(OBJ) util
-	$(CC) -T linker.ld -o boot.bin $(FLAGS) $(OBJ) $(UDEP_FROM_HERE) -lgcc
+	$(CC) -T linker.ld -o $@ $(FLAGS_B) $(OBJ) $(UDEP_FROM_HERE) -lgcc
 	@echo "Grub check multiboot"
 	grub-file --is-x86-multiboot boot.bin
 
 .depends:
-	../../tools/mkdep.sh "$(CC) $(FLAGS) $(INCLUDES)" $(SRCDEP) > .depends
+	../../tools/mkdep.sh "$(CC) $(FLAGS_B) $(INCLUDES)" $(SRCDEP) > .depends
 
 include .depends
 

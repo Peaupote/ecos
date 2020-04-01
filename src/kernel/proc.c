@@ -6,6 +6,8 @@
 #include <kernel/int.h>
 #include <kernel/sys.h>
 
+#include <libc/sys.h>
+#include <libc/stdio.h>
 #include <util/elf64.h>
 #include <kernel/memory/kmem.h>
 #include <kernel/int.h>
@@ -211,6 +213,7 @@ void proc_ldr_copy(void* err_pt, Elf64_Xword flag __attribute__((unused)),
         ((uint8_t*) dst)[i] = ((uint8_t*) src)[i];
 }
 
+//UNUSED
 uint8_t proc_create_userspace(void* prg_elf, proc_t *proc) {
     struct elf_loader proc_ldr = {
         .fill0 = &proc_ldr_fill0,
@@ -247,4 +250,13 @@ void proc_ps() {
                     (int)pid, (int)proc_state_char[p->p_stat],
                     (int)p->p_ppid, (int)p->p_prio);
     }
+}
+
+void proc_write_stdin(char *buf, size_t len) {
+    // TODO : handle differently to dont block other processes
+    vfile_t *vf = vfs_load("/proc/1/fd/0", 0);
+    if (!vf) return;
+
+    vfs_write(vf, buf, 0, len);
+    vfs_close(vf);
 }

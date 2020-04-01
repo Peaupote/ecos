@@ -143,6 +143,10 @@ proc_t *switch_proc(pid_t pid);
 
 void proc_ps();
 
+void proc_write_stdin(char *buf, size_t len);
+
+//
+
 static inline pid_t find_new_pid() {
     pid_t pid = state.st_free_proc;
     if (~pid)
@@ -167,17 +171,18 @@ static inline void proc_set_curr_pid(pid_t pid) {
 static inline uintptr_t make_proc_stack() {
     *kmem_acc_pts_entry(paging_add_lvl(pgg_pd, USER_STACK_PD),
                             2, PAGING_FLAG_U | PAGING_FLAG_W)
-        = SPAGING_FLAG_P | PAGING_FLAG_W;
+        = SPAGING_FLAG_P | PAGING_FLAG_W | PAGING_FLAG_U;
     return paging_add_lvl(pgg_pd, USER_STACK_PD + 1);
 }
 
 static inline cid_t free_chann() {
     cid_t cid;
     for (cid = 0; cid < NCHAN; cid++) {
-        if (state.st_chann[cid].chann_mode == UNUSED) break;
+        if (state.st_chann[cid].chann_mode == UNUSED)
+            return cid;
     }
 
-    return cid;
+    return NCHAN;
 }
 
 #endif

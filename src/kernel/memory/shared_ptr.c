@@ -1,6 +1,6 @@
 #include <kernel/memory/shared_ptr.h>
 
-#ifndef TEST_UNIT
+#ifndef __is_test_unit
 #include <kernel/memory/kmem.h>
 #endif
 

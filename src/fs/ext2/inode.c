@@ -1,8 +1,6 @@
-#if defined(__is_test)
-#include <stdio.h>
-#endif
-
 #include <fs/ext2.h>
+
+#include <util/test.h>
 
 struct ext2_inode *
 ext2_get_inode(uint32_t inode, struct ext2_mount_info *info) {

@@ -3,7 +3,7 @@
 
 int putchar(int p) {
 	//TODO: if libc
-#if defined(__is_libk)
+#ifdef __is_kernel
     unsigned char c = (unsigned char)p;
     vga_putchar(c);
     return (int)c;

@@ -4,7 +4,7 @@
 #include<stddef.h>
 #include<stdint.h>
 
-#ifndef TEST_UNIT
+#ifndef __is_test_unit
 #include "../../util/paging.h"
 #endif
 

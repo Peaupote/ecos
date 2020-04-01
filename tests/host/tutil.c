@@ -53,7 +53,7 @@ void kpanic(const char *p) {
 void kpanic_ct(const char *p) {
 	texit(p);
 }
-void kassert(uint8_t b, const char *p) {
+void tassert(uint8_t b, const char *p) {
 	if (!b) kpanic(p);
 }
 void klog (enum klog_level lvl __attribute__((unused)),

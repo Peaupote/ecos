@@ -28,7 +28,7 @@ tools:
 
 tests:
 	@echo "Testing"
-	$(MAKE) -C tests all
+	$(MAKE) -C tests/host all
 	# $(MAKE) -C tests/ext2 run
 
 start: $(ISO)
@@ -40,7 +40,7 @@ depends:
 	$(MAKE) -B -C src/boot           .depends
 	$(MAKE) -B -C src/util      clean-depends
 	$(MAKE) -B -C src/libc           .depends
-	$(MAKE)    -C tests               depends
+	$(MAKE)    -C tests/host          depends
 	$(MAKE) -B -C tools              .depends
 
 clean:
@@ -49,7 +49,9 @@ clean:
 	$(MAKE) -C src/util   clean
 	$(MAKE) -C src/libc   clean
 	$(MAKE) -C src/fs     clean
-	$(MAKE) -C tests      clean
+	$(MAKE) -C src/sys    clean
+	$(MAKE) -C tests/host clean
+	$(MAKE) -C tests/run  clean
 	$(MAKE) -C tools      clean
 	rm -rf *.o *.iso *.bin *.out isodir
 

@@ -26,6 +26,7 @@ void sys_exit(int status) {
           proc_state_char[pp->p_stat]);
 
     if (~p->p_fchd) {
+		// Les enfants du processus reçoivent INIT comme nouveau parent
         proc_t* fcp = state.st_proc + p->p_fchd;
         proc_t*  ip = state.st_proc + PID_INIT;
 
@@ -34,7 +35,7 @@ void sys_exit(int status) {
             pid_t zcpid = p->p_fchd;
             proc_t* zcp = fcp;
             goto loop_enter_z;
-            while (~zcp->p_nxzb) {
+            while (~zcp->p_nxzb) {// Zombies
                 zcpid = zcp->p_nxzb;
                 zcp   = state.st_proc + zcpid;
             loop_enter_z:
@@ -93,14 +94,6 @@ void sys_exit(int status) {
                 ip->p_fchd = p->p_fchd;
         }
         ip->p_nchd += p->p_nchd;
-    }
-
-    for (pid_t pid = 2; pid < NPROC; pid++) {
-        proc_t* cp = &state.st_proc[pid];
-        if (cp->p_ppid == state.st_curr_pid) {
-            cp->p_ppid = 1;
-            state.st_proc[1].p_nchd++;
-        }
     }
 
     if (~p->p_nxsb)

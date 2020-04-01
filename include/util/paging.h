@@ -37,6 +37,10 @@
 //désactive la mise à jour du TLB lors d'un changement de CR3
 //requiert PGE
 #define PAGING_FLAG_G		(1<<8)
+//ignorés: peuvent être utilisés par le système
+#define PAGING_FLAG_Y1      (1<<9)
+#define PAGING_FLAG_Y2      (1<<10)
+#define PAGING_FLAG_Y3      (1<<11)
 
 #define PAGING_FLAGS PAGING_FLAG_P|PAGING_FLAG_W|PAGING_FLAG_U|PAGING_FLAG_S|PAGING_FLAG_G
 

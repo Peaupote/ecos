@@ -110,6 +110,7 @@ void kmem_init_pml4(uint64_t* addr, phy_addr loc);
 //Crée de nouvelles structures de paging en copiant la mémoire du processus
 //à partir du paging actuel et switch sur le nouveau paging
 //@see kmem_fork_paging
+//UNUSED
 void kmem_copy_paging(phy_addr new_pml4);
 
 //définies dans ../idt_as.S

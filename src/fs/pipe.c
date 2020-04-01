@@ -6,7 +6,7 @@
 struct pipe_inode *pipe_alloc() {
     size_t i;
     for (i = 0; i < PIPE_SZ; i++) {
-        if (!pipes[i].pp_size) break;
+        if (!pipes[i].pp_hard) break;
     }
 
     if (i == PIPE_SZ) return 0;
@@ -16,6 +16,7 @@ struct pipe_inode *pipe_alloc() {
     pipe->pp_tail  = 1;
     pipe->pp_uid   = 0; // TODO
     pipe->pp_guid  = 0;
+    pipe->pp_hard  = 1;
     pipe->pp_size  = 0;
     pipe->pp_ctime = 0; // TODO now
     pipe->pp_mtime = 0;
@@ -25,7 +26,7 @@ struct pipe_inode *pipe_alloc() {
 
 int pipe_stat(struct pipe_inode *p, struct stat *st) {
     st->st_mode  = TYPE_FIFO;
-    st->st_nlink = 1;
+    st->st_nlink = p->pp_hard;
     st->st_uid   = p->pp_uid;
     st->st_gid   = p->pp_guid;
     st->st_size  = p->pp_size;
@@ -49,7 +50,7 @@ int pipe_read(struct pipe_inode *p, void *buf, size_t len) {
     return i;
 }
 
-int pipe_write(struct pipe_inode *p, void *buf, size_t len) {
+int pipe_write(struct pipe_inode *p, const void *buf, size_t len) {
     if (!p || !buf) return 0;
 
     if (PIPE_SZ < p->pp_size + len) {

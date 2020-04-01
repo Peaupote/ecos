@@ -156,6 +156,10 @@ int proc_write(ino_t ino, void *buf, off_t pos __attribute__((unused)),
         return pipe_write((struct pipe_inode*)inode->in_block, buf, len);
         break;
 
+    case TYPE_CHAR:
+        return 0;
+        break;
+
     default:
         kAssert(false);
         return 0;
@@ -195,7 +199,7 @@ uint32_t proc_touch(ino_t parent, const char *fname, uint16_t type,
 
     if (!proc_add_dirent(p, ino, fname)) return 0;
 
-    inode->in_type  = type|TYPE_DIR;
+    inode->in_type  = type;
     inode->in_uid   = 0;
     inode->in_size  = 0;
     inode->in_ctime = 0; // TODO now
@@ -315,9 +319,9 @@ uint32_t proc_alloc_std_streams(pid_t pid) {
     if (cid_in == NCHAN || cid_out == NCHAN || cid_out == NCHAN)
         return 0;
 
-    stdin  = vfs_touch(buf, "0", 0640);
-    stdout = vfs_touch(buf, "1", 0640);
-    stderr = vfs_touch(buf, "2", 0640);
+    stdin  = vfs_touch(buf, "0", TYPE_CHAR|0600);
+    stdout = vfs_touch(buf, "1", TYPE_CHAR|0600);
+    stderr = vfs_touch(buf, "2", TYPE_CHAR|0600);
     if (!stdin || !stdout || !stderr) {
         state.st_chann[cid_in].chann_mode = UNUSED;
         state.st_chann[cid_out].chann_mode = UNUSED;

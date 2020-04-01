@@ -1,4 +1,4 @@
-#include "tutil.h"
+#include "../tutil.h"
 
 #include <stddef.h>
 #include <stdint.h>
@@ -9,7 +9,7 @@ void* sbrk(intptr_t increment);
 void  malloc_init();
 void* malloc(size_t dsize);
 void  free(void* ptr);
-#include "../../src/libc/stdlib/malloc.c"
+#include <src/libc/stdlib/malloc.c>
 
 #define TEST_BUFFER_SIZE 0x2000
 #define TEST_NB_ALLOC    50
@@ -64,7 +64,7 @@ void sq_test_malloc() {
 
 		for (size_t i = 0; i < TEST_NB_ALLOC; ++i) {
 			allocs[i].sz   = rand_rng(0, TEST_ALLOC_SIZE);
-			allocs[i].addr = TESTED(malloc)(allocs[i].sz);
+			allocs[i].addr = TEST_U(malloc)(allocs[i].sz);
 			reg_alloc(allocs[i].addr, allocs[i].sz);
 		}
 
@@ -73,7 +73,7 @@ void sq_test_malloc() {
 		for (size_t i = 0; i < TEST_NB_ALLOC; ++i) {
 			size_t j = free_ord[i];
 			reg_free(allocs[j].addr, allocs[j].sz);
-			TESTED(free)(allocs[j].addr);
+			TEST_U(free)(allocs[j].addr);
 		}
 
 		kAssert(buf_alloc == use0);

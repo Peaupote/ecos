@@ -1,32 +1,34 @@
-CC?=gcc
-AS?=as
-AR?=ar
-FLAGS?=-O2 -g -Wall -Wextra -std=gnu99 \
-		-nostdlib -mcmodel=large -ffreestanding \
-		-mno-red-zone
+export CC?=x86_64-elf-gcc
+export AS?=x86_64-elf-as
+export AR?=x86_64-elf-ar
+include ../../../vars.Makefile
+
 FILES=ext2.c inode.c dir.c
-OBJ=$(FILES:%.c=%.o)
-INCLUDES=-I ../../../include
+SRCDEP=$(FILES)
+OBJ=$(FILES:%.c=%$(TSFX).o)
+INCLUDE_LIBC?=-I ../../../include/libc
+INCLUDES=-I ../../../include $(INCLUDE_LIBC)
+NAME=ext2$(TSFX).a
 
 ##
 
 .PHONY: all re clean
 
-all: ext2.a
+all: $(NAME)
 
-%.o:%.c
-	$(CC) $(FLAGS) -c $? -o $@ $(INCLUDES)
+%$(TSFX).o:%.c
+	$(CC) $(FLAGS_K) -c $< -o $@ $(INCLUDES)
 
-ext2.a: $(OBJ)
+$(NAME): $(OBJ)
 	$(AR) rcs $@ $(OBJ)
 
-.depends:
-	../../../tools/mkdep.sh "$(CC) $(FLAGS) $(INCLUDES)" $(SRCDEP) > .depends
+$(TSFX).depends:
+	../../../tools/mkdep.sh "$(CC) $(FLAGS_K) $(INCLUDES)" $(SRCDEP) > .depends
 
-include .depends
+include $(TSFX).depends
 
 clean:
 	@echo "Clean trash files"
 	rm -rf $(NAME) $(OBJ) *.o **/*.o *.a *.s
 
-re: clean $(NAME)
+re: clean all

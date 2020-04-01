@@ -1,15 +1,13 @@
 #include <stddef.h>
-#include <fs/ext2.h>
-#include <libc/string.h>
 
-#if defined(__is_test)
-#include <stdio.h>
+#include <fs/ext2.h>
 #include <string.h>
-#endif
 
 #if defined(__is_kernel)
 #include <kernel/kutil.h>
 #endif
+
+#include <util/test.h>
 
 struct ext2_dir_entry *
 ext2_iter_dir(struct ext2_inode *inode,

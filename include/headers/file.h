@@ -17,9 +17,6 @@ typedef void * block_t;
 #define TYPE_SYM  0xa000
 #define TYPE_SOCK 0xc000
 
-#if defined(__is_test)
-#include <sys/stat.h>
-#else
 typedef uint64_t off_t;
 typedef int32_t  ino_t;
 typedef uint16_t mode_t;
@@ -42,5 +39,5 @@ struct stat {
     uint32_t st_ctime;
     uint32_t st_mtime;
 };
-#endif
+
 #endif

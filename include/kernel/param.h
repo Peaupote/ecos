@@ -3,14 +3,15 @@
  * values can be updated if ever needed
  */
 
-#define NPROC 1024 // number of processes
-#define NFD   128  // number of file descriptors
-#define NCHAN 1024 // number of channels
-#define INODE 1024 // number of inodes
-#define NHEAP 16   // number of enqued processes
-#define NFILE 1024 // number of virtual files
-#define NDEV  32   // number of devices mounted
-#define NPIPE 32   // number of pipes
+#define NPROC   1024 // number of processes
+#define NFD     128  // number of file descriptors
+#define NCHAN   1024 // number of channels
+#define INODE   1024 // number of inodes
+#define NHEAP   16   // number of enqued processes
+#define NFILE   1024 // number of virtual files
+#define NDEV    32   // number of devices mounted
+#define NPIPE   32   // number of pipes
+#define NSTREAM 32   // number of streams
 
 #define NSLEEP 128 // number of parralled sleep allowed
 
@@ -25,7 +26,8 @@
 #define NB_PRIORITY_LVL 41
 
 // maximum number of chars accumulated in a pipe
-#define PIPE_SZ 2048
+#define PIPE_SZ   2048
+#define STREAM_SZ 2048
 
 /**
  * Dont touch too much here
