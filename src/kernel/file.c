@@ -161,9 +161,10 @@ vfile_t *vfs_load(const char *filename, uint32_t create) {
         kAssert(false);
     }
 
-    size_t free = 0;
+
+    size_t free = NFILE;
     for (size_t i = 0; i < NFILE; i++) {
-        if (!state.st_files[i].vf_cnt) continue;
+        if (state.st_files[i].vf_cnt) continue;
 
         if (state.st_files[i].vf_stat.st_ino == st.st_ino &&
             state.st_files[i].vf_stat.st_dev == dev->dev_id) {
@@ -172,7 +173,7 @@ vfile_t *vfs_load(const char *filename, uint32_t create) {
             return state.st_files + i;
         }
 
-        if (!free) free = i;
+        if (i < free) free = i;
     }
 
     if (free == NFILE) {
@@ -183,11 +184,12 @@ vfile_t *vfs_load(const char *filename, uint32_t create) {
     memcpy(&state.st_files[free].vf_stat, &st, sizeof(struct stat));
     state.st_files[free].vf_stat.st_dev = dev->dev_id;
     state.st_files[free].vf_cnt = 1;
+
     return state.st_files + free;
 }
 
 int vfs_read(vfile_t *vfile, void *buf, off_t pos, size_t len) {
-    klogf(Log_verb, "vfs", "read ino %d (device %d) offset %d len %d (size %d)",
+    klogf(Log_info, "vfs", "read ino %d (device %d) offset %d len %d (size %d)",
           vfile->vf_stat.st_ino, vfile->vf_stat.st_dev, pos, len,
           vfile->vf_stat.st_size);
     struct device *dev = devices + vfile->vf_stat.st_dev;

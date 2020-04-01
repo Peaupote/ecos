@@ -26,7 +26,7 @@ void sys_exit(int status) {
           proc_state_char[pp->p_stat]);
 
     if (~p->p_fchd) {
-		// Les enfants du processus reçoivent INIT comme nouveau parent
+        // Les enfants du processus reçoivent INIT comme nouveau parent
         proc_t* fcp = state.st_proc + p->p_fchd;
         proc_t*  ip = state.st_proc + PID_INIT;
 
@@ -282,9 +282,6 @@ pid_t sys_fork() {
 
     pp->p_nchd++; // one more child
     memcpy(&fp->p_reg, &pp->p_reg, sizeof(struct reg));
-    /* uint64_t *a = (uint64_t*)&fp->p_reg; */
-    /* uint64_t *b = (uint64_t*)&pp->p_reg; */
-    /* for (size_t i = 0; i < 18; i++) a[i] = b[i]; */
 
     fp->p_pml4 = kmem_alloc_page();
     kmem_fork_paging(fp->p_pml4);
@@ -324,10 +321,7 @@ int sys_open(const char *fname, enum chann_mode mode) {
         return -1;
     }
 
-    chann_t *c   = &state.st_chann[cid];
-    c->chann_acc  = 1;
-    c->chann_mode = mode;
-
+    chann_t *c = state.st_chann + cid;
     c->chann_vfile = vfs_load(fname, 1);
     if (!c->chann_vfile) {
         klogf(Log_error, "sys", "process %d couldn't open %s",
@@ -335,13 +329,14 @@ int sys_open(const char *fname, enum chann_mode mode) {
         return -1;
     }
 
-    c->chann_pos   = 0;
-
     for (int fd = 0; fd < NFD; fd++) {
         if (p->p_fds[fd] == -1) {
+            c->chann_acc  = 1;
+            c->chann_mode = mode;
+            c->chann_pos  = 0;
             p->p_fds[fd] = cid;
-            klogf(Log_info, "syscall", "process %d open %s on %d",
-                    state.st_curr_pid, fname, fd);
+            klogf(Log_info, "syscall", "process %d open %s on %d (cid %d)",
+                  state.st_curr_pid, fname, fd, cid);
             return fd;
         }
     }
@@ -359,6 +354,9 @@ int sys_close(int filedes) {
     // file descriptor reference no channel
     if (p->p_fds[filedes] == -1)
         return -1;
+
+    klogf(Log_info, "syscall", "close filedes %d (cid %d)",
+          filedes, p->p_fds[filedes]);
 
     chann_t *c = &state.st_chann[p->p_fds[filedes]];
     if (c->chann_mode != UNUSED && --c->chann_acc == 0) {
@@ -429,8 +427,8 @@ int sys_read(int fd, uint8_t *d, size_t len) {
         return -1;
 
     chann_t *chann = &state.st_chann[p->p_fds[fd]];
-    klogf(Log_verb, "syscall", "process %d read %d on %d",
-          state.st_curr_pid, len, fd);
+    klogf(Log_info, "syscall", "process %d read %d on %d (cid %d)",
+          state.st_curr_pid, len, fd, p->p_fds[fd]);
 
     vfile_t *vfile = chann->chann_vfile;
 
@@ -445,8 +443,9 @@ int sys_read(int fd, uint8_t *d, size_t len) {
         return rc;
 
     case STREAM_IN:
-        kAssert(false); // TODO
-        return -1;
+        return vfs_read(vfile, d, 0, len);
+        break;
+
     default:
         return -1;
     }
@@ -471,6 +470,9 @@ int sys_write(int fd, uint8_t *s, size_t len) {
         rc = vfs_write(vfile, s, chann->chann_pos, len);
         if (rc > 0) chann->chann_pos += rc;
         return rc;
+
+        //case STREAM_IN:
+        //    return vfs_write(vfile, s, 0, len);
 
     case STREAM_OUT:
         // TODO : more efficient

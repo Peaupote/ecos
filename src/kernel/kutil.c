@@ -28,7 +28,7 @@ int kprintf(const char *format, ...) {
     return count;
 }
 
-enum klog_level log_level = Log_info;
+enum klog_level log_level = Log_error;
 
 void klog(enum klog_level lvl, const char *hd, const char *msg) {
     if (lvl <= log_level)
@@ -51,27 +51,27 @@ uint_ptr panic_rsp;
 extern void kpanic_do_stop(void);
 
 void kpanic_stop() {
-	tty_set_mode(ttym_panic);
-	panic_cpid = state.st_curr_pid;
-	state.st_proc[PID_STOP].p_stat = RUN;
-	proc_set_curr_pid(PID_STOP);
-	kpanic_do_stop();
+    tty_set_mode(ttym_panic);
+    panic_cpid = state.st_curr_pid;
+    state.st_proc[PID_STOP].p_stat = RUN;
+    proc_set_curr_pid(PID_STOP);
+    kpanic_do_stop();
 }
 
 void kpanic(const char *msg) {
     kprintf("PANIC!\n");
     kprintf("%s", msg);
-	kpanic_stop();
+    kpanic_stop();
 }
 void kpanicf(const char *msg, const char *fmt, ...) {
     kprintf("PANIC!\n");
     kprintf("%s\n", msg);
-	va_list params;
-	va_start(params, fmt);
-	vprintf(fmt, params);
-	va_end(params);
-	kprintf("\n");
-	kpanic_stop();
+    va_list params;
+    va_start(params, fmt);
+    vprintf(fmt, params);
+    va_end(params);
+    kprintf("\n");
+    kpanic_stop();
 }
 void kpanic_ct(const char* msg) {
     vga_init((uint16_t*)(low_addr + VGA_BUFFER));

@@ -13,7 +13,7 @@ struct pipe_inode *pipe_alloc() {
     struct pipe_inode *pipe = pipes + i;
 
     pipe->pp_head  = 0;
-    pipe->pp_tail  = 1;
+    pipe->pp_tail  = 0;
     pipe->pp_uid   = 0; // TODO
     pipe->pp_guid  = 0;
     pipe->pp_hard  = 1;
@@ -37,14 +37,15 @@ int pipe_stat(struct pipe_inode *p, struct stat *st) {
 
 int pipe_read(struct pipe_inode *p, void *buf, size_t len) {
     if (!p || !buf) return 0;
+    if (p->pp_size == 0) return 0;
 
     size_t i;
     char *dst = (char*)buf;
-    for (i = 0; i < len && p->pp_head + 1 < p->pp_tail; i++) {
+    for (i = 0; i < len && p->pp_head < p->pp_tail; i++) {
         *dst++ = p->pp_content[p->pp_head++];
     }
 
-    p->pp_size = p->pp_tail - p->pp_head;
+    p->pp_size -= i;
     p->pp_mtime = 0; // TODO now
 
     return i;
@@ -54,23 +55,23 @@ int pipe_write(struct pipe_inode *p, const void *buf, size_t len) {
     if (!p || !buf) return 0;
 
     if (PIPE_SZ < p->pp_size + len) {
-        klogf(Log_error, "pipe", "no enough space");
+        klogf(Log_info, "pipe", "no enough space");
         return 0;
     }
 
     if (p->pp_tail + len > PIPE_SZ) {
-        memmove(p->pp_content + p->pp_head, p->pp_content, p->pp_size);
+        memmove(p->pp_content, p->pp_content + p->pp_head, p->pp_size);
         p->pp_head = 0;
         p->pp_tail = p->pp_size;
     }
 
     size_t i;
     char *src = (char*)buf;
-    for (i = 0; i < len; i++)
+    for (i = 0; i < len; i++) {
         p->pp_content[p->pp_tail++] = *src++;
+    }
 
     p->pp_size += i;
     p->pp_mtime = 0; // TODO now
-
     return i;
 }

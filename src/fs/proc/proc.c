@@ -138,8 +138,9 @@ int proc_read(ino_t ino, void *buf, off_t pos __attribute__((unused)),
               size_t len, struct mount_info *info __attribute__((unused))) {
     struct proc_inode *inode = proc_inodes + ino;
     switch (inode->in_type&0xf000) {
+    case TYPE_CHAR:
     case TYPE_FIFO:
-        return pipe_read((struct pipe_inode*)inode->in_block, buf, len);
+        return pipe_read((struct pipe_inode*)inode->in_block[0], buf, len);
         break;
 
     default:
@@ -152,12 +153,9 @@ int proc_write(ino_t ino, void *buf, off_t pos __attribute__((unused)),
               size_t len, struct mount_info *info __attribute__((unused))) {
     struct proc_inode *inode = proc_inodes + ino;
     switch (inode->in_type&0xf000) {
-    case TYPE_FIFO:
-        return pipe_write((struct pipe_inode*)inode->in_block, buf, len);
-        break;
-
     case TYPE_CHAR:
-        return 0;
+    case TYPE_FIFO:
+        return pipe_write((struct pipe_inode*)inode->in_block[0], buf, len);
         break;
 
     default:
@@ -265,15 +263,17 @@ uint32_t proc_create(pid_t pid) {
 
     sprintf(buf, "%d", pid);
     ino = proc_mkdir(PROC_ROOT_INO, buf,
-                     TYPE_DIR|0400, &dev->dev_info);
+                     TYPE_DIR|0600, &dev->dev_info);
     if (!ino) return 0;
 
-    rc = proc_mkdir(ino, "fd", TYPE_DIR|0640, &dev->dev_info);
+    rc = proc_mkdir(ino, "fd", TYPE_DIR|0600, &dev->dev_info);
     if (!rc) return 0;
 
     proc_t *p = state.st_proc + pid;
     struct dirent *dir = proc_opendir(rc, &dev->dev_info);
-    while (dir->d_ino) dir = proc_readdir(dir);
+    struct proc_inode *fd = proc_inodes + rc;
+    for (size_t l = 0; l < fd->in_size;
+         l += dir->d_rec_len, dir = proc_readdir(dir));
 
     for (int i = 0; i < NFD; i++) {
         if (p->p_fds[i] == -1) continue;
@@ -283,7 +283,9 @@ uint32_t proc_create(pid_t pid) {
 
         sprintf(buf, "%d", i);
         proc_fill_dirent(dir, c->chann_vfile->vf_stat.st_ino, buf);
+        fd->in_size += dir->d_rec_len;
         dir = proc_readdir(dir);
+
         // TODO problem if not same fs
         // TODO change type
     }
@@ -316,8 +318,10 @@ uint32_t proc_alloc_std_streams(pid_t pid) {
     cid_err = free_chann();
     state.st_chann[cid_err].chann_mode = STREAM_OUT;
 
-    if (cid_in == NCHAN || cid_out == NCHAN || cid_out == NCHAN)
+    if (cid_in == NCHAN || cid_out == NCHAN || cid_out == NCHAN) {
+        vfs_close(vf);
         return 0;
+    }
 
     stdin  = vfs_touch(buf, "0", TYPE_CHAR|0600);
     stdout = vfs_touch(buf, "1", TYPE_CHAR|0600);
@@ -329,23 +333,35 @@ uint32_t proc_alloc_std_streams(pid_t pid) {
         vfs_close(stdin);
         vfs_close(stdout);
         vfs_close(stderr);
+        vfs_close(vf);
         return 0;
     }
 
+    struct proc_inode *inode;
+
     // stdin
+    inode = proc_inodes + stdin->vf_stat.st_ino;
+    inode->in_block[0] = pipe_alloc();
     state.st_chann[cid_in].chann_vfile = stdin;
+    state.st_chann[cid_in].chann_mode  = STREAM_IN;
     state.st_chann[cid_in].chann_pos   = 0;
     state.st_chann[cid_in].chann_acc   = 1;
     p->p_fds[0] = cid_in;
 
     // stdout
+    inode = proc_inodes + stdout->vf_stat.st_ino;
+    inode->in_block[0] = pipe_alloc();
     state.st_chann[cid_out].chann_vfile = stdout;
+    state.st_chann[cid_out].chann_mode  = STREAM_OUT;
     state.st_chann[cid_out].chann_pos   = 0;
     state.st_chann[cid_out].chann_acc   = 1;
     p->p_fds[1] = cid_out;
 
     // stderr
+    inode = proc_inodes + stderr->vf_stat.st_ino;
+    inode->in_block[0] = pipe_alloc();
     state.st_chann[cid_err].chann_vfile = stderr;
+    state.st_chann[cid_err].chann_mode  = STREAM_OUT;
     state.st_chann[cid_err].chann_pos   = 0;
     state.st_chann[cid_err].chann_acc   = 1;
     p->p_fds[2] = cid_err;

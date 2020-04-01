@@ -94,7 +94,7 @@ bool pit_hdl(void) {
 
 void pit_hdl_switch(void) {
     proc_t *p = switch_proc(state.st_curr_pid);
-    klogf(Log_info, "sched",
+    klogf(Log_verb, "sched",
           "pit switch, nb R %d, run proc %d :\n"
           "   rip %p, rsp %p",
           state.st_sched.nb_proc + 1, state.st_curr_pid,
@@ -118,10 +118,10 @@ void exception_PF_hdl(uint_ptr fault_vaddr, uint64_t errcode) {
             && paging_get_lvl(pgg_pml4, fault_vaddr) < PML4_END_USPACE) {
         if (handle_PF(fault_vaddr))
             kpanicf("#PF handling", "on %p errcode=%llx",
-					fault_vaddr, errcode);
+                    fault_vaddr, errcode);
     } else //TODO: kill process
-		kpanicf("#PF not handled", "on %p errcode=%llx",
-					fault_vaddr, errcode);
+        kpanicf("#PF not handled", "on %p errcode=%llx",
+                    fault_vaddr, errcode);
     klogf(Log_verb, "exc", "#PF handled");
 }
 
