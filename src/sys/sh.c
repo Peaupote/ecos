@@ -1,6 +1,9 @@
-#include <libc/sys.h>
-#include <libc/stdio.h>
-#include <libc/string.h>
+#include <unistd.h>
+#include <stdio.h>
+#include <fcntl.h>
+#include <stdlib.h>
+#include <string.h>
+#include <sys.h>
 
 int main() {
     printf("ecos-shell version 0.1\n");

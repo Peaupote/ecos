@@ -1,5 +1,7 @@
-#include <libc/sys.h>
-#include <libc/stdio.h>
+#include <unistd.h>
+#include <stdio.h>
+#include <fcntl.h>
+#include <stdlib.h>
 
 int main(int argc, char *argv[]) {
     char buf[1024];
