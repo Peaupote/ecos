@@ -1,6 +1,7 @@
 #ifndef _H_FILE
 #define _H_FILE
 
+#include <headers/proc.h>
 #include <headers/file.h>
 
 #include <kernel/param.h>
@@ -8,8 +9,9 @@
 
 
 typedef struct vfile {
-    struct stat vf_stat; // information about the file
-    uint8_t     vf_cnt;  // nb of channel pointing at the file
+    struct stat vf_stat;    // information about the file
+    uint8_t     vf_cnt;     // nb of channel pointing at the file
+    pid_t       vf_waiting; // pid of a pid waiting to read something
 } vfile_t;
 
 #define DIRENT_OFF 8
@@ -86,7 +88,7 @@ void  vfs_init();
 int vfs_mount(const char *path, uint8_t fs, void *partition);
 
 vfile_t *vfs_pipe();
-vfile_t *vfs_load(const char *path, uint32_t create);
+vfile_t *vfs_load(const char *path);
 int      vfs_close(vfile_t *vfile);
 int      vfs_read(vfile_t *vfile, void *buf, off_t pos, size_t len);
 int      vfs_write(vfile_t *vfile, void *buf, off_t pos, size_t len);

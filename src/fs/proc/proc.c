@@ -298,7 +298,7 @@ uint32_t proc_create(pid_t pid) {
 uint32_t proc_alloc_std_streams(pid_t pid) {
     char buf[256];
     sprintf(buf, "/proc/%d/fd", pid);
-    vfile_t *vf = vfs_load(buf, 0);
+    vfile_t *vf = vfs_load(buf);
     if (!vf) return 0;
 
     klogf(Log_info, "proc", "alloc streams /proc/%d/fd ino %d dev %d",

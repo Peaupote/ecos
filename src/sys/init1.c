@@ -17,8 +17,6 @@ void child() {
             printf("[pid %d] read %d chars : ", pid, rc);
             for (i = 0; i < rc; i++) printf("%c", buf[i]);
             printf("\n");
-        } else {
-            printf("[pid %d] nothing on stdin\n", pid);
         }
     }
 }
@@ -43,7 +41,7 @@ int main() {
             printf("[pid %d] write %s %d times on %s\n", ppid, str, n, fname);
             for (size_t k = 0; k < n; k++)
                 write(fd, str, len);
-            sleep(4);
+            sleep(2);
         }
 
         close(fd);

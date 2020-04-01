@@ -322,7 +322,7 @@ int sys_open(const char *fname, enum chann_mode mode) {
     }
 
     chann_t *c = state.st_chann + cid;
-    c->chann_vfile = vfs_load(fname, 1);
+    c->chann_vfile = vfs_load(fname);
     if (!c->chann_vfile) {
         klogf(Log_error, "sys", "process %d couldn't open %s",
                 state.st_curr_pid, fname);
