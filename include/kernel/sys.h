@@ -5,6 +5,8 @@
 
 #ifndef ASM_FILE
 
+#include <headers/types.h>
+
 #include "proc.h"
 
 uint64_t sys_sleep(uint64_t);
@@ -21,8 +23,8 @@ int      sys_open(const char* fname, enum chann_mode mode);
 int      sys_close(int fd);
 int      sys_dup(int fd);
 int      sys_pipe(int fds[2]);
-int      sys_write(int fd, uint8_t *s, size_t len);
-int      sys_read(int fd, uint8_t *buf, size_t len);
+ssize_t  sys_write(int fd, uint8_t *s, size_t len);
+ssize_t  sys_read(int fd, uint8_t *buf, size_t len);
 off_t    sys_lseek(int fd, off_t offset);
 
 int      sys_execve(reg_t fname, reg_t argv, reg_t env);

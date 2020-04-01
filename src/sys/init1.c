@@ -1,6 +1,10 @@
+#include <unistd.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <fcntl.h>
+
 #include <libc/sys.h>
-#include <libc/stdio.h>
-#include <libc/string.h>
 
 void child() {
 #define SZ 1024

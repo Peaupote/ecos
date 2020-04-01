@@ -3,7 +3,7 @@
 #include <stdint.h>
 #include <libc/stdio.h>
 #include <libc/string.h>
-#include <libc/sys.h>
+#include <libc/unistd.h>
 
 static char buf[256];
 static const char *decimal_digits = "0123456789";
@@ -66,6 +66,19 @@ int64_t arg_int(uint8_t mod, va_list ps) {
     return va_arg(ps, int);
 }
 
+static inline
+uint64_t arg_uint(uint8_t mod, va_list ps) {
+    switch (mod) {
+        case 1:
+            return va_arg(ps, long unsigned);
+        case 2:
+            return va_arg(ps, long long unsigned);
+        default:
+            break;
+    }
+    return va_arg(ps, unsigned);
+}
+
 int fpprintf(stringl_writer w, void* wi, const char* fmt, va_list ps) {
     int count = 0;
     while (*fmt) {
@@ -115,7 +128,7 @@ int fpprintf(stringl_writer w, void* wi, const char* fmt, va_list ps) {
                 len = itoa(arg_int(mod, ps), decimal_digits, 10);
             goto print_buf;
             case 'x':
-                len = ultoa(arg_int(mod, ps), hex_digits, 16);
+                len = ultoa(arg_uint(mod, ps), hex_digits, 16);
             goto print_buf;
             case 'p':
                 len = complete_buf(

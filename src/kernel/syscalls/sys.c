@@ -421,7 +421,7 @@ int sys_pipe(int fd[2]) {
     return 0;
 }
 
-int sys_read(int fd, uint8_t *d, size_t len) {
+ssize_t sys_read(int fd, uint8_t *d, size_t len) {
     proc_t *p  = &state.st_proc[state.st_curr_pid];;
 
     if (!d || fd < 0 || fd > NFD || p->p_fds[fd] == -1)
@@ -462,7 +462,7 @@ int sys_read(int fd, uint8_t *d, size_t len) {
     }
 }
 
-int sys_write(int fd, uint8_t *s, size_t len) {
+ssize_t sys_write(int fd, uint8_t *s, size_t len) {
     proc_t *p  = &state.st_proc[state.st_curr_pid];;
 
     if (!s || fd < 0 || fd > NFD || p->p_fds[fd] == -1)
