@@ -2,12 +2,16 @@ ROOT=../..
 
 .PHONY:clean sys home
 
+include $(ROOT)/vars.Makefile
+unexport $(VARS_NAME)
+
 home: sys
 	mkdir -p home/test
 	mkdir -p home/bin
 	cp $(ROOT)/src/sys/init1.out home/bin/init1
 	cp $(ROOT)/src/sys/sh.out    home/bin/sh
 	cp $(ROOT)/src/sys/cat.out   home/bin/cat
+	cp $(ROOT)/src/sys/echo.out  home/bin/echo
 
 home.img: home
 	$(ROOT)/tools/build-ext2.sh home home.img

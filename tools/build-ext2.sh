@@ -10,7 +10,7 @@ IMG_ABS="`pwd`/$IMG"
 rm -f "$IMG"
 
 echo "Creating partition $IMG";
-dd if=/dev/zero of="$IMG" bs=64K count=1;
+dd if=/dev/zero of="$IMG" bs=64K count=4;
 mke2fs "$IMG"
 
 if ! cd "$BASE"

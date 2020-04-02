@@ -16,3 +16,6 @@ export FLAGS_LC?=$(FLAGS_L)
 export FLAGS_LK?=$(FLAGS_L) -D__is_kernel
 #Userspace
 export FLAGS_UR?=$(FLAGS_C) -fno-builtin -ffreestanding
+
+VARS_NAME=NAME_LC NAME_LK TSFX FLAGS_C FLAGS_K FLAGS_B FLAGS_L FLAGS_LC \
+		  FLAGS_LK FLAGS_UR INCLUDE_LIBC
