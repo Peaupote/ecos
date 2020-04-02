@@ -1,0 +1,15 @@
+%*nMF
+
+* : si présent ne stocke pas l'entrée (ne consomme pas d'argument)
+n : entier décimal, si présent limite le nombre de caractère lu pour ce format, n'inclus pas les blancs pouvant être ignorés où le '\0' en fin de %s
+
+F: FORMATS
+	c   char
+	s   string
+	d   entier décimal signé
+	x   entier non signé hexadécimal
+	i   entier signé: décimal (défaut), hexadécimal (0x / 0X) ou octal (0)
+	p   pointeur
+M: MODIFICATEURS
+	l	long
+	ll	long long

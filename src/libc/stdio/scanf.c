@@ -20,15 +20,19 @@ static uint8_t dec_digit_of_char(char c) {
 	if (c > '9' || c < '0') return ~0;
 	return c - '0';
 }
+static uint8_t oct_digit_of_char(char c) {
+	if (c > '7' || c < '0') return ~0;
+	return c - '0';
+}
 typedef uint8_t (*digit_parser)(char);
 
 //TODO: overflow
-static ssize_t parse_unsigned(string_reader r, void* ri,
+static ssize_t parse_unsigned(string_reader r, void* ri, size_t slim,
 		digit_parser f, uint8_t base, uint64_t* rt) {
 	*rt = 0;
 	bool  hrd = false;
 	uint8_t d;
-	do {
+	while (slim--) {
 		char    ic;
 		ssize_t st = r.read(ri, &ic, 1);
 		if (st < 0) return st;
@@ -41,11 +45,13 @@ static ssize_t parse_unsigned(string_reader r, void* ri,
 			return hrd ? 0 : 1;
 		}
 		hrd = true;
-	} while(true);
+	}
+	return hrd ? 0 : 1;
 }
 
-static ssize_t parse_signed(string_reader r, void* ri,
+static ssize_t parse_signed(string_reader r, void* ri, size_t slim,
 		digit_parser f, uint8_t base, int64_t* rt) {
+	if (!slim) return 1;
 	uint64_t urt;
 	char    ic;
 	ssize_t st = r.read(ri, &ic, 1);
@@ -53,13 +59,62 @@ static ssize_t parse_signed(string_reader r, void* ri,
 	if ( ! st ) return 1;
 	if (ic == '-') {
 		uint64_t urt;
-		st = parse_unsigned(r, ri, f, base, &urt);
+		st = parse_unsigned(r, ri, slim - 1, f, base, &urt);
 		*rt = -urt;
 		return st;
-	} else if (ic != '+')
+	} if (ic == '+')
+		--slim;
+	else
 		r.unget(ri);
-	st = parse_unsigned(r, ri, f, base, &urt);
+	st = parse_unsigned(r, ri, slim, f, base, &urt);
 	*rt = urt;
+	return st;
+}
+
+static ssize_t parse_signedi(string_reader r, void* ri, size_t slim,
+		int64_t* rt) {
+	if (!slim--) return 1;
+	bool    neg = false;
+	digit_parser f = &dec_digit_of_char;
+	uint8_t   base = 10;
+	char    ic;
+
+	ssize_t st = r.read(ri, &ic, 1);
+	if (st < 0) return st;
+	if ( ! st ) return 1;
+
+	switch (ic) {
+		case '-':
+			neg = true;
+		case '+':
+			if (!slim--) return 1;
+			ssize_t st = r.read(ri, &ic, 1);
+			if (st < 0) return st;
+			if ( ! st ) return 1;
+			break;
+	}
+
+	switch (ic) {
+		case '0':
+			if (!slim--) return 0;
+			ssize_t st = r.read(ri, &ic, 1);
+			if (st < 0) return st;
+			if ( ! st ) return 0;
+			if(ic == 'x' || ic == 'X') {
+				f = &hexa_digit_of_char;
+				base = 16;
+				break;
+			}
+			f = &oct_digit_of_char;
+			base = 8;
+		default:
+			r.unget(ri);
+			++slim;
+	}
+	
+	uint64_t urt;
+	st = parse_unsigned(r, ri, slim, f, base, &urt);
+	*rt = neg ? -urt : urt;
 	return st;
 }
 
@@ -79,9 +134,19 @@ ssize_t fpscanf(string_reader r, void* ri, const char* fmt, va_list ps) {
 	size_t matched = 0;
 	while (*fmt) {
 		if (*fmt == '%') {
-		
+			bool ignore = false;
 			uint8_t mod = 0;
-			switch(* ++fmt) {
+			size_t slim = ~0;
+			if (* ++fmt == '*') {
+				++fmt;
+				ignore = true;
+			}
+			if (isdigit(*fmt)) {
+				slim = *fmt - '0';
+				while(isdigit(*++fmt))
+					slim = slim * 10 + *fmt - '0';
+			}
+			switch(*fmt) {
 				case 'l':
 					switch(* ++fmt) {
 						case 'l':
@@ -96,10 +161,42 @@ ssize_t fpscanf(string_reader r, void* ri, const char* fmt, va_list ps) {
 					break;
 			}
 
-			int64_t  rd_nb;
+			int64_t  rd_nb = 0;
 			uint64_t rd_nb_u;
 			ssize_t  rd_nb_st;
 			switch(* fmt) {
+				
+				case '%': {
+					char ic;
+					ssize_t st = r.read(ri, &ic, 1);
+					if (st <  0) return st;
+					if (st == 0) return matched;
+					if (ic != '%') {
+						r.unget(ri);
+						return matched;
+					}
+					}break;
+
+				case 'c':
+					if (!~slim) slim = 1;
+					if (ignore) {
+						while (slim--) {
+							char ic;
+							ssize_t st= r.read(ri, &ic, 1);
+							if (st <  0) return st;
+							if (st == 0) return matched;
+						}
+					} else {
+						char* dst = va_arg(ps, char*);
+						while (slim--) {
+							ssize_t st= r.read(ri, dst, 1);
+							if (st <  0) return st;
+							if (st == 0) return matched + 1;
+							++dst;
+						}
+						++matched;
+					}
+					break;
 
 				case 's': {
 					char ic;
@@ -108,10 +205,24 @@ ssize_t fpscanf(string_reader r, void* ri, const char* fmt, va_list ps) {
 						if (st <  0) return st;
 						if (st == 0) return matched;
 					} while(isspace(ic));
+					r.unget(ri);
+
+					if (ignore) {
+						while(slim--) {
+							ssize_t st= r.read(ri, &ic, 1);
+							if (st <  0) return st;
+							if (st == 0) return matched;
+							if (isspace(ic)) {
+								r.unget(ri);
+								break;
+							}
+						}
+						break;
+					}
+
 					char* dst = va_arg(ps, char*);
 					*dst = ic;
-					do {
-						++dst;
+					while(slim--) {
 						ssize_t st= r.read(ri, dst, 1);
 						if (st <  0) return st;
 						if (st == 0) {
@@ -119,20 +230,27 @@ ssize_t fpscanf(string_reader r, void* ri, const char* fmt, va_list ps) {
 							return matched + 1;
 						}
 						if (isspace(*dst)) {
-							*dst = '\0';
 							r.unget(ri);
-							++matched;
 							break;
 						}
-					} while(true);
+						++dst;
+					}
+					* dst = '\0';
+					++matched;
 				}break;
 
+				case 'i':
+					skip_space(r, ri);
+					rd_nb_st = parse_signedi(r, ri, slim, &rd_nb);
+					goto signed_store;
 				case 'd':
 					skip_space(r, ri);
-					rd_nb_st = parse_signed(r, ri, 
+					rd_nb_st = parse_signed(r, ri, slim,
 								&dec_digit_of_char, 10, &rd_nb);
+				signed_store:
 					if (rd_nb_st < 0) return rd_nb_st;
-					if (rd_nb_st) return matched;
+					if (rd_nb_st)     return matched;
+					if (ignore)       break;
 					++matched;
 					switch(mod) {
 						case 0:
@@ -150,10 +268,11 @@ ssize_t fpscanf(string_reader r, void* ri, const char* fmt, va_list ps) {
 					mod = 3;
 				case 'x':
 					skip_space(r, ri);
-					rd_nb_st = parse_unsigned(r, ri, 
+					rd_nb_st = parse_unsigned(r, ri, slim,
 								&hexa_digit_of_char, 0x10, &rd_nb_u);
 					if (rd_nb_st < 0) return rd_nb_st;
-					if (rd_nb_st) return matched;
+					if (rd_nb_st)     return matched;
+					if (ignore)       break;
 					++matched;
 					switch(mod) {
 						case 0:

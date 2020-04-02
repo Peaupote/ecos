@@ -8,6 +8,11 @@
 pid_t    wait(int* status);
 pid_t    waitpid(pid_t cpid, int* status);
 
+int      _setpriority(int prio);
+int      _getpriority();
+int      setpriority(int prio);
+int      getpriority();
+
 int      debug_block(int v);
 
 // Appel avec privilège ring 1

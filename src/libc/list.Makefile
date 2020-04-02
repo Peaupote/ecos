@@ -17,7 +17,8 @@ LIBC_CFILES?=string/memcmp.c \
 	  stdlib/malloc.c \
 	  unistd/brk.c \
 	  stdio/scanf.c \
-	  ctype/ctype.c
+	  ctype/ctype.c \
+      sys/ressource.c
 LIBC_DEP=$(foreach file,$(LIBC_CFILES),\
 			"-MT $(file:.c=.$(NAME_LC).o) $(file)")
 LIBC_OBJ=$(LIBC_CFILES:%.c=%.$(NAME_LC).o)\

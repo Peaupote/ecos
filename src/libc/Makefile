@@ -12,9 +12,6 @@ INCLUDES=-I ../../include
 
 all: libc.a libk.a
 
-sys.S:sys-as.awk ../../include/kernel/sys.h
-	awk -f sys-as.awk ../../include/headers/sys.h > sys.S
-
 %.o:%.S
 
 %.s:%.S
@@ -57,6 +54,6 @@ include $(NAME_LK).depends
 ##
 
 clean:
-	rm -rf $(NAME) $(OBJ) *.o **/*.o *.a *.s sys.S sys.h *.depends
+	rm -rf $(NAME) $(OBJ) *.o **/*.o *.a *.s sys.h *.depends
 
 re: clean $(NAME)

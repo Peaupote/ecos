@@ -11,4 +11,3 @@ isodir
 *.img
 *.a
 tests/run/home
-src/libc/sys.S

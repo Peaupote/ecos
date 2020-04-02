@@ -27,6 +27,8 @@ syscall_tab:
     .quad sys_read
     .quad sys_lseek
     .quad sys_execve
+	.quad sys_setpriority
+	.quad sys_getpriority
 	.quad sys_debug_block
 syscall_ring1_tab:
 	.quad sys_prires

@@ -246,7 +246,7 @@ void proc_ps() {
             kprintf("%cpid=%d st=%c ppid=%d pr=%d\n",
                     pid==state.st_curr_pid ? '*' : ' ',
                     (int)pid, (int)proc_state_char[p->p_stat],
-                    (int)p->p_ppid, (int)p->p_prio);
+                    (int)p->p_ppid, 19 - (int)p->p_prio);
     }
 }
 
