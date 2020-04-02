@@ -11,10 +11,10 @@ static struct ext2_inode *curr;
 int init_ext2(void* fs) {
     int rc = ext2_mount(fs, &info);
     if (rc < 0)
-		return 1;
+        return 1;
     curr_ino = EXT2_ROOT_INO;
     curr = ext2_get_inode(EXT2_ROOT_INO, &info); // root
-	return 0;
+    return 0;
 }
 
 bool is_curr_dir() {
@@ -60,7 +60,7 @@ int ls () {
     }
 
     ext2_iter_dir(curr, print_dir, &info);
-	return 0;
+    return 0;
 }
 
 void do_touch(char* s) {
@@ -74,6 +74,7 @@ void print_stat() {
 
 void do_cd(const char* s) {
     uint32_t ino = ext2_lookup_dir(curr, s, &info);
+
     struct ext2_inode *inode = ext2_get_inode(ino, &info);
     if (!inode) {
         printf("%s dont exists\n", s);
@@ -90,16 +91,16 @@ void do_cd(const char* s) {
 }
 
 bool do_mkdir(char* s) {
-	if (!ext2_mkdir(curr_ino, s, 0640, &info)) {
-		test_errprintf("fail\n");
-		return false;
-	}
-	return true;
+    if (!ext2_mkdir(curr_ino, s, 0640, &info)) {
+        test_errprintf("fail\n");
+        return false;
+    }
+    return true;
 }
 
 void* save_area(size_t* sz) {
-	*sz = info.sp->s_blocks_count * info.block_size;
-	return info.sp;
+    *sz = info.sp->s_blocks_count * info.block_size;
+    return info.sp;
 }
 
 void dump() {

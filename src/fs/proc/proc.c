@@ -260,7 +260,7 @@ proc_opendir(ino_t ino, struct mount_info *info __attribute__((unused))) {
 
 uint32_t proc_create(pid_t pid) {
     struct device *dev = find_device("/proc");
-    char buf[256];
+    char buf[256] = { 0 };
     uint32_t ino, rc;
 
     klogf(Log_info, "procfs", "proc create /proc/%d", pid);
@@ -287,7 +287,8 @@ uint32_t proc_create(pid_t pid) {
         chann_t *c = state.st_chann + p->p_fds[i];
         if (c->chann_mode == UNUSED) continue;
 
-        sprintf(buf, "%d", i);
+        rc = sprintf(buf, "%d", i);
+        buf[rc] = 0;
         proc_fill_dirent(dir, c->chann_vfile->vf_stat.st_ino, buf);
         fd->st.st_size += dir->d_rec_len;
 
@@ -305,7 +306,7 @@ uint32_t proc_create(pid_t pid) {
 }
 
 uint32_t proc_alloc_std_streams(pid_t pid) {
-    char buf[256];
+    char buf[256] = { 0 };
     sprintf(buf, "/proc/%d/fd", pid);
     vfile_t *vf = vfs_load(buf);
     if (!vf) return 0;
