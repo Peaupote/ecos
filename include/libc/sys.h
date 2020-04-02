@@ -6,7 +6,7 @@
 //TODO: mv to correct header
 //sys/wait.h
 pid_t    wait(int* status);
-pid_t    waitpid(int* status, pid_t);
+pid_t    waitpid(pid_t cpid, int* status);
 
 int      debug_block(int v);
 

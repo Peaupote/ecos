@@ -10,5 +10,5 @@ isodir
 *.tst
 *.img
 *.a
-tests/ext2/home
+tests/run/home
 src/libc/sys.S

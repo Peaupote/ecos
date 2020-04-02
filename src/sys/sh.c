@@ -15,7 +15,7 @@ int main() {
     const char *env[1] = { 0 };
 
     while(1) {
-        rc = read(0, line, 256);
+        rc = read(0, line, 256);//TODO: attendre \n
         if (rc < 0) {
             printf("an error occurred\n");
             exit(1);
@@ -37,6 +37,6 @@ int main() {
             exit(1);
         }
 
-        wait(0);
+        wait(NULL);
     }
 }

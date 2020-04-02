@@ -13,7 +13,7 @@ uint64_t sys_sleep(uint64_t);
 void     lookup_end_sleep(void);
 
 pid_t    sys_wait(int* status);
-pid_t    sys_waitpid(int* status, pid_t);
+pid_t    sys_waitpid(pid_t cpid, int* status);
 pid_t    sys_fork(void);
 void     sys_exit(int status);
 pid_t    sys_getpid(void);

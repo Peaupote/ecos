@@ -12,7 +12,7 @@ Liste des appels systèmes (implémentés ou à implémenter) avec le type des a
 [x] void     exit(int status);
 [x] pid_t    wait(int* status);
 		renvoit le status du fils ssi le pointeur est non nul
-[x] pid_t    waitpid(int* status, pid_t pid);
+[x] pid_t    waitpid(pid_t pid, int* status);
 	    si pid == -1:
 		    attend qu'un enfant quelconque termine
 	    sinon
