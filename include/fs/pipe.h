@@ -24,5 +24,6 @@ struct pipe_inode *pipe_alloc();
 int pipe_stat(struct pipe_inode*, struct stat*);
 int pipe_read(struct pipe_inode*, void *dst, size_t len);
 int pipe_write(struct pipe_inode*, const void *src, size_t len);
+int pipe_free(struct pipe_inode*);
 
 #endif

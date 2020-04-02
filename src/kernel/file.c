@@ -1,5 +1,6 @@
 #include <libc/string.h>
 
+#include <kernel/param.h>
 #include <kernel/kutil.h>
 #include <kernel/file.h>
 #include <kernel/proc.h>
@@ -35,6 +36,8 @@ void vfs_init() {
     fst[PROC_FS].fs_mkdir   = &proc_mkdir;
     fst[PROC_FS].fs_opendir = &proc_opendir;
     fst[PROC_FS].fs_readdir = &proc_readdir;
+    fst[PROC_FS].fs_rm      = &proc_rm;
+    fst[PROC_FS].fs_destroy_dirent = &proc_destroy_dirent;
 
     klogf(Log_info, "vfs", "setup ext2 file system");
     memcpy(fst[EXT2_FS].fs_name, "ext2", 4);
@@ -47,6 +50,8 @@ void vfs_init() {
     fst[EXT2_FS].fs_mkdir   = 0; // not implemented yet
     fst[EXT2_FS].fs_opendir = (fs_opendir_t*)&ext2_opendir;
     fst[EXT2_FS].fs_readdir = (fs_readdir_t*)&ext2_readdir;
+    fst[EXT2_FS].fs_rm      = 0; // not implemted yet
+    fst[EXT2_FS].fs_destroy_dirent = 0;
 
     vfs_mount("/proc", PROC_FS, 0);
     vfs_mount("/home", EXT2_FS, home_partition);
@@ -220,11 +225,20 @@ int vfs_write(vfile_t *vfile, void *buf, off_t pos, size_t len) {
     return rc;
 }
 
+int vfs_destroy(vfile_t *vf) {
+    klogf(Log_info, "vfs", "destroy vfile for inode %d (device %d)",
+          vf->vf_stat.st_ino, vf->vf_stat.st_dev);
+
+    // TODO tell channels
+    vf->vf_cnt = 0;
+    return 0;
+}
+
 int vfs_close(vfile_t *vf) {
     if (vf) {
         klogf(Log_info, "vfs", "close file %d (device %d)",
               vf->vf_stat.st_ino, vf->vf_stat.st_dev);
-        vf->vf_cnt--;
+        --vf->vf_cnt;
     }
     return 0;
 }
@@ -300,4 +314,90 @@ struct dirent *vfs_readdir(struct dirent *dir, vfile_t *vfile) {
     struct device *dev = devices + vfile->vf_stat.st_dev;
     struct fs *fs = fst + dev->dev_fs;
     return fs->fs_readdir(dir);
+}
+
+ino_t vfs_rmdir(const char *fname, uint32_t rec) {
+    vfile_t *vf = vfs_load(fname);
+    if (!vf) return 0;
+    if (!(vf->vf_stat.st_mode&TYPE_DIR)) return 0;
+
+    dev_t did = vf->vf_stat.st_dev;
+    struct device *dev = devices + did;
+    struct fs *fs = fst + dev->dev_fs;
+
+    // remember all inodes to update vfiles
+    uint64_t inoset[1024] = { 0 };
+    ino_t stack[1024], *top = stack;
+
+#define SET(ino)   inoset[ino >> 6] |= 1 << (ino&(64-1));
+#define ISSET(ino) (inoset[ino >> 6] & (1 << (ino&(64-1))))
+#define PUSH(ino)  *top++ = ino
+#define POP()      *--top
+#define EMPTY()    (stack == top)
+
+    ino_t root = vf->vf_stat.st_ino, ino;
+    struct stat st;
+    uint32_t is_empty = 1, parent = 0;
+    struct dirent *dir;
+    size_t size;
+
+    // check if dir is empty and save parent inode
+    dir = fs->fs_opendir(root, &dev->dev_info);
+    for (size_t size = 0; size < vf->vf_stat.st_size;
+         size += dir->d_rec_len, dir = fs->fs_readdir(dir)) {
+        if (!strncmp(dir->d_name, "..", dir->d_name_len))
+            parent = dir->d_ino;
+        else if (dir->d_ino && strncmp(dir->d_name, ".", dir->d_name_len))
+            is_empty = 0;
+    }
+
+    kAssert(parent > 0);
+
+    if (!rec) {
+        if (!is_empty) {
+            vfs_close(vf);
+            return 0;
+        }
+
+        SET(root);
+        goto destroy_root;
+    }
+
+    PUSH(root);
+    while (!EMPTY()) {
+        ino = POP();
+        SET(ino);
+        klogf(Log_info, "vfs", "remove inode %d", ino);
+
+        fs->fs_stat(ino, &st, &dev->dev_info);
+        if (st.st_mode&TYPE_DIR) {
+            dir = fs->fs_opendir(ino, &dev->dev_info);
+            for (size = 0; size < st.st_size;
+                 size += dir->d_rec_len, dir = fs->fs_readdir(dir)) {
+                if (strncmp(dir->d_name, "..", dir->d_name_len)) {
+                    PUSH(dir->d_ino);
+                }
+                fs->fs_rm(dir->d_ino, &dev->dev_info);
+            }
+        }
+    }
+
+destroy_root:
+    fs->fs_destroy_dirent(parent, root, &dev->dev_info);
+
+    // update vfiles
+    for (size_t i = 0; i < NFILE; i++) {
+        if (state.st_files[i].vf_stat.st_dev == did &&
+            ISSET(state.st_files[i].vf_stat.st_ino)) {
+            fs->fs_stat(state.st_files[i].vf_stat.st_ino,
+                       &state.st_files[i].vf_stat,
+                       &dev->dev_info);
+
+            if (state.st_files[i].vf_stat.st_nlink == 0) {
+                vfs_destroy(state.st_files + i);
+            }
+        }
+    }
+
+    return root;
 }

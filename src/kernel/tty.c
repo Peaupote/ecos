@@ -146,8 +146,12 @@ uint8_t do_kprint = 0;
 
 extern uint8_t t0_data[];
 
+static struct fs *fs;
 int print_dir(struct dirent *dir) {
-    kprintf("(%d) ", dir->d_ino);
+    struct stat st;
+    fs->fs_stat(dir->d_ino, &st, 0);
+
+    kprintf("(%d) %d    ", dir->d_ino, st.st_nlink);
     for (size_t i = 0; i < dir->d_name_len; i++)
         kprintf("%c", dir->d_name[i]);
     kprintf("\n");
@@ -162,6 +166,9 @@ void ls () {
         kprintf("%s don't exist\n", cmd_decomp + cmd_decomp_idx[1]);
         return;
     }
+
+    struct device *dev = devices + vf->vf_stat.st_dev;
+    fs = fst + dev->dev_fs;
 
     size_t size = 0;
     while (size < vf->vf_stat.st_size) {

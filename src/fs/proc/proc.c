@@ -14,10 +14,10 @@ static uint32_t proc_free_block() {
 
 static inline void
 proc_fill_dirent(struct dirent *dir, uint32_t ino, const char *fname) {
-    dir->d_ino = ino;
+    dir->d_ino       = ino;
     dir->d_file_type = proc_inodes[ino].st.st_mode;
-    dir->d_name_len = strlen(fname);
-    dir->d_rec_len = DIRENT_OFF + dir->d_name_len + 1;
+    dir->d_name_len  = strlen(fname);
+    dir->d_rec_len   = DIRENT_OFF + dir->d_name_len + 1;
     memcpy(dir->d_name, fname, dir->d_name_len);
     dir->d_name[dir->d_name_len] = 0;
 }
@@ -28,6 +28,8 @@ proc_add_dirent(struct proc_inode *p, int32_t ino, const char *fname) {
     while (dir->d_ino) dir = proc_readdir(dir);
     proc_fill_dirent(dir, ino, fname);
     p->st.st_size += dir->d_rec_len;
+
+    proc_inodes[ino].st.st_nlink++;
 
     dir = proc_readdir(dir);
     proc_fill_dirent(dir, 0, "");
@@ -40,6 +42,7 @@ static uint32_t proc_init_dir(uint32_t ino, uint32_t parent, uint16_t type) {
     if (b == PROC_NBLOCK) return 0;
 
     inode->in_block[0] = proc_blocks + b;
+    inode->st.st_size  = 0;
 
     struct dirent *dir = (struct dirent*)inode->in_block[0];
     proc_fill_dirent(dir, ino, ".");
@@ -47,6 +50,7 @@ static uint32_t proc_init_dir(uint32_t ino, uint32_t parent, uint16_t type) {
 
     dir = proc_readdir(dir);
     proc_fill_dirent(dir, parent, "..");
+    proc_inodes[parent].st.st_nlink++;
     inode->st.st_size += dir->d_rec_len;
 
     dir = proc_readdir(dir);
@@ -193,6 +197,7 @@ uint32_t proc_touch(ino_t parent, const char *fname, uint16_t type,
     uint32_t b = proc_free_block();
     if (b == PROC_NBLOCK) return 0;
     inode->in_block[0] = proc_blocks + b;
+    inode->st.st_nlink = 0;
 
     if (!proc_add_dirent(p, ino, fname)) return 0;
 
@@ -202,7 +207,6 @@ uint32_t proc_touch(ino_t parent, const char *fname, uint16_t type,
     inode->st.st_ctime = 0; // TODO now
     inode->st.st_mtime = 0;
     inode->st.st_gid   = 0;
-    inode->st.st_nlink = 1;
 
     // set block b to used
     proc_block_bitmap[b >> 3] |= 1 << (b&7);
@@ -240,8 +244,8 @@ uint32_t proc_mkdir(ino_t parent, const char *fname, uint16_t type,
         return 0;
     }
 
-    if (!proc_add_dirent(p, ino, fname)) return 0;
     if (!proc_init_dir(ino, parent, type)) return 0;
+    if (!proc_add_dirent(p, ino, fname)) return 0;
 
     klogf(Log_verb, "procfs", "mkdir %s inode %d", fname, ino);
 
@@ -259,6 +263,8 @@ uint32_t proc_create(pid_t pid) {
     char buf[256];
     uint32_t ino, rc;
 
+    klogf(Log_info, "procfs", "proc create /proc/%d", pid);
+
     sprintf(buf, "%d", pid);
     ino = proc_mkdir(PROC_ROOT_INO, buf,
                      TYPE_DIR|0600, &dev->dev_info);
@@ -270,7 +276,9 @@ uint32_t proc_create(pid_t pid) {
     proc_t *p = state.st_proc + pid;
     struct dirent *dir = proc_opendir(rc, &dev->dev_info);
     struct proc_inode *fd = proc_inodes + rc;
-    for (size_t l = 0; l < fd->st.st_size;
+
+    size_t i = 0;
+    for (size_t l = 0; l < fd->st.st_size && i++ < 4;
          l += dir->d_rec_len, dir = proc_readdir(dir));
 
     for (int i = 0; i < NFD; i++) {
@@ -282,6 +290,9 @@ uint32_t proc_create(pid_t pid) {
         sprintf(buf, "%d", i);
         proc_fill_dirent(dir, c->chann_vfile->vf_stat.st_ino, buf);
         fd->st.st_size += dir->d_rec_len;
+
+        proc_inodes[c->chann_vfile->vf_stat.st_ino].st.st_nlink++;
+
         dir = proc_readdir(dir);
 
         // TODO problem if not same fs
@@ -367,4 +378,63 @@ uint32_t proc_alloc_std_streams(pid_t pid) {
     uint32_t ino = vf->vf_stat.st_ino;
     vfs_close(vf);
     return ino;
+}
+
+ino_t proc_destroy_dirent(ino_t p, ino_t ino, struct mount_info *info) {
+    struct proc_inode *parent = proc_inodes + p;
+    struct dirent *ndir, *dir;
+    size_t size;
+
+    dir = (struct dirent*)parent->in_block[0];
+
+    for (size = 0; size < parent->st.st_size;
+         size += dir->d_rec_len, dir = proc_readdir(dir)) {
+        if (dir->d_ino == ino) break;
+    }
+
+    if (size == parent->st.st_size) return 0;
+
+    if (size + dir->d_rec_len == parent->st.st_size) goto ret;
+
+    ndir = proc_readdir(dir);
+    memmove(dir, ndir, parent->st.st_size - size - dir->d_rec_len);
+
+ret:
+    // TODO if not in this device
+    proc_rm(ino, info);
+    parent->st.st_size -= dir->d_rec_len;
+    return ino;
+}
+
+ino_t proc_rm(ino_t ino, struct mount_info *info __attribute__((unused))) {
+    struct proc_inode *inode = proc_inodes + ino;
+    if (--inode->st.st_nlink > 0) return ino;
+
+    klogf(Log_info, "procfs", "free inode %d", ino);
+
+    // TODO : free block
+    // TODO : proc_block_bitmap[b >> 3] &= ~(1 << (b&7));
+    switch (inode->st.st_mode&0xf000) {
+    case TYPE_REG:
+        kAssert(false);
+        break;
+
+    case TYPE_CHAR:
+    case TYPE_FIFO:
+        pipe_free((struct pipe_inode*)inode->in_block[0]);
+        break;
+
+    default:
+        return 0;
+    }
+
+    return ino;
+}
+
+uint32_t proc_exit(pid_t pid) {
+    char fname[256] = { 0 };
+
+    klogf(Log_info, "procfs", "remove dir /proc/%d", pid);
+    sprintf(fname, "/proc/%d", pid);
+    return vfs_rmdir(fname, 1);
 }

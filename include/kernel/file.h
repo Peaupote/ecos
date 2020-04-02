@@ -7,7 +7,6 @@
 #include <kernel/param.h>
 #include <kernel/devices.h>
 
-
 typedef struct vfile {
     struct stat vf_stat;    // information about the file
     uint8_t     vf_cnt;     // nb of channel pointing at the file
@@ -71,6 +70,12 @@ typedef struct dirent *(fs_opendir_t)(ino_t, struct mount_info*);
 
 typedef struct dirent *(fs_readdir_t)(struct dirent*);
 
+/**
+ * Remove a dir entry with ino in list of dir entries of parent
+ */
+typedef ino_t (fs_destroy_dirent_t)(ino_t parent, ino_t ino, struct mount_info*);
+typedef ino_t (fs_rm_t)(ino_t, struct mount_info*);
+
 struct fs {
     char           fs_name[4];
     fs_mnt_t      *fs_mnt;
@@ -82,6 +87,8 @@ struct fs {
     fs_create_t   *fs_mkdir;
     fs_opendir_t  *fs_opendir;
     fs_readdir_t  *fs_readdir;
+    fs_rm_t       *fs_rm;
+    fs_destroy_dirent_t *fs_destroy_dirent;
 } fst [NFST];
 
 void  vfs_init();
@@ -98,5 +105,7 @@ vfile_t *vfs_mkdir(const char *parent, const char *fname, mode_t perm);
 
 vfile_t *vfs_opendir(const char *fname, struct dirent **dir);
 struct dirent *vfs_readdir(struct dirent *dir, vfile_t *vfile);
+
+ino_t vfs_rmdir(const char *fname, uint32_t rec);
 
 #endif

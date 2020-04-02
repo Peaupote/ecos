@@ -51,7 +51,12 @@ uint32_t proc_mkdir(ino_t, const char*, uint16_t, struct mount_info*);
 struct dirent *proc_opendir(ino_t, struct mount_info *);
 struct dirent *proc_readdir(struct dirent*);
 
+ino_t proc_rm(ino_t ino, struct mount_info *);
+ino_t proc_rmdir(ino_t ino, struct mount_info *);
+ino_t proc_destroy_dirent(ino_t p, ino_t ino, struct mount_info*);
+
 uint32_t proc_create(pid_t pid);
 uint32_t proc_alloc_std_streams(pid_t pid);
+uint32_t proc_exit(pid_t pid);
 
 #endif

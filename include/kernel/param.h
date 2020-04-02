@@ -6,7 +6,6 @@
 #define NPROC   1024 // number of processes
 #define NFD     128  // number of file descriptors
 #define NCHAN   1024 // number of channels
-#define INODE   1024 // number of inodes
 #define NHEAP   16   // number of enqued processes
 #define NFILE   1024 // number of virtual files
 #define NDEV    32   // number of devices mounted
