@@ -7,8 +7,7 @@ int main(int argc, char *argv[]) {
 		printf("%s", argv[argi]);
 	}
 
-    printf("error\n");
-    exit(1);
+    printf("\n");
 
     return 0;
 }

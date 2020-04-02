@@ -36,7 +36,9 @@ int main() {
             printf("error: %d ...\n", rc);
             exit(1);
         }
-
-        wait(NULL);
+	
+		int rs;
+        wait(&rs);
+		printf("process %d exited with status %d\n", rc, rs);
     }
 }
