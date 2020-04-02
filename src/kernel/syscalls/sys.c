@@ -104,25 +104,27 @@ void sys_exit(int status) {
     else
         pp->p_fchd = p->p_nxsb;
 
+    proc_exit(state.st_curr_pid);
+
     if (pp->p_stat == WAIT
         && (rei_cast(pid_t, pp->p_reg.rax) == PID_NONE
             || rei_cast(pid_t, pp->p_reg.rax) == state.st_curr_pid)) {
 
-		int* rt_st = rei_cast(pid_t, pp->p_reg.rax) == PID_NONE
-				   ? rei_cast(int*, pp->p_reg.rdi)
-				   : rei_cast(int*, pp->p_reg.rsi);
+        int* rt_st = rei_cast(pid_t, pp->p_reg.rax) == PID_NONE
+                   ? rei_cast(int*, pp->p_reg.rdi)
+                   : rei_cast(int*, pp->p_reg.rsi);
 
         kmem_free_paging(p->p_pml4,
                 pp->p_pml4 ? pp->p_pml4 : kernel_pml4);
-		
+
         free_pid(state.st_curr_pid);
         pp->p_nchd--;
         pp->p_reg.rax = state.st_curr_pid;
         pp->p_stat    = RUN;
 
         proc_set_curr_pid(ppid);
-        
-		if (rt_st)
+
+        if (rt_st)
             *rt_st = status;
 
         iret_to_proc(pp);

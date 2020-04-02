@@ -75,3 +75,8 @@ int pipe_write(struct pipe_inode *p, const void *buf, size_t len) {
     p->pp_mtime = 0; // TODO now
     return i;
 }
+
+int pipe_free(struct pipe_inode *p) {
+    p->pp_hard = 0;
+    return 1;
+}

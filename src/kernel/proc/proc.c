@@ -255,7 +255,10 @@ void proc_write_stdin(char *buf, size_t len) {
     vfile_t *vf = vfs_load("/proc/1/fd/0");
     if (!vf) return;
 
-    vfs_write(vf, buf, 0, len);
+    if (vfs_write(vf, buf, 0, len) < 0) {
+        klogf(Log_error, "proc", "problem when writing on stdin");
+    }
+
     vfs_close(vf);
 }
 
