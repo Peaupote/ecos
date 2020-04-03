@@ -7,7 +7,6 @@
 
 #include <fs/pipe.h>
 #include <fs/ext2.h>
-#include <fs/dummy.h>
 #include <fs/proc.h>
 
 extern char home_partition[];
@@ -348,9 +347,9 @@ ino_t vfs_rmdir(const char *fname, uint32_t rec) {
     dir = fs->fs_opendir(root, &dev->dev_info);
     for (size_t size = 0; size < vf->vf_stat.st_size;
          size += dir->d_rec_len, dir = fs->fs_readdir(dir)) {
-        if (!strncmp(dir->d_name, "..", dir->d_name_len))
+        if (!strcmp(dir->d_name, ".."))
             parent = dir->d_ino;
-        else if (dir->d_ino && strncmp(dir->d_name, ".", dir->d_name_len))
+        else if (dir->d_ino && strcmp(dir->d_name, "."))
             is_empty = 0;
     }
 
@@ -377,7 +376,7 @@ ino_t vfs_rmdir(const char *fname, uint32_t rec) {
             dir = fs->fs_opendir(ino, &dev->dev_info);
             for (size = 0; size < st.st_size;
                  size += dir->d_rec_len, dir = fs->fs_readdir(dir)) {
-                if (strncmp(dir->d_name, "..", dir->d_name_len)) {
+                if (dir->d_ino != ino && strcmp(dir->d_name, "..")) {
                     PUSH(dir->d_ino);
                 }
                 fs->fs_rm(dir->d_ino, &dev->dev_info);

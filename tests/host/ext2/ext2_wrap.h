@@ -10,7 +10,7 @@ int init_ext2(void* fs);
 bool is_curr_dir();
 void print_type(uint16_t type);
 int ls();
-void print_stat();
+void print_stat(const char *);
 void do_touch(char* s);
 void do_cd(const char* s);
 bool do_mkdir(char* s);

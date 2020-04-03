@@ -105,7 +105,7 @@ uint32_t proc_lookup(const char *fname, ino_t parent,
 
     start:
         if (!dir->d_ino) break;
-        if (!strncmp(fname, dir->d_name, dir->d_name_len))
+        if (!strncmp(fname, dir->d_name, 255))
             break;
 
         len += dir->d_rec_len;

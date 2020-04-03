@@ -68,18 +68,23 @@ void do_touch(char* s) {
         test_errprintf("fail\n");
 }
 
-void print_stat() {
-    print_inode(curr);
+void print_stat(const char *fname) {
+    uint32_t ino = ext2_lookup_dir(curr, fname, &info);
+    if (!ino) printf("%s dont exists\n", fname);
+    else {
+        struct ext2_inode *inode = ext2_get_inode(ino, &info);
+        print_inode(inode);
+    }
 }
 
 void do_cd(const char* s) {
     uint32_t ino = ext2_lookup_dir(curr, s, &info);
-
-    struct ext2_inode *inode = ext2_get_inode(ino, &info);
-    if (!inode) {
+    if (!ino) {
         printf("%s dont exists\n", s);
         return;
     }
+
+    struct ext2_inode *inode = ext2_get_inode(ino, &info);
 
     if (!(inode->in_type&EXT2_TYPE_DIR)) {
         printf("%s is not a directory\n", s);

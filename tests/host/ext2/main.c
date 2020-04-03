@@ -43,6 +43,13 @@ void cd () {
     do_cd(s1);
 }
 
+void cmd_stat() {
+    char *s = strtok(line, " \n");
+
+    for (s = strtok(0, " \n"); s; s = strtok(0, " \n"))
+        print_stat(s);
+}
+
 void cmd_mkdir() {
     char *s = strtok(line, " ");
 
@@ -147,7 +154,7 @@ int main(int argc, char *argv[]) {
             }
         }
         else if (!strncmp(line, "cd", 2)) cd();
-        else if (!strncmp(line, "stat", 4)) print_stat();
+        else if (!strncmp(line, "stat", 4)) cmd_stat();
         else if (!strncmp(line, "mkdir", 5)) cmd_mkdir();
         else if (!strncmp(line, "save", 4)) save();
         else if (!strncmp(line, "dump", 4)) dump();
