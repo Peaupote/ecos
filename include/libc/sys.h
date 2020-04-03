@@ -2,6 +2,7 @@
 #define _LIBC_SYS_H
 
 #include <headers/proc.h>
+#include <headers/file.h>
 
 //TODO: mv to correct header
 //sys/wait.h
@@ -14,6 +15,12 @@ int      setpriority(int prio);
 int      getpriority();
 
 int      debug_block(int v);
+
+// TODO: mv to correct header
+// sys/stat.h
+
+int fstat(int fd, struct stat *st);
+int stat(const char *fname, struct stat *st);
 
 // Appel avec privilège ring 1
 

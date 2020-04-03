@@ -442,6 +442,7 @@ ssize_t sys_read(int fd, uint8_t *d, size_t len) {
         return -1;
 
     switch (vfile->vf_stat.st_mode&0xf000) {
+    case TYPE_DIR:
     case TYPE_REG:
         if (chann->chann_pos == vfile->vf_stat.st_size) // EOF
             return 0;
@@ -492,8 +493,9 @@ ssize_t sys_write(int fd, uint8_t *s, size_t len) {
 
     case TYPE_CHAR:
         // TODO : more efficient
-        for (c = 0; c < len; c++)
+        for (size_t i = 0; i < len; i++)
             kprintf("%c", *s++);
+
         return c;
 
     default:
@@ -521,13 +523,13 @@ off_t sys_lseek(int fd, off_t off) {
 }
 
 int sys_setpriority(int prio) {
-	proc_t *p = state.st_proc + state.st_curr_pid;
-	if (prio > p->p_prio) return -1;
-	p->p_prio = prio;
-	return 0;
+    proc_t *p = state.st_proc + state.st_curr_pid;
+    if (prio > p->p_prio) return -1;
+    p->p_prio = prio;
+    return 0;
 }
 int sys_getpriority() {
-	return state.st_proc[state.st_curr_pid].p_prio;
+    return state.st_proc[state.st_curr_pid].p_prio;
 }
 
 int sys_debug_block(int v) {
@@ -537,6 +539,19 @@ int sys_debug_block(int v) {
     state.st_proc[state.st_curr_pid].p_stat = BLOCK;
     schedule_proc();
     never_reached return -1;
+}
+
+int sys_fstat(int fd, struct stat *st) {
+    proc_t *p = state.st_proc + state.st_curr_pid;
+
+    if (fd < 0 || fd > NFD) return -1;
+    if (p->p_fds[fd] == -1) return -1;
+
+    chann_t *c = state.st_chann + p->p_fds[fd];
+    if (c->chann_mode == UNUSED) return -1;
+
+    memcpy(st, &c->chann_vfile->vf_stat, sizeof (struct stat));
+    return 0;
 }
 
 uint64_t invalid_syscall() {

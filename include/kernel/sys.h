@@ -31,6 +31,9 @@ ssize_t  sys_read(int fd, uint8_t *buf, size_t len);
 off_t    sys_lseek(int fd, off_t offset);
 
 int      sys_execve(reg_t fname, reg_t argv, reg_t env);
+
+int      sys_fstat(int fd, struct stat *st);
+
 int      sys_setpriority(int prio);
 int      sys_getpriority();
 

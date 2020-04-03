@@ -27,11 +27,12 @@ syscall_tab:
     .quad sys_read
     .quad sys_lseek
     .quad sys_execve
-	.quad sys_setpriority
-	.quad sys_getpriority
-	.quad sys_debug_block
+    .quad sys_fstat
+    .quad sys_setpriority
+    .quad sys_getpriority
+    .quad sys_debug_block
 syscall_ring1_tab:
-	.quad sys_prires
+    .quad sys_prires
 
     .section .text
 .global irq_sys
@@ -88,8 +89,8 @@ syscall_ring1_tab:
     popq   %r15
     movq   %r15, 0x88(%r10)
 
-	// Sauvegarde des données présentes dans la structure d'iret
-	movq   0x20(%rsp), %r11
+    // Sauvegarde des données présentes dans la structure d'iret
+    movq   0x20(%rsp), %r11
     movq   %r11,      (%r10) // reg.rflags
     movq   0x10(%rsp), %r11
     movq   %r11,   0x8(%r10) // reg.rip
@@ -114,7 +115,7 @@ syscall_ring1_tab:
     movq   0x70(%r15), %r12
     movq   0x78(%r15), %r13
     movq   0x80(%r15), %r14
-	movq   0x88(%r15), %r15
+    movq   0x88(%r15), %r15
 .endm
 
 .macro restore_curr_proc_reg_exc_rax
@@ -133,7 +134,7 @@ syscall_ring1_tab:
     movq   0x70(%r15), %r12
     movq   0x78(%r15), %r13
     movq   0x80(%r15), %r14
-	movq   0x88(%r15), %r15
+    movq   0x88(%r15), %r15
 .endm
 
 .macro load_curr_prog_regp
@@ -207,14 +208,14 @@ syscall_ring1_tab:
 // Place 16 octets sur la pile
 // Ne modifient aucun registre
 .macro save_data_segments16
-	pushq %r10
-	save_data_segments
-	movq 8(%rsp), %r10
+    pushq %r10
+    save_data_segments
+    movq 8(%rsp), %r10
 .endm
 .macro restore_data_segments16
-	movq  %r10, 8(%rsp)
-	restore_data_segments
-	popq  %r10
+    movq  %r10, 8(%rsp)
+    restore_data_segments
+    popq  %r10
 .endm
 
 // Prépare une structure pour iretq
@@ -224,7 +225,7 @@ syscall_ring1_tab:
 .macro setup_iret
     movabs $st_curr_reg, %rax
     movq  (%rax), %rax
-	leaq  8(%rdi), %r10
+    leaq  8(%rdi), %r10
     pushq %r10             //SS
     pushq 0x10(%rax)       //RSP
     movq  0x00(%rax), %rsi //RFLAGS
@@ -237,52 +238,52 @@ syscall_ring1_tab:
 // Utilise le selecteur du SS d'une structure d'iret placée sur la pile
 // Ne modifie aucun registre
 .macro set_data_segments_from_iret
-	pushq %r10
-	movq  0x28(%rsp), %r10 //SS
+    pushq %r10
+    movq  0x28(%rsp), %r10 //SS
     set_data_segments
-	popq  %r10
+    popq  %r10
 .endm
 
 #include "int_handlers.s"
 
 irq_keyboard:
     save_c_reg
-	save_data_segments
+    save_data_segments
     movw  $SEG_SEL(GDT_RING0_DATA,0), %r10w
     set_data_segments
-    
-	call keyboard_hdl
-	
-	restore_data_segments
+
+    call keyboard_hdl
+
+    restore_data_segments
     restore_c_reg
     iretq
 
 irq_pit:
     save_c_reg
-	save_data_segments
+    save_data_segments
     movw  $SEG_SEL(GDT_RING0_DATA,0), %r10w
     set_data_segments
 
     call  pit_hdl
-	testb %al, %al
-	je    irq_pit_remain
+    testb %al, %al
+    je    irq_pit_remain
 
-	leaq  -8(%rsp), %rsp
-	restore_c_reg
-	save_curr_proc_reg
-	call  pit_hdl_switch
+    leaq  -8(%rsp), %rsp
+    restore_c_reg
+    save_curr_proc_reg
+    call  pit_hdl_switch
 
 irq_pit_remain:
     restore_data_segments
-	restore_c_reg
+    restore_c_reg
     iretq
 
 irq_sys:
-	save_data_segments16
+    save_data_segments16
     movw  $SEG_SEL(GDT_RING0_DATA,0), %r10w
     set_data_segments
-    
-	save_curr_proc_reg
+
+    save_curr_proc_reg
 
     cmpq   $NSYSCALL, %rax
     jns    incorrect_rax
@@ -293,7 +294,7 @@ irq_sys:
 
 func_end:
     restore_curr_proc_reg_exc_rax
-	restore_data_segments16
+    restore_data_segments16
     iretq
 
 incorrect_rax:
@@ -301,28 +302,28 @@ incorrect_rax:
     jmp  func_end
 
 continue_syscall:
-	load_curr_prog_regp
-	movabs $syscall_tab, %r10
+    load_curr_prog_regp
+    movabs $syscall_tab, %r10
     movq   (%r10, %rax, 8), %rax
-	jmpq   *%rax //Appel terminal
+    jmpq   *%rax //Appel terminal
 
 irq_sys_ring1_call:
-	callq  *%rax
-	iretq
+    callq  *%rax
+    iretq
 
 irq_sys_ring1:
     save_c_reg
-	save_data_segments
+    save_data_segments
     movw   $SEG_SEL(GDT_RING0_DATA,0), %r10w
     set_data_segments
-    
+
     movabs $syscall_ring1_tab, %r10
     lea    (%r10,  %rax, 8), %rax
     movq   (%rax), %rax
     jmpq   *%rax
 
 irq_sys_ring1_end:
-	restore_data_segments
+    restore_data_segments
     restore_c_reg
     iretq
 //Pile:
@@ -330,15 +331,15 @@ irq_sys_ring1_end:
 // reg save 9 quad
 // ds  save 1 quad
 sys_prires:
-	movq  $(GDT_RING_SZ+1), %r10 //+1 pour le CPL
-	imulw %di,              %r10w
-	addw  $GDT_RING_OFS,    %r10w
-	movq  %r10, 0x58(%rsp) //cs
-	addw  $8,               %r10w
-	movq  %r10,     (%rsp) //ds
-	movq  %r10, 0x70(%rsp) //ss
-	call  prires_proc_struct
-	jmp   irq_sys_ring1_end
+    movq  $(GDT_RING_SZ+1), %r10 //+1 pour le CPL
+    imulw %di,              %r10w
+    addw  $GDT_RING_OFS,    %r10w
+    movq  %r10, 0x58(%rsp) //cs
+    addw  $8,               %r10w
+    movq  %r10,     (%rsp) //ds
+    movq  %r10, 0x70(%rsp) //ss
+    call  prires_proc_struct
+    jmp   irq_sys_ring1_end
 
 irq14://#PF: Page Fault
     save_c_reg_err
@@ -352,7 +353,7 @@ irq14://#PF: Page Fault
 iret_to_userspace:
     setup_iret
     restore_curr_proc_reg
-	set_data_segments_from_iret
+    set_data_segments_from_iret
     iretq
 
 eoi_iret_to_userspace:
@@ -360,7 +361,7 @@ eoi_iret_to_userspace:
     movb $PIC_EOI_CODE, %al
     outb %al, $PIC1_PORT
     restore_curr_proc_reg
-	set_data_segments_from_iret
+    set_data_segments_from_iret
     iretq
 
 pml4_to_cr3:
@@ -368,20 +369,20 @@ pml4_to_cr3:
     ret
 
 invalide_page:
-	invlpg (%rdi)
-	ret
+    invlpg (%rdi)
+    ret
 
 paging_refresh:
-	movq   %cr3, %rax
-	movq   %rax, %cr3
-	ret
+    movq   %cr3, %rax
+    movq   %rax, %cr3
+    ret
 
 kpanic_do_stop:
-	movabs $panic_rsp,   %r10
-	movq   %rsp,        (%r10)
-	movabs $st_curr_reg, %r10
-	movq   (%r10),       %r10
-	movq   %rsp,    0x10(%r10)
-	sti
+    movabs $panic_rsp,   %r10
+    movq   %rsp,        (%r10)
+    movabs $st_curr_reg, %r10
+    movq   (%r10),       %r10
+    movq   %rsp,    0x10(%r10)
+    sti
 1:  hlt
-	jmp 1b
+    jmp 1b

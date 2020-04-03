@@ -40,4 +40,13 @@ struct stat {
     uint32_t st_mtime;
 };
 
+#define DIRENT_OFF 8
+struct dirent {
+    ino_t    d_ino;
+    uint16_t d_rec_len;
+    uint8_t  d_name_len;
+    uint8_t  d_file_type;
+    char     d_name[]; // at most 255 bytes len
+};
+
 #endif

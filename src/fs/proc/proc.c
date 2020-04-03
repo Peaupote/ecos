@@ -132,9 +132,19 @@ int proc_read(ino_t ino, void *buf, off_t pos __attribute__((unused)),
               size_t len, struct mount_info *info __attribute__((unused))) {
     struct proc_inode *inode = proc_inodes + ino;
     int rc;
+    size_t i;
+    char *src, *dst;
     struct pipe_inode *pipe;
 
     switch (inode->st.st_mode&0xf000) {
+    case TYPE_DIR:
+    case TYPE_REG:
+        src = (char*)inode->in_block[0] + pos;
+        dst = (char*)buf;
+        for (i = 0; i < len; i++)
+            *dst++ = *src++;
+        return i;
+
     case TYPE_CHAR:
     case TYPE_FIFO:
         pipe = (struct pipe_inode*)inode->in_block[0];

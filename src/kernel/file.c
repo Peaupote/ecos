@@ -292,7 +292,7 @@ vfile_t *vfs_mkdir(const char *parent, const char *fname, mode_t perm) {
     return vfs_alloc(dev, parent, fname, perm, fs->fs_mkdir);
 }
 
-vfile_t *vfs_opendir(vfile_t *vfile, struct dirent **dir) {
+struct dirent *vfs_opendir(vfile_t *vfile, struct dirent **dir) {
     if (vfile) {
         if (!(vfile->vf_stat.st_mode&TYPE_DIR)) {
             klogf(Log_error, "vfs", "opendir: file %d is not a directory",
@@ -309,10 +309,10 @@ vfile_t *vfs_opendir(vfile_t *vfile, struct dirent **dir) {
         *dir = fs->fs_opendir(vfile->vf_stat.st_ino, &dev->dev_info);
     }
 
-    return vfile;
+    return *dir;
 }
 
-struct dirent *vfs_readdir(struct dirent *dir, vfile_t *vfile) {
+struct dirent *vfs_readdir(vfile_t *vfile, struct dirent *dir) {
     struct device *dev = devices + vfile->vf_stat.st_dev;
     struct fs *fs = fst + dev->dev_fs;
     return fs->fs_readdir(dir);

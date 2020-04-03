@@ -5,25 +5,25 @@
 .section .text
 
 .macro mksc name sid
-	.global \name
+    .global \name
 \name :
-	movq   $\sid , %rax
-	int    $SYSCALL_VEC
-	retq
+    movq   $\sid , %rax
+    int    $SYSCALL_VEC
+    retq
 .endm
 .macro mksc1 name sid
-	.global \name
+    .global \name
 \name :
-	movq   $\sid , %rax
-	int    $SYSCALL_R1_VEC
-	retq
+    movq   $\sid , %rax
+    int    $SYSCALL_R1_VEC
+    retq
 .endm
 
 mksc sleep        SYS_SLEEP
 mksc fork         SYS_FORK
 mksc exit         SYS_EXIT
 mksc wait         SYS_WAIT
-mksc waitpid  	  SYS_WAITPID
+mksc waitpid      SYS_WAITPID
 mksc getpid       SYS_GETPID
 mksc getppid      SYS_GETPPID
 mksc open         SYS_OPEN
@@ -34,6 +34,7 @@ mksc write        SYS_WRITE
 mksc read         SYS_READ
 mksc lseek        SYS_LSEEK
 mksc execve       SYS_EXECVE
+mksc fstat        SYS_FSTAT
 mksc _setpriority SYS_SETPRIO
 mksc _getpriority SYS_GETPRIO
 mksc debug_block  SYS_DEBUG_BLOCK
