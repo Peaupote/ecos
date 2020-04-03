@@ -14,8 +14,8 @@ static char *line = NULL;
 void touch() {
     if (!is_curr_dir()) {
         fprintf(stderr, "not in a dir\n");
-		return;
-	}
+        return;
+    }
 
     char *s = strtok(line, " \n");
     if (!(s = strtok(0, " \n"))) {
@@ -23,7 +23,7 @@ void touch() {
         return;
     }
 
-	do_touch(s);
+    do_touch(s);
 }
 
 void cd () {
@@ -40,15 +40,15 @@ void cd () {
     }
 
     *s2 = 0;
-	do_cd(s1);
+    do_cd(s1);
 }
 
 void cmd_mkdir() {
     char *s = strtok(line, " ");
 
     for (s = strtok(0, " "); s; s = strtok(0, " "))
-		if (!do_mkdir(s))
-			return;
+        if (!do_mkdir(s))
+            return;
 }
 
 void save() {
@@ -63,8 +63,8 @@ void save() {
     if (fd < 0) { perror("open"); goto end; }
 
     if (lseek(fd, 1024, SEEK_SET) < 0) { perror("seek"); goto end; }
-	size_t sz;
-	void*  sp = save_area(&sz);
+    size_t sz;
+    void*  sp = save_area(&sz);
     if (write(fd, sp, sz) < 0) {
         perror("write");
         goto end;
@@ -77,7 +77,7 @@ end:
 }
 
 int main(int argc, char *argv[]) {
-	int rtst = 0;
+    int rtst = 0;
 
     if (argc < 2) {
         fprintf(stderr, "usage: %s part.img\n", argv[0]);
@@ -100,52 +100,52 @@ int main(int argc, char *argv[]) {
     void *fs = malloc(rc);
     if (!fs) {
         perror("malloc");
-		close(fd);
+        close(fd);
         exit(1);
     }
 
     if (lseek(fd, 0, SEEK_SET) < 0) {
         perror("seek");
-		close(fd);
-		free(fs);
+        close(fd);
+        free(fs);
         exit(1);
     }
-	
-	while(rc > 0) {
-		int rt = read(fd, fs, rc);
-		if(rt <= 0) {
-        	perror("read");
-			close(fd);
-			free(fs);
-			exit(1);
-		}
-		rc -= rt;
-	}
-    
-	close(fd);
 
-	int rt = init_ext2(fs);
-	if (rt) {
+    while(rc > 0) {
+        int rt = read(fd, fs, rc);
+        if(rt <= 0) {
+            perror("read");
+            close(fd);
+            free(fs);
+            exit(1);
+        }
+        rc -= rt;
+    }
+
+    close(fd);
+
+    int rt = init_ext2(fs);
+    if (rt) {
         fprintf(stderr, "can't mount\n");
-		rtst = 1;
-		goto exit_main;
-	}
+        rtst = 1;
+        goto exit_main;
+    }
 
     size_t len = 0;
     ssize_t nread;
     while (1) {
         printf("> ");
         if ((nread = getline(&line, &len, stdin)) < 0) {
-			rtst = 1;
-			goto exit_main;
+            rtst = 1;
+            goto exit_main;
         }
 
         if (!strncmp(line, "ls", 2)) {
-			if(ls()) {
-				rtst = 1;
-				goto exit_main;
-			}
-		}
+            if(ls()) {
+                rtst = 1;
+                goto exit_main;
+            }
+        }
         else if (!strncmp(line, "cd", 2)) cd();
         else if (!strncmp(line, "stat", 4)) print_stat();
         else if (!strncmp(line, "mkdir", 5)) cmd_mkdir();

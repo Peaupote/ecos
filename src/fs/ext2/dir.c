@@ -38,14 +38,16 @@ ext2_iter_dir(struct ext2_inode *inode,
 }
 
 static const char *lookup_name;
+static size_t lookup_name_len;
 static int cmp_dir_name(struct ext2_dir_entry* dir) {
-    if (!strncmp(dir->d_name, lookup_name, dir->d_name_len)) return -1;
+    if (!strncmp(dir->d_name, lookup_name, lookup_name_len)) return -1;
     return 0;
 }
 
 uint32_t ext2_lookup_dir(struct ext2_inode *inode, const char *fname,
                          struct ext2_mount_info *info) {
     lookup_name = fname;
+    lookup_name_len = strlen(lookup_name);
     struct ext2_dir_entry *entry = ext2_iter_dir(inode, cmp_dir_name, info);
     // TODO : binary search
     return entry ? entry->d_ino : 0;

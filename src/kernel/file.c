@@ -151,7 +151,7 @@ vfile_t *vfs_load(const char *filename) {
     klogf(Log_info, "vfs", "load %s from %s (device id %d)",
           filename, dev->dev_mnt, dev->dev_id);
 
-    struct fs *fs = &fst[dev->dev_fs];
+    struct fs *fs = fst + dev->dev_fs;
     struct stat st;
     char *fname = (char*)(filename + strlen(dev->dev_mnt));
     ino_t rc = vfs_lookup(&dev->dev_info, fs, fname, &st);
@@ -193,8 +193,8 @@ int vfs_read(vfile_t *vfile, void *buf, off_t pos, size_t len) {
     struct device *dev = devices + vfile->vf_stat.st_dev;
     struct fs *fs = fst + dev->dev_fs;
 
-    klogf(Log_info, "vfs", "read %d (dev %d) pos",
-          vfile->vf_stat.st_ino, vfile->vf_stat.st_dev, pos);
+    klogf(Log_info, "vfs", "read %d (dev %d)",
+          vfile->vf_stat.st_ino, vfile->vf_stat.st_dev);
 
     int rc = fs->fs_read(vfile->vf_stat.st_ino, buf, pos, len, &dev->dev_info);
     fs->fs_stat(vfile->vf_stat.st_ino, &vfile->vf_stat, &dev->dev_info);
@@ -293,14 +293,17 @@ vfile_t *vfs_mkdir(const char *parent, const char *fname, mode_t perm) {
     return vfs_alloc(dev, parent, fname, perm, fs->fs_mkdir);
 }
 
-vfile_t *vfs_opendir(const char *fname, struct dirent **dir) {
-    vfile_t *vfile = vfs_load(fname);
-
+vfile_t *vfs_opendir(vfile_t *vfile, struct dirent **dir) {
     if (vfile) {
         if (!(vfile->vf_stat.st_mode&TYPE_DIR)) {
+            klogf(Log_error, "vfs", "opendir: file %d is not a directory",
+                  vfile->vf_stat.st_ino);
             vfs_close(vfile);
             return 0;
         }
+
+        klogf(Log_info, "vfs", "opendir %d (device %d)",
+              vfile->vf_stat.st_ino, vfile->vf_stat.st_dev);
 
         struct device *dev = devices + vfile->vf_stat.st_dev;
         struct fs *fs = fst + dev->dev_fs;

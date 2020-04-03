@@ -363,7 +363,6 @@ int sys_execve(reg_t fname, reg_t argv, reg_t env) {
 // Ring 1
 void proc_execve_entry(const char *fname,
         const char **args, const char **envs) {
-
     int fd = open(fname, READ);
     if (fd == -1) call_proc_execve_error_1();
 

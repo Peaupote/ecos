@@ -146,10 +146,10 @@ uint8_t do_kprint = 0;
 
 extern uint8_t t0_data[];
 
-static struct fs *fs;
+static struct device *dev;
 int print_dir(struct dirent *dir) {
     struct stat st;
-    fs->fs_stat(dir->d_ino, &st, 0);
+    fst[dev->dev_fs].fs_stat(dir->d_ino, &st, &dev->dev_info);
 
     kprintf("(%d) %d    ", dir->d_ino, st.st_nlink);
     for (size_t i = 0; i < dir->d_name_len; i++)
@@ -161,22 +161,19 @@ int print_dir(struct dirent *dir) {
 #include <fs/proc.h>
 void ls () {
     struct dirent *dir;
-    vfile_t *vf = vfs_opendir(cmd_decomp + cmd_decomp_idx[1], &dir);
+    vfile_t *vf = vfs_load(cmd_decomp + cmd_decomp_idx[1]);
     if (!vf) {
         kprintf("%s don't exist\n", cmd_decomp + cmd_decomp_idx[1]);
         return;
     }
 
-    struct device *dev = devices + vf->vf_stat.st_dev;
-    fs = fst + dev->dev_fs;
+    if (!vfs_opendir(vf, &dir)) return;
+    dev = devices + vf->vf_stat.st_dev;
+    struct fs *fs = fst + dev->dev_fs;
 
-    size_t size = 0;
-    while (size < vf->vf_stat.st_size) {
+    for (size_t size = 0; size < vf->vf_stat.st_size;
+         size += dir->d_rec_len, dir = fs->fs_readdir(dir))
         print_dir(dir);
-        size += dir->d_rec_len;
-
-        dir = vfs_readdir(dir, vf);
-    }
 
     vfs_close(vf);
 }

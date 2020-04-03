@@ -103,7 +103,7 @@ int      vfs_write(vfile_t *vfile, void *buf, off_t pos, size_t len);
 vfile_t *vfs_touch(const char *parent, const char *fname, mode_t perm);
 vfile_t *vfs_mkdir(const char *parent, const char *fname, mode_t perm);
 
-vfile_t *vfs_opendir(const char *fname, struct dirent **dir);
+vfile_t *vfs_opendir(vfile_t *vf, struct dirent **dir);
 struct dirent *vfs_readdir(struct dirent *dir, vfile_t *vfile);
 
 ino_t vfs_rmdir(const char *fname, uint32_t rec);

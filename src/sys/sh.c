@@ -21,6 +21,8 @@ int main() {
             exit(1);
         }
 
+        line[rc] = 0;
+
         aptr = (char**)args;
         memset(args, 0, 256);
         for (ptr = strtok(line, " "); ptr; ptr = strtok(0, " ")) {
@@ -36,9 +38,9 @@ int main() {
             printf("error: %d ...\n", rc);
             exit(1);
         }
-	
-		int rs;
+
+        int rs;
         wait(&rs);
-		printf("process %d exited with status %d\n", rc, rs);
+        printf("process %d exited with status %d\n", rc, rs);
     }
 }
