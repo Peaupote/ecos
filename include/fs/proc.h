@@ -37,7 +37,7 @@ struct proc_inode {
     struct stat st;
 
     // pointers to auxiliary memory if necessary
-    void    *in_block[PROC_NBLOCK];
+    uint64_t in_block[PROC_NBLOCK];
 } proc_inodes[PROC_NINODES];
 
 int proc_mount(void*, struct mount_info *info);
@@ -58,5 +58,15 @@ ino_t proc_destroy_dirent(ino_t p, ino_t ino, struct mount_info*);
 uint32_t proc_create(pid_t pid);
 uint32_t proc_alloc_std_streams(pid_t pid);
 uint32_t proc_exit(pid_t pid);
+
+static inline uint32_t proc_free_inode() {
+    uint32_t ino;
+    for (ino = 2; ino < PROC_NINODES; ino++) {
+        if (!proc_inodes[ino].st.st_nlink) break;
+    }
+
+    return ino == PROC_NINODES ? 0 : ino;
+}
+
 
 #endif

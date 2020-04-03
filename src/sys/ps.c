@@ -12,7 +12,7 @@ int main () {
     char buf[256];
     int pid, count = 0;
 
-    printf("PID\n");
+    printf("PID\tSTATE\tCMD\n");
     while ((dir = readdir(dirp))) {
         memcpy(buf, dir->d_name, dir->d_name_len);
         buf[dir->d_name_len] = 0;
@@ -20,7 +20,18 @@ int main () {
         if (!strcmp(buf, ".") || !strcmp(buf, "..")) continue;
 
         pid = atoi(buf);
-        printf("%d\n", pid);
+
+        sprintf(buf, "/proc/%d/stat", pid);
+        int fd = open(buf, READ);
+
+        read(fd, buf, 1024);
+        int p; char cmd[256]; char st;
+        sscanf(buf, "%d %s %c", &p, cmd, &st);
+
+        printf("%d\t%c\t%s\n", pid, st, cmd);
+
+        close(fd);
+
         count++;
     }
 

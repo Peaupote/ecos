@@ -62,6 +62,10 @@ typedef struct proc {
     phy_addr         p_pml4;     // paging
 	uint_ptr         p_brk;      // program break
     struct reg       p_reg;      // saved registers
+    char             p_cmd[256]; // cmd to exec the process
+
+    ino_t            p_cino;     // inode of current dir
+    dev_t            p_dev;      // device of current dir
 } proc_t;
 
 /**

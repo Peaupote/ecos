@@ -13,6 +13,7 @@
 #include <util/elf64.h>
 #include <util/misc.h>
 
+#include <libc/string.h>
 #include <libc/unistd.h>
 #include <libc/fcntl.h>
 
@@ -315,6 +316,7 @@ int sys_execve(reg_t fname, reg_t argv, reg_t env) {
     pid_t  pid = state.st_curr_pid;
     klogf(Log_info, "syscall", "process %d called execve", (int)pid);
     proc_t  *p = state.st_proc + pid;
+    strncpy(p->p_cmd, (char*)fname, 256);
 
     pid_t epid = find_new_pid();
     if (!~epid) return -1;

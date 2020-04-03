@@ -15,7 +15,8 @@ CFILES=main.c \
 		memory/shared_pages.c \
 		memory/shared_ptr.c \
 		../fs/pipe.c \
-		../fs/proc/proc.c
+		../fs/proc/proc.c \
+		../fs/proc/special.c
 
 ASFILES=entry.S \
 		int.S \

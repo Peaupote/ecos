@@ -17,13 +17,16 @@ int main(int argc, char *argv[]) {
         }
 
     start:
-        while ((rc = read(fd, buf, 1024)) > 0)
+        while ((rc = read(fd, buf, 1024)) > 0) {
             write(1, buf, rc);
+        }
 
         if (rc < 0) {
             printf("error\n");
             exit(1);
         }
+
+        close(fd);
     }
 
     return 0;
