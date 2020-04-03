@@ -37,6 +37,7 @@ mksc execve       SYS_EXECVE
 mksc fstat        SYS_FSTAT
 mksc _setpriority SYS_SETPRIO
 mksc _getpriority SYS_GETPRIO
+mksc sbrk         SYS_SBRK
 mksc debug_block  SYS_DEBUG_BLOCK
 
 mksc1 r1_prires  SYS_R1_PRIRES

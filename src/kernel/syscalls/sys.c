@@ -532,15 +532,6 @@ int sys_getpriority() {
     return state.st_proc[state.st_curr_pid].p_prio;
 }
 
-int sys_debug_block(int v) {
-    if (~v) return v;
-
-    //On bloque le processus actuel
-    state.st_proc[state.st_curr_pid].p_stat = BLOCK;
-    schedule_proc();
-    never_reached return -1;
-}
-
 int sys_fstat(int fd, struct stat *st) {
     proc_t *p = state.st_proc + state.st_curr_pid;
 
@@ -552,6 +543,35 @@ int sys_fstat(int fd, struct stat *st) {
 
     memcpy(st, &c->chann_vfile->vf_stat, sizeof (struct stat));
     return 0;
+}
+
+void* sys_sbrk(intptr_t inc) {//TODO: protect
+    proc_t *p = state.st_proc + state.st_curr_pid;
+	uint_ptr nbrk = (uint_ptr)( ((intptr_t)p->p_brk) + inc );
+
+	kmem_paging_alloc_rng(align_to(p->p_brk, PAGE_SIZE), nbrk,
+			PAGING_FLAG_W | PAGING_FLAG_U,
+			PAGING_FLAG_W | PAGING_FLAG_U);
+	
+	for (uint_ptr a = align_to(nbrk, PAGE_SIZE); a < p->p_brk;
+			a += PAGE_SIZE) {
+		uint64_t *e = paging_page_entry(a);
+		kAssert(*e & PAGING_FLAG_P);
+		kmem_free_page(*e & PAGE_MASK);
+		*e &= ~(uint64_t)PAGING_FLAG_P;
+	}
+	void *rt = (void*) p->p_brk;
+	p->p_brk = nbrk;
+	return rt;
+}
+
+int sys_debug_block(int v) {
+    if (~v) return v;
+
+    //On bloque le processus actuel
+    state.st_proc[state.st_curr_pid].p_stat = BLOCK;
+    schedule_proc();
+    never_reached return -1;
 }
 
 uint64_t invalid_syscall() {

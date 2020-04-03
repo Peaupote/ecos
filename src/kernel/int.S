@@ -30,6 +30,7 @@ syscall_tab:
     .quad sys_fstat
     .quad sys_setpriority
     .quad sys_getpriority
+    .quad sys_sbrk
     .quad sys_debug_block
 syscall_ring1_tab:
     .quad sys_prires

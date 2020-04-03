@@ -1,5 +1,6 @@
 LIBC_AS_FILES?=sys.S
-LIBC_CFILES?=string/memcmp.c \
+LIBC_CFILES?=libc_main.c \
+	  string/memcmp.c \
 	  string/memcpy.c \
 	  string/memset.c \
 	  string/memmove.c \

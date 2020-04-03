@@ -45,6 +45,7 @@ void proc_start() {
     p_idle->p_ring = 0;
     p_idle->p_prio = 0; //priorité minimale
     p_idle->p_pml4 = (phy_addr)NULL;
+	p_idle->p_brk  = 0;
     p_idle->p_reg.rsp = (uint_ptr)kernel_stack_top;
     p_idle->p_reg.rip = (uint_ptr)&proc_idle_entry;
 
@@ -58,6 +59,7 @@ void proc_start() {
     p_init->p_ring = 1;
     p_init->p_prio = NB_PRIORITY_LVL - 2; //priorité maximale
     p_init->p_pml4 = (phy_addr)NULL;
+	p_init->p_brk  = 0x1000;
     p_init->p_reg.rsp = (uint_ptr)NULL;
     p_init->p_reg.rip = (uint_ptr)&proc_init_entry;
 
@@ -71,6 +73,7 @@ void proc_start() {
     p_stop->p_ring = 0;
     p_stop->p_prio = NB_PRIORITY_LVL - 1;
     p_stop->p_pml4 = (phy_addr)NULL;
+	p_stop->p_brk  = 0;
     p_stop->p_reg.rsp = (uint_ptr)kernel_stack_top;
     p_stop->p_reg.rip = (uint_ptr)&proc_idle_entry;
 

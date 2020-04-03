@@ -4,6 +4,8 @@
 #include <headers/proc.h>
 #include <headers/file.h>
 
+void     _libc_init();
+
 //TODO: mv to correct header
 //sys/wait.h
 pid_t    wait(int* status);

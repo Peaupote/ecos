@@ -37,6 +37,8 @@ int      sys_fstat(int fd, struct stat *st);
 int      sys_setpriority(int prio);
 int      sys_getpriority();
 
+void*    sys_sbrk(intptr_t inc);
+
 int      sys_debug_block(int v);
 
 uint64_t invalid_syscall();

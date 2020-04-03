@@ -301,7 +301,7 @@ static inline bool execve_load_args() {
         uint64_t* e = paging_page_entry(src);
         if (paging_map_to(dst, PAGE_MASK & *e,
                     PAGING_FLAG_W | PAGING_FLAG_U,
-                    PAGING_FLAG_W | PAGING_FLAG_U))
+                    PAGING_FLAG_W | PAGING_FLAG_U | PAGING_FLAG_RW))
             return false;
         *e = 0;
     }
@@ -403,6 +403,7 @@ void proc_execve_end() {
     pp->p_reg.rsi = (uint_ptr)trf()->argv;
     pp->p_reg.rdx = (uint_ptr)trf()->envv;
     pp->p_pml4    = mp->p_pml4;
+	pp->p_brk     = align_to(trf()->args_ed, 8);
 
     --pp->p_nchd;
     free_pid(state.st_curr_pid);

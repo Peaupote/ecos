@@ -2,10 +2,8 @@
 
 #include <stddef.h>
 
-int brk(void* addr __attribute__((unused)) ) { // TODO
-	return -1;
-}
-
-void* sbrk(intptr_t increment __attribute__((unused)) ) { //TODO
-	return NULL;
+int brk(void* addr) {
+	void* cbrk = sbrk(0);
+	void* nbrk = sbrk(addr - cbrk);
+	return nbrk == addr;
 }

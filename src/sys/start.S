@@ -4,6 +4,7 @@
 	.global _start
 
 _start:
+	call  _libc_init
 	call  main
 	movq  %rax,      %rdi
 	movq  $SYS_EXIT, %rax

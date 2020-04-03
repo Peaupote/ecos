@@ -60,6 +60,7 @@ typedef struct proc {
     priority_t       p_prio;     // priority of the process
     int              p_fds[NFD]; // table of file descriptors
     phy_addr         p_pml4;     // paging
+	uint_ptr         p_brk;      // program break
     struct reg       p_reg;      // saved registers
 } proc_t;
 
