@@ -86,6 +86,7 @@ static ssize_t parse_signedi(string_reader r, void* ri, size_t slim,
 	switch (ic) {
 		case '-':
 			neg = true;
+			// FALLTHRU
 		case '+':
 			if (!slim--) return 1;
 			ssize_t st = r.read(ri, &ic, 1);
@@ -107,6 +108,7 @@ static ssize_t parse_signedi(string_reader r, void* ri, size_t slim,
 			}
 			f = &oct_digit_of_char;
 			base = 8;
+			// FALLTHRU
 		default:
 			r.unget(ri);
 			++slim;
@@ -266,6 +268,7 @@ ssize_t fpscanf(string_reader r, void* ri, const char* fmt, va_list ps) {
 					break;
 				case 'p':
 					mod = 3;
+					// FALLTHRU
 				case 'x':
 					skip_space(r, ri);
 					rd_nb_st = parse_unsigned(r, ri, slim,
