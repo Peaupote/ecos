@@ -61,6 +61,10 @@ typedef struct proc {
     int              p_fds[NFD]; // table of file descriptors
     phy_addr         p_pml4;     // paging
     struct reg       p_reg;      // saved registers
+    char             p_cmd[256]; // cmd to exec the process
+
+    ino_t            p_cino;     // inode of current dir
+    dev_t            p_dev;      // device of current dir
 } proc_t;
 
 /**

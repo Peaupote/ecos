@@ -8,6 +8,7 @@
 
 #include <libc/sys.h>
 #include <libc/stdio.h>
+#include <libc/string.h>
 #include <util/elf64.h>
 #include <kernel/memory/kmem.h>
 #include <kernel/int.h>
@@ -60,6 +61,7 @@ void proc_start() {
     p_init->p_pml4 = (phy_addr)NULL;
     p_init->p_reg.rsp = (uint_ptr)NULL;
     p_init->p_reg.rip = (uint_ptr)&proc_init_entry;
+    strcpy(p_init->p_cmd, "init");
 
     // processus 2: stop, utilisé en cas de panic
     proc_t *p_stop = &state.st_proc[PID_STOP];
@@ -73,6 +75,7 @@ void proc_start() {
     p_stop->p_pml4 = (phy_addr)NULL;
     p_stop->p_reg.rsp = (uint_ptr)kernel_stack_top;
     p_stop->p_reg.rip = (uint_ptr)&proc_idle_entry;
+    strcpy(p_stop->p_cmd, "stop");
 
     // set unused file desc
     for (size_t i = 0; i < NFD; i++)
