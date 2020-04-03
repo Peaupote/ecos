@@ -218,7 +218,7 @@ size_t built_in_exec(size_t in_begin, size_t in_len) {
                         cmd_decomp + cmd_decomp_idx[2]);
         state.st_proc[pid].p_reg.rdi = val;
         sched_add_proc(pid);
-    } else if (!strncmp(cmd_name, "ls", 3)) ls();
+    } else if (!strcmp(cmd_name, "ls")) ls();
 
     return 0;
 }

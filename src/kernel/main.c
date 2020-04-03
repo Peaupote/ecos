@@ -22,13 +22,15 @@
 void kernel_init(uint32_t boot_info) {
     gdt_init();
     kmem_init_paging();
-    vga_init((uint16_t*)(low_addr + VGA_BUFFER));
     tty_init(ttym_def);
     kmem_init_alloc(boot_info);
     tss_init();
     idt_init();
+   
+	vga_init((uint16_t*)(low_addr + VGA_BUFFER));
 }
 
+__attribute__ ((noreturn))
 void kernel_main(uint32_t boot_info) {
     kernel_init(boot_info);
 
@@ -41,6 +43,4 @@ void kernel_main(uint32_t boot_info) {
     tty_new_prompt();
 
     proc_start();
-
-	never_reached
 }

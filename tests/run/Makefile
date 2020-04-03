@@ -6,6 +6,7 @@ include $(ROOT)/vars.Makefile
 unexport $(VARS_NAME)
 
 home: sys
+	rm   -rf home
 	mkdir -p home/test
 	mkdir -p home/bin
 	cp $(ROOT)/src/sys/init1.out home/bin/init1

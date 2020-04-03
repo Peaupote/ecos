@@ -1,6 +1,6 @@
 #include <libc/string.h>
 
-char *strcpy(char *pdst, const char *psrc) {
-    for (char *src = (char*)psrc, *dst = pdst; *src; *dst++ = *src++);
-    return pdst;
+char *strcpy(char *dst_bg, const char *src) {
+    for (char *dst = dst_bg; (*dst++ = *src); ++src);
+    return dst_bg;
 }

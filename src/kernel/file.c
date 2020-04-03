@@ -121,7 +121,7 @@ static ino_t vfs_lookup(struct mount_info *info, struct fs *fs,
 
     if (!full_name) return 0;
     start = (char*)(*full_name == '/' ? full_name + 1 : full_name);
-    end = index(start, '/');
+    end = strchrnul(start, '/');
 
     ino_t ino = info->root_ino;
 
@@ -134,7 +134,7 @@ static ino_t vfs_lookup(struct mount_info *info, struct fs *fs,
 
         if (!*end || !*(end+1)) break;
         start = end+1;
-        end = index(start, '/');
+        end = strchrnul(start, '/');
     }
 
     return fs->fs_stat(ino, st, info);

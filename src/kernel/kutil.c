@@ -47,8 +47,11 @@ void klogf(enum klog_level lvl, const char *hd, const char *msgf, ...) {
 
 pid_t    panic_cpid;
 uint_ptr panic_rsp;
+
+__attribute__((noreturn))
 extern void kpanic_do_stop(void);
 
+__attribute__((noreturn))
 void kpanic_stop() {
     tty_set_mode(ttym_panic);
     panic_cpid = state.st_curr_pid;

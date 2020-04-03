@@ -10,7 +10,7 @@
 #define STR_HELPER(x) #x
 #define STR(x) STR_HELPER(x)
 #define kAssert(P) kassert(P, __FILE__":"STR(__LINE__)" "#P)
-#define never_reached kassert(false, __FILE__":"STR(__LINE__)\
+#define never_reached kpanic(__FILE__":"STR(__LINE__)\
 									" never reached assert");
 
 int  wprintf(stringl_writer, void*, const char* fmt, va_list params);
@@ -24,8 +24,13 @@ enum klog_level {
 void klog (enum klog_level lvl, const char *head, const char *msg);
 void klogf(enum klog_level lvl, const char *head, const char *msgf, ...);
 
+__attribute__((noreturn))
 void kpanic(const char *msg);
+
+__attribute__((noreturn))
 void kpanicf(const char *msg, const char *fmt, ...);
+
+__attribute__((noreturn))
 void kpanic_ct(const char *msg);
 void kassert(uint8_t, const char *msg);
 
