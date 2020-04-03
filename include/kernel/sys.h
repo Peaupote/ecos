@@ -15,7 +15,10 @@ void     lookup_end_sleep(void);
 pid_t    sys_wait(int* status);
 pid_t    sys_waitpid(pid_t cpid, int* status);
 pid_t    sys_fork(void);
+
+__attribute__ ((noreturn))
 void     sys_exit(int status);
+
 pid_t    sys_getpid(void);
 pid_t    sys_getppid(void);
 

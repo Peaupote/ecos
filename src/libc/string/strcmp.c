@@ -1,15 +1,13 @@
 #include <libc/string.h>
 
 int strcmp(const char *lhs, const char *rhs){
-    while(*lhs && *rhs){
-        if ((unsigned char)*lhs < (unsigned char)*rhs)
-            return -1;
-        if ((unsigned char)*lhs > (unsigned char)*rhs)
-            return 1;
+	if (*lhs < *rhs) return -1;
+	if (*lhs > *rhs) return  1;
+    while(*lhs) {
         ++lhs;
         ++rhs;
+        if (*lhs < *rhs) return -1;
+        if (*lhs > *rhs) return  1;
     }
-    if(*rhs) return -1;
-    if(*lhs) return  1;
     return 0;
 }

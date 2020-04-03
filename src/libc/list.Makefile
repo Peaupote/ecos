@@ -9,8 +9,10 @@ LIBC_CFILES?=string/memcmp.c \
 	  string/strcmp.c \
 	  string/strncmp.c \
 	  string/index.c \
+	  string/strtok_r.c \
 	  string/strtok.c \
 	  string/strchr.c \
+	  string/strchrnul.c \
 	  stdio/printf.c \
 	  stdio/putchar.c \
 	  stdio/puts.c \
@@ -39,6 +41,9 @@ LIBK_CFILES?=string/memcmp.c \
 	  string/strcmp.c \
 	  string/strncmp.c \
 	  string/index.c \
+	  string/strchr.c \
+	  string/strchrnul.c \
+	  string/strtok_r.c \
 	  stdio/printf.c \
 	  stdio/scanf.c \
 	  ctype/ctype.c

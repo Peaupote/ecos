@@ -1,7 +1,7 @@
 #include <libc/string.h>
 
-void *memcpy(void *pdst, const void *psrc, size_t len) {
-    char *src = (char*)psrc, *dst = (char*)pdst;
-    for (;len > 0; len--) *dst++ = *src++;
-    return pdst;
+void *memcpy(void *dst_bg, const void *src_bg, size_t len) {
+    for(char *src = (char*)src_bg, *dst = (char*)dst_bg; len; --len)
+		*dst++ = *src++;
+    return dst_bg;
 }

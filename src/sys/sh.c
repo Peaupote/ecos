@@ -9,8 +9,8 @@ int main() {
     printf("ecos-shell version 0.1\n");
 
     int rc;
-    char *ptr, line[256];
-    char **aptr;
+    char *ptr, line[258];
+    const char **aptr;
     const char *args[256] = { 0 };
     const char *env[1] = { 0 };
 
@@ -21,14 +21,16 @@ int main() {
             exit(1);
         }
 
-        line[rc] = 0;
+		line[rc] = '\n';
+        line[rc + 1] = 0;
 
-        aptr = (char**)args;
+        aptr = args;
         memset(args, 0, 256);
-        for (ptr = strtok(line, " "); ptr; ptr = strtok(0, " ")) {
+        for (ptr = strtok(line, " \n"); ptr; ptr = strtok(NULL, " \n"))
             *aptr++ = ptr;
-        }
-        *aptr = 0;
+		if (aptr == args)
+			continue; // commande vide
+        *aptr = NULL;
 
         rc = fork();
         if (rc < 0) {

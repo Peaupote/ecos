@@ -161,7 +161,7 @@ void schedule_proc() {
     }
 
     // Le processus IDLE empêche que l'on arrive ici
-    never_reached
+	never_reached
 }
 
 pid_t schedule_proc_ev() {

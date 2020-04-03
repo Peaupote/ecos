@@ -151,7 +151,6 @@ void sys_exit(int status) {
         p->p_stat = ZOMB;// statut dans rdi
         schedule_proc();
     }
-    never_reached
 }
 
 pid_t sys_getpid() {

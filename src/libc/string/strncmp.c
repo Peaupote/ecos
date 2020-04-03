@@ -1,17 +1,15 @@
 #include <libc/string.h>
 
 int strncmp(const char *lhs, const char *rhs, size_t len) {
-    while(len-- && *lhs && *rhs){
-        if ((unsigned char)*lhs < (unsigned char)*rhs)
-            return -1;
-        if ((unsigned char)*lhs > (unsigned char)*rhs)
-            return 1;
+	if (!len) return 0;
+	if (*lhs < *rhs) return -1;
+	if (*lhs > *rhs) return  1;
+	if (!*lhs) return 0;
+    while(len-- && *lhs) {
         ++lhs;
         ++rhs;
+		if (*lhs < *rhs) return -1;
+		if (*lhs > *rhs) return  1;
     }
-	if (~len) {
-		if(*rhs) return -1;
-		if(*lhs) return  1;
-	}
-    return 0;
+	return 0;
 }

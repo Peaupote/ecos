@@ -1,3 +1,5 @@
+#define _GNU_SOURCE //strchrnull
+
 #include <util/test.h>
 
 #include <stdio.h>
@@ -17,8 +19,8 @@ void touch() {
         return;
     }
 
-    char *s = strtok(line, " \n");
-    if (!(s = strtok(0, " \n"))) {
+    char *s = strtok(NULL, " \n");
+    if (!s) {
         fprintf(stderr, "usage: touch file\n");
         return;
     }
@@ -27,7 +29,7 @@ void touch() {
 }
 
 void cd () {
-    char *s1 = strchr(line, ' ');
+    char *s1 = strchrnul(line, ' ');
     if (!s1) {
         printf("usage: cd dir\n");
         return;
@@ -44,23 +46,18 @@ void cd () {
 }
 
 void cmd_stat() {
-    char *s = strtok(line, " \n");
-
-    for (s = strtok(0, " \n"); s; s = strtok(0, " \n"))
+    for (char *s = strtok(NULL, " \r\n"); s; s = strtok(0, " \n"))
         print_stat(s);
 }
 
 void cmd_mkdir() {
-    char *s = strtok(line, " ");
-
-    for (s = strtok(0, " "); s; s = strtok(0, " "))
+    for (char *s = strtok(NULL, " \r\n"); s; s = strtok(0, " \r\n"))
         if (!do_mkdir(s))
             return;
 }
 
 void save() {
-    char *s = strtok(line, " \n");
-    s = strtok(0, " \n");
+    char *s = strtok(NULL, " \r\n");
     if (!s) {
         printf("usage: save name\n");
         return;
@@ -146,20 +143,20 @@ int main(int argc, char *argv[]) {
             rtst = 1;
             goto exit_main;
         }
-
-        if (!strncmp(line, "ls", 2)) {
+		char *cmd = strtok(line, " \r\n");
+		if (!cmd) continue;
+        if (!strcmp(cmd, "ls")) {
             if(ls()) {
                 rtst = 1;
                 goto exit_main;
             }
         }
-        else if (!strncmp(line, "cd", 2)) cd();
-        else if (!strncmp(line, "stat", 4)) cmd_stat();
-        else if (!strncmp(line, "mkdir", 5)) cmd_mkdir();
-        else if (!strncmp(line, "save", 4)) save();
-        else if (!strncmp(line, "dump", 4)) dump();
-        else if (!strncmp(line, "touch", 4)) touch();
-        else if (!strncmp(line, "\n", 1)) {}
+        else if (!strcmp(cmd, "cd"   )) cd();
+        else if (!strcmp(cmd, "stat" )) cmd_stat();
+        else if (!strcmp(cmd, "mkdir")) cmd_mkdir();
+        else if (!strcmp(cmd, "save" )) save();
+        else if (!strcmp(cmd, "dump" )) dump();
+        else if (!strcmp(cmd, "touch")) touch();
         else {
             printf("unkonwn command %s", line);
         }

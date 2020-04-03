@@ -118,13 +118,14 @@ struct reg *st_curr_reg;
  * create process IDLE and INIT
  * start INIT
  */
+__attribute__ ((noreturn))
 void proc_start(void);
 
 void  sched_add_proc(pid_t);
 // Le scheduler ne doit pas être vide
 pid_t sched_pop_proc();
 
-// Ne renvoie pas
+__attribute__ ((noreturn))
 void  schedule_proc();
 // Renvoi le nouveau processus
 pid_t schedule_proc_ev();
@@ -133,21 +134,28 @@ pid_t schedule_proc_ev();
 //  les objets doivent se trouver dans l'espace du kernel
 uint8_t proc_create_userspace(void* prg_elf, proc_t *proc);
 
-//! ne retournent pas à l'appelant
 // prennent en argument le sélecteur du CS destination
 // (étendu à 8 octets par des zéros)
 // le DS est CS + 8
+__attribute__ ((noreturn))
 extern void iret_to_userspace(uint64_t cs_ze);
+
+__attribute__ ((noreturn))
 extern void eoi_iret_to_userspace(uint64_t cs_ze);
+
 extern reg_t continue_syscall();
 
+__attribute__ ((noreturn))
 static inline void iret_to_proc(const proc_t* p) {
     iret_to_userspace(gdt_ring_lvl(p->p_ring));
 }
+
+__attribute__ ((noreturn))
 static inline void eoi_iret_to_proc(const proc_t* p) {
     eoi_iret_to_userspace(gdt_ring_lvl(p->p_ring));
 }
 
+__attribute__ ((noreturn))
 static inline void run_proc(proc_t* p) {
     if (p->p_stat == RUN) iret_to_proc(p);
     else { //blocked
@@ -155,8 +163,8 @@ static inline void run_proc(proc_t* p) {
         p->p_reg.rax = continue_syscall();
         iret_to_proc(p);
     }
-    never_reached
 }
+__attribute__ ((noreturn))
 static inline void eoi_run_proc(proc_t* p) {
     if (p->p_stat == RUN) eoi_iret_to_proc(p);
     else { //blocked
@@ -165,7 +173,6 @@ static inline void eoi_run_proc(proc_t* p) {
         p->p_reg.rax = continue_syscall();
         iret_to_proc(p);
     }
-    never_reached
 }
 
 proc_t *switch_proc(pid_t pid);
