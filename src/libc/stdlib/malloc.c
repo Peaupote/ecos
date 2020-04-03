@@ -30,8 +30,8 @@
 
 typedef struct free_bloc free_bloc_t;
 struct free_bloc {
-	// jamais nuls (liste circulaire)
-	free_bloc_t *prev, *next;
+    // jamais nuls (liste circulaire)
+    free_bloc_t *prev, *next;
 };
 
 // fin du dernier bloc, qui est nécessairement alloué
@@ -39,120 +39,120 @@ uint_ptr    up_lim;
 free_bloc_t root;
 
 void malloc_init() {
-	up_lim    = (uint_ptr) sbrk(0);
-	if (up_lim % MALLOC_ALIGN != 0) {
-		uint_ptr  add = MALLOC_ALIGN - (up_lim % MALLOC_ALIGN);
-		up_lim += add;
-		sbrk((intptr_t)add);
-	}
-	root.next = root.prev = &root;
+    up_lim    = (uint_ptr) sbrk(0);
+    if (up_lim % MALLOC_ALIGN != 0) {
+        uint_ptr  add = MALLOC_ALIGN - (up_lim % MALLOC_ALIGN);
+        up_lim += add;
+        sbrk((intptr_t)add);
+    }
+    root.next = root.prev = &root;
 }
 
 static inline uint32_t* bloc_head(void* bloc) {
-	return ((uint32_t*)bloc) - 1;
+    return ((uint32_t*)bloc) - 1;
 }
 
 static inline void llist_replace(free_bloc_t* old, free_bloc_t* new) {
-	new->next       = old->next;
-	old->next->prev = new;
-	new->prev       = old->prev;
-	old->prev->next = new;
+    new->next       = old->next;
+    old->next->prev = new;
+    new->prev       = old->prev;
+    old->prev->next = new;
 }
 static inline void llist_rem(struct free_bloc* b) {
-	b->next->prev = b->prev;
-	b->prev->next = b->next;
+    b->next->prev = b->prev;
+    b->prev->next = b->next;
 }
 static inline void llist_insert_after(struct free_bloc* ref,
-		struct free_bloc* b) {
-	ref->next->prev = b;
-	b->next   = ref->next;
-	ref->next = b;
-	b->prev   = ref;
+        struct free_bloc* b) {
+    ref->next->prev = b;
+    b->next   = ref->next;
+    ref->next = b;
+    b->prev   = ref;
 }
 static inline void llist_insert_before(struct free_bloc* ref,
-		struct free_bloc* b) {
-	ref->prev->next = b;
-	b->prev   = ref->prev;
-	ref->prev = b;
-	b->next   = ref;
+        struct free_bloc* b) {
+    ref->prev->next = b;
+    b->prev   = ref->prev;
+    ref->prev = b;
+    b->next   = ref;
 }
 
 void* TEST_U(malloc)(size_t dsize) {
-	size_t size = MALLOC_MIN_DSZ + MALLOC_HD_SZ;
-	if (dsize > MALLOC_MIN_DSZ)
-		size = align_to_size(dsize + MALLOC_HD_SZ, MALLOC_ALIGN);
+    size_t size = MALLOC_MIN_DSZ + MALLOC_HD_SZ;
+    if (dsize > MALLOC_MIN_DSZ)
+        size = align_to_size(dsize + MALLOC_HD_SZ, MALLOC_ALIGN);
 
-	for (free_bloc_t* it = root.next; it != &root; it = it->next) {
-		uint32_t* hd = bloc_head(it);
-		if (*hd >= size) {
-			uint32_t bsz = MBLOC_SIZE_MASK & *hd;
-			
-			if (bsz >= size + MALLOC_MIN_DSZ + MALLOC_HD_SZ) {
-				// On fragmente le bloc
-				free_bloc_t* rem = (free_bloc_t*) (size + (uint_ptr)it);
-				uint32_t rsz       = bsz - size;
-				
-				*bloc_head(rem) = *(uint32_t*)(bsz + (uint_ptr)hd)
-				                   = rsz | MBLOC_FREE;
-			
-				llist_replace(it, rem);
-				*hd = size | (MBLOC_PREV_FREE & *hd);
-			} else {
-				uint_ptr nx_hd = ((uint_ptr)it) + bsz - MALLOC_HD_SZ;
-				if (nx_hd < up_lim)
-					*((uint32_t*)nx_hd) &= ~(uint32_t)MBLOC_PREV_FREE;
+    for (free_bloc_t* it = root.next; it != &root; it = it->next) {
+        uint32_t* hd = bloc_head(it);
+        if (*hd >= size) {
+            uint32_t bsz = MBLOC_SIZE_MASK & *hd;
 
-				llist_rem(it);
+            if (bsz >= size + MALLOC_MIN_DSZ + MALLOC_HD_SZ) {
+                // On fragmente le bloc
+                free_bloc_t* rem = (free_bloc_t*) (size + (uint_ptr)it);
+                uint32_t rsz       = bsz - size;
 
-				*hd &= ~(uint32_t)MBLOC_FREE;
-			}
-		}
-		return it;
-	}
+                *bloc_head(rem) = *(uint32_t*)(bsz + (uint_ptr)hd)
+                                   = rsz | MBLOC_FREE;
 
-	void *rt_hd       = sbrk((intptr_t)size);
-	*(uint32_t*)rt_hd = size;
-	up_lim            = (uint_ptr)rt_hd + size;
-	return (void*)(MALLOC_HD_SZ + (uint_ptr)rt_hd);
+                llist_replace(it, rem);
+                *hd = size | (MBLOC_PREV_FREE & *hd);
+            } else {
+                uint_ptr nx_hd = ((uint_ptr)it) + bsz - MALLOC_HD_SZ;
+                if (nx_hd < up_lim)
+                    *((uint32_t*)nx_hd) &= ~(uint32_t)MBLOC_PREV_FREE;
+
+                llist_rem(it);
+
+                *hd &= ~(uint32_t)MBLOC_FREE;
+            }
+        }
+        return it;
+    }
+
+    void *rt_hd       = sbrk((intptr_t)size);
+    *(uint32_t*)rt_hd = size;
+    up_lim            = (uint_ptr)rt_hd + size;
+    return (void*)(MALLOC_HD_SZ + (uint_ptr)rt_hd);
 }
 
 void TEST_U(free)(void* ptr) {
-	free_bloc_t*      b = (free_bloc_t*) ptr;
-	uint32_t        bsz = MBLOC_SIZE_MASK & *bloc_head(b);
-	free_bloc_t* insert = &root;
-	free_bloc_t* rem_b  = NULL;
+    free_bloc_t*      b = (free_bloc_t*) ptr;
+    uint32_t        bsz = MBLOC_SIZE_MASK & *bloc_head(b);
+    free_bloc_t* insert = &root;
+    free_bloc_t* rem_b  = NULL;
 
-	uint_ptr nx_hd = ((uint_ptr)b) + bsz - MALLOC_HD_SZ;
-	if (nx_hd < up_lim && (MBLOC_FREE & *((uint32_t*)nx_hd))) {
-		free_bloc_t* nb = (free_bloc_t*)(bsz + (uint_ptr)b);
-		rem_b   = nb;
-		insert  = nb->prev;
-		llist_rem(nb);
-		bsz    += MBLOC_SIZE_MASK & *(uint32_t*)nx_hd;
-	}
+    uint_ptr nx_hd = ((uint_ptr)b) + bsz - MALLOC_HD_SZ;
+    if (nx_hd < up_lim && (MBLOC_FREE & *((uint32_t*)nx_hd))) {
+        free_bloc_t* nb = (free_bloc_t*)(bsz + (uint_ptr)b);
+        rem_b   = nb;
+        insert  = nb->prev;
+        llist_rem(nb);
+        bsz    += MBLOC_SIZE_MASK & *(uint32_t*)nx_hd;
+    }
 
-	if (MBLOC_PREV_FREE & *bloc_head(b)) {
-		uint32_t  pb_hd = *(bloc_head(b) - 1);
-		free_bloc_t* pb = (free_bloc_t*)
-			( ((uint_ptr)b) - (MBLOC_SIZE_MASK & pb_hd) );
-		if (pb->prev != rem_b)
-			insert = pb->prev;
-		llist_rem(pb);
-		b    = pb;
-		bsz += MBLOC_SIZE_MASK & pb_hd;
-	}
+    if (MBLOC_PREV_FREE & *bloc_head(b)) {
+        uint32_t  pb_hd = *(bloc_head(b) - 1);
+        free_bloc_t* pb = (free_bloc_t*)
+            ( ((uint_ptr)b) - (MBLOC_SIZE_MASK & pb_hd) );
+        if (pb->prev != rem_b)
+            insert = pb->prev;
+        llist_rem(pb);
+        b    = pb;
+        bsz += MBLOC_SIZE_MASK & pb_hd;
+    }
 
-	if ((bsz +  (uint_ptr)b) >= up_lim) {
-		sbrk(-(intptr_t)bsz);
-		up_lim -= bsz;
-	} else {
-		uint32_t* nhd = (uint32_t*)(bsz + (uint_ptr)bloc_head(b));
-		*bloc_head(b) = *(nhd - 1) = bsz | MBLOC_FREE;
-		*nhd         |= MBLOC_PREV_FREE;
-		
-		if (b > insert)
-			llist_insert_after(insert, b);
-		else
-			llist_insert_before(insert, b);
-	}
+    if ((bsz +  (uint_ptr)b) >= up_lim) {
+        sbrk(-(intptr_t)bsz);
+        up_lim -= bsz;
+    } else {
+        uint32_t* nhd = (uint32_t*)(bsz + (uint_ptr)bloc_head(b));
+        *bloc_head(b) = *(nhd - 1) = bsz | MBLOC_FREE;
+        *nhd         |= MBLOC_PREV_FREE;
+
+        if (b > insert)
+            llist_insert_after(insert, b);
+        else
+            llist_insert_before(insert, b);
+    }
 }

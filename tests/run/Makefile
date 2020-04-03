@@ -12,6 +12,9 @@ home: sys
 	cp $(ROOT)/src/sys/sh.out    home/bin/sh
 	cp $(ROOT)/src/sys/cat.out   home/bin/cat
 	cp $(ROOT)/src/sys/echo.out  home/bin/echo
+	cp $(ROOT)/src/sys/stat.out  home/bin/stat
+	cp $(ROOT)/src/sys/ls.out    home/bin/ls
+	cp $(ROOT)/src/sys/ps.out    home/bin/ps
 
 home.img: home
 	$(ROOT)/tools/build-ext2.sh home home.img

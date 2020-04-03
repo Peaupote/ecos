@@ -1,7 +1,7 @@
 #ifndef _HD_SYS_H
 #define _HD_SYS_H
 
-#define NSYSCALL 16
+#define NSYSCALL 18
 
 #define SYS_SLEEP    0
 #define SYS_FORK     1
@@ -18,9 +18,10 @@
 #define SYS_READ    12
 #define SYS_LSEEK   13
 #define SYS_EXECVE  14
-#define SYS_SETPRIO 15
-#define SYS_GETPRIO 15
-#define SYS_DEBUG_BLOCK 16
+#define SYS_FSTAT   15
+#define SYS_SETPRIO 16
+#define SYS_GETPRIO 16
+#define SYS_DEBUG_BLOCK 17
 
 #define SYS_R1_PRIRES    0
 

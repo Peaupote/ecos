@@ -13,15 +13,6 @@ typedef struct vfile {
     pid_t       vf_waiting; // pid of a pid waiting to read something
 } vfile_t;
 
-#define DIRENT_OFF 8
-struct dirent {
-    ino_t    d_ino;
-    uint16_t d_rec_len;
-    uint8_t  d_name_len;
-    uint8_t  d_file_type;
-    char     d_name[]; // at most 255 bytes len
-};
-
 // File system table
 #define NFST 3
 #define DUMMY_FS 0
@@ -91,8 +82,8 @@ struct fs {
     fs_destroy_dirent_t *fs_destroy_dirent;
 } fst [NFST];
 
-void  vfs_init();
-int vfs_mount(const char *path, uint8_t fs, void *partition);
+void vfs_init();
+int  vfs_mount(const char *path, uint8_t fs, void *partition);
 
 vfile_t *vfs_pipe();
 vfile_t *vfs_load(const char *path);
@@ -103,8 +94,8 @@ int      vfs_write(vfile_t *vfile, void *buf, off_t pos, size_t len);
 vfile_t *vfs_touch(const char *parent, const char *fname, mode_t perm);
 vfile_t *vfs_mkdir(const char *parent, const char *fname, mode_t perm);
 
-vfile_t *vfs_opendir(vfile_t *vf, struct dirent **dir);
-struct dirent *vfs_readdir(struct dirent *dir, vfile_t *vfile);
+struct dirent *vfs_opendir(vfile_t *vf, struct dirent **dir);
+struct dirent *vfs_readdir(vfile_t *vfile, struct dirent *dir);
 
 ino_t vfs_rmdir(const char *fname, uint32_t rec);
 

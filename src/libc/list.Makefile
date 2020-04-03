@@ -14,11 +14,15 @@ LIBC_CFILES?=string/memcmp.c \
 	  stdio/printf.c \
 	  stdio/putchar.c \
 	  stdio/puts.c \
+	  stdlib/atoi.c \
 	  stdlib/malloc.c \
 	  unistd/brk.c \
 	  stdio/scanf.c \
 	  ctype/ctype.c \
-      sys/ressource.c
+	  sys/ressource.c \
+	  sys/stat.c \
+	  dirent/opendir.c \
+	  dirent/readdir.c
 LIBC_DEP=$(foreach file,$(LIBC_CFILES),\
 			"-MT $(file:.c=.$(NAME_LC).o) $(file)")
 LIBC_OBJ=$(LIBC_CFILES:%.c=%.$(NAME_LC).o)\

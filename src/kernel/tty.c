@@ -534,6 +534,11 @@ loop_enter:
                     sbuffer[ln_index][x] = vga_entry(' ', back_color);
                 c = *(++str);
                 break;
+            } else if (c == '\t') {
+                for(size_t i = 0; i < 4 && x < VGA_WIDTH; ++x, ++i)
+                    sbuffer[ln_index][x] = vga_entry(' ', back_color);
+                c = *(++str);
+                break;
             }
             sbuffer[ln_index][x] = vga_entry(c, back_color);
         }
