@@ -46,7 +46,7 @@ void proc_start() {
     p_idle->p_ring = 0;
     p_idle->p_prio = 0; //priorité minimale
     p_idle->p_pml4 = (phy_addr)NULL;
-	p_idle->p_brk  = 0;
+    p_idle->p_brk  = 0;
     p_idle->p_reg.rsp = (uint_ptr)kernel_stack_top;
     p_idle->p_reg.rip = (uint_ptr)&proc_idle_entry;
 
@@ -60,7 +60,7 @@ void proc_start() {
     p_init->p_ring = 1;
     p_init->p_prio = NB_PRIORITY_LVL - 2; //priorité maximale
     p_init->p_pml4 = (phy_addr)NULL;
-	p_init->p_brk  = 0x1000;
+    p_init->p_brk  = 0x1000;
     p_init->p_reg.rsp = (uint_ptr)NULL;
     p_init->p_reg.rip = (uint_ptr)&proc_init_entry;
     strcpy(p_init->p_cmd, "init");
@@ -75,7 +75,7 @@ void proc_start() {
     p_stop->p_ring = 0;
     p_stop->p_prio = NB_PRIORITY_LVL - 1;
     p_stop->p_pml4 = (phy_addr)NULL;
-	p_stop->p_brk  = 0;
+    p_stop->p_brk  = 0;
     p_stop->p_reg.rsp = (uint_ptr)kernel_stack_top;
     p_stop->p_reg.rip = (uint_ptr)&proc_idle_entry;
     strcpy(p_stop->p_cmd, "stop");
@@ -107,6 +107,7 @@ void proc_start() {
     st_curr_reg       = &p_init->p_reg;
 
     proc_create(1);
+    proc_create(2);
     proc_alloc_std_streams(1);
 
     klogf(Log_info, "init", "Start process init @ %p", p_init->p_reg.rip);
@@ -164,7 +165,7 @@ void schedule_proc() {
     }
 
     // Le processus IDLE empêche que l'on arrive ici
-	never_reached
+    never_reached
 }
 
 pid_t schedule_proc_ev() {

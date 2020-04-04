@@ -20,7 +20,6 @@ int main () {
         if (!strcmp(buf, ".") || !strcmp(buf, "..")) continue;
 
         pid = atoi(buf);
-
         sprintf(buf, "/proc/%d/stat", pid);
         int fd = open(buf, READ);
 

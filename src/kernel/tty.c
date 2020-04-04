@@ -146,18 +146,6 @@ uint8_t do_kprint = 0;
 
 extern uint8_t t0_data[];
 
-static struct device *dev;
-int print_dir(struct dirent *dir) {
-    struct stat st;
-    fst[dev->dev_fs].fs_stat(dir->d_ino, &st, &dev->dev_info);
-
-    kprintf("(%d) %d    ", dir->d_ino, st.st_nlink);
-    for (size_t i = 0; i < dir->d_name_len; i++)
-        kprintf("%c", dir->d_name[i]);
-    kprintf("\n");
-    return 0;
-}
-
 #include <fs/proc.h>
 void ls () {
     struct dirent *dir;
@@ -167,15 +155,46 @@ void ls () {
         return;
     }
 
-    if (!vfs_opendir(vf, &dir)) return;
-    dev = devices + vf->vf_stat.st_dev;
+    if (!vfs_opendir(vf, &dir)) {
+        vfs_close(vf);
+        return;
+    }
+
+    struct device *dev = devices + vf->vf_stat.st_dev;
     struct fs *fs = fst + dev->dev_fs;
+    struct stat st;
 
     for (size_t size = 0; size < vf->vf_stat.st_size;
-         size += dir->d_rec_len, dir = fs->fs_readdir(dir))
-        print_dir(dir);
+         size += dir->d_rec_len, dir = fs->fs_readdir(dir)) {
+        fs->fs_stat(dir->d_ino, &st, &dev->dev_info);
+        kprintf("(%d) %d    ", dir->d_ino, st.st_nlink);
+        for (size_t i = 0; i < dir->d_name_len; i++)
+            kprintf("%c", dir->d_name[i]);
+        kprintf("\n");
+
+    }
 
     vfs_close(vf);
+}
+
+void inspect_vfiles() {
+    for (size_t i = 0; i < NFILE; i++) {
+        vfile_t *vf = state.st_files + i;
+        if (vf->vf_cnt > 0)
+            kprintf("file %d : ino %d (device %d), cnt %d\n",
+                    i, vf->vf_stat.st_ino, vf->vf_stat.st_dev, vf->vf_cnt);
+    }
+}
+
+void inspect_channs() {
+    for (size_t i = 0; i < NCHAN; i++) {
+        chann_t *c = state.st_chann + i;
+        if (c->chann_acc > 0) {
+            kprintf("cid %d : mode %d, acc %d\n",
+                    i, c->chann_mode, c->chann_acc);
+        }
+    }
+
 }
 
 uint_ptr read_ptr(const char str[]) {
@@ -219,6 +238,8 @@ size_t built_in_exec(size_t in_begin, size_t in_len) {
         state.st_proc[pid].p_reg.rdi = val;
         sched_add_proc(pid);
     } else if (!strcmp(cmd_name, "ls")) ls();
+    else if (!strcmp(cmd_name, "vfiles")) inspect_vfiles();
+    else if (!strcmp(cmd_name, "channs")) inspect_channs();
 
     return 0;
 }

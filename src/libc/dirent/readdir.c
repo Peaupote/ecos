@@ -4,29 +4,30 @@
 #include <libc/stdlib.h>
 #include <libc/unistd.h>
 #include <libc/stdio.h>
+#include <libc/string.h>
 
 struct dirent *readdir(struct dirp *dirp) {
     if (!dirp) return 0;
+
+    // size might change between readdirs
     if (dirp->pos == dirp->size) return 0;
 
     struct dirent *dir;
 
-    // problem if dir entry is cut in middle of buf
-    if (dirp->off == DIRP_BUF_SIZE) {
-        if(read(dirp->fd, dirp->buf, DIRP_BUF_SIZE) < 0) {
-            // TODO
-            exit(42);
-        }
+    dir       = dirp->dir_entry;
+    dirp->off += dir->d_rec_len; // TODO problem here
+    dirp->pos += dir->d_rec_len;
 
+    if (dirp->off > DIRP_BUF_SIZE) {
+        lseek(dirp->fd, dirp->pos);
+        if (read(dirp->fd, dirp->buf, DIRP_BUF_SIZE) < 0) goto error;
         dirp->dir_entry = (struct dirent*)dirp->buf;
+    } else {
+        dirp->dir_entry = (struct dirent*)((char*)dir + dirp->dir_entry->d_rec_len);
     }
 
-    dir = dirp->dir_entry;
-    dirp->off += dirp->dir_entry->d_rec_len; // TODO problem here
-    dirp->pos += dirp->dir_entry->d_rec_len;
-
-    dirp->dir_entry = (struct dirent*)((char*)dirp->dir_entry
-                                      + dirp->dir_entry->d_rec_len);
-
     return dir;
+
+error:
+    return 0;
 }

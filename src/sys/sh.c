@@ -21,16 +21,22 @@ int main() {
             exit(1);
         }
 
-		line[rc] = '\n';
+        line[rc] = '\n';
         line[rc + 1] = 0;
 
         aptr = args;
         memset(args, 0, 256);
         for (ptr = strtok(line, " \n"); ptr; ptr = strtok(NULL, " \n"))
             *aptr++ = ptr;
-		if (aptr == args)
-			continue; // commande vide
+        if (aptr == args)
+            continue; // commande vide
         *aptr = NULL;
+
+        if (!strcmp(args[0], "exit")) {
+            int code = 0;
+            if (args[1]) code = atoi(args[1]);
+            exit(code);
+        }
 
         rc = fork();
         if (rc < 0) {

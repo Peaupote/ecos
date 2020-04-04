@@ -7,6 +7,7 @@ export LIBC_CFILES=\
 	string/strlen.c \
 	string/memcmp.c \
 	string/strncmp.c \
+	string/strcmp.c \
 	stdio/scanf.c \
 	ctype/ctype.c
 export LIBK_AS_FILES=

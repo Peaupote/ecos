@@ -129,8 +129,9 @@ static ino_t vfs_lookup(struct mount_info *info, struct fs *fs,
         memcpy(name, start, end - start);
         name[end - start] = 0;
 
-        if (!(ino = fs->fs_lookup(name, ino, info)))
+        if (!(ino = fs->fs_lookup(name, ino, info))) {
             return 0;
+        }
 
         if (!*end || !*(end+1)) break;
         start = end+1;
@@ -165,8 +166,9 @@ vfile_t *vfs_load(const char *filename) {
         if (state.st_files[i].vf_cnt) {
             if (state.st_files[i].vf_stat.st_ino == st.st_ino &&
                 state.st_files[i].vf_stat.st_dev == dev->dev_id) {
-                klogf(Log_info, "vfs", "file %s is already open", fname);
                 state.st_files[i].vf_cnt++;
+                klogf(Log_info, "vfs", "file %s is open %d times",
+                      fname, state.st_files[i].vf_cnt);
                 return state.st_files + i;
             }
 
@@ -192,7 +194,7 @@ int vfs_read(vfile_t *vfile, void *buf, off_t pos, size_t len) {
     struct device *dev = devices + vfile->vf_stat.st_dev;
     struct fs *fs = fst + dev->dev_fs;
 
-    klogf(Log_info, "vfs", "read %d (dev %d)",
+    klogf(Log_verb, "vfs", "read %d (dev %d)",
           vfile->vf_stat.st_ino, vfile->vf_stat.st_dev);
 
     int rc = fs->fs_read(vfile->vf_stat.st_ino, buf, pos, len, &dev->dev_info);
@@ -238,6 +240,7 @@ int vfs_close(vfile_t *vf) {
         klogf(Log_info, "vfs", "close file %d (device %d)",
               vf->vf_stat.st_ino, vf->vf_stat.st_dev);
         --vf->vf_cnt;
+        klogf(Log_info, "vfs", "still open %d times", vf->vf_cnt);
     }
     return 0;
 }
@@ -347,9 +350,10 @@ ino_t vfs_rmdir(const char *fname, uint32_t rec) {
     dir = fs->fs_opendir(root, &dev->dev_info);
     for (size_t size = 0; size < vf->vf_stat.st_size;
          size += dir->d_rec_len, dir = fs->fs_readdir(dir)) {
-        if (!strcmp(dir->d_name, ".."))
+        if (dir->d_name_len == 2 && !strncmp(dir->d_name, "..", 2))
             parent = dir->d_ino;
-        else if (dir->d_ino && strcmp(dir->d_name, "."))
+        else if (dir->d_ino &&
+                 !(dir->d_name_len == 1 && dir->d_name[0] == '.'))
             is_empty = 0;
     }
 
@@ -376,7 +380,8 @@ ino_t vfs_rmdir(const char *fname, uint32_t rec) {
             dir = fs->fs_opendir(ino, &dev->dev_info);
             for (size = 0; size < st.st_size;
                  size += dir->d_rec_len, dir = fs->fs_readdir(dir)) {
-                if (dir->d_ino != ino && strcmp(dir->d_name, "..")) {
+                if (dir->d_ino != ino &&
+                    !(dir->d_name_len == 2 && !strncmp("..", dir->d_name, 2))) {
                     PUSH(dir->d_ino);
                 }
                 fs->fs_rm(dir->d_ino, &dev->dev_info);

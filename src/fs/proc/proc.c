@@ -6,22 +6,13 @@
 
 #include "special.h"
 
-static uint32_t proc_free_block() {
-    size_t b;
-    for (b = 0; b < PROC_NBLOCKS; b++) {
-        if (!(proc_block_bitmap[b >> 3] & (1 << (b&7)))) break;
-    }
-    return b;
-}
-
 static inline void
 proc_fill_dirent(struct dirent *dir, uint32_t ino, const char *fname) {
     dir->d_ino       = ino;
     dir->d_file_type = proc_inodes[ino].st.st_mode;
     dir->d_name_len  = strlen(fname);
-    dir->d_rec_len   = DIRENT_OFF + dir->d_name_len + 1;
+    dir->d_rec_len   = DIRENT_OFF + dir->d_name_len;
     memcpy(dir->d_name, fname, dir->d_name_len);
-    dir->d_name[dir->d_name_len] = 0;
 }
 
 static inline uint32_t
@@ -41,7 +32,10 @@ proc_add_dirent(struct proc_inode *p, int32_t ino, const char *fname) {
 static uint32_t proc_init_dir(uint32_t ino, uint32_t parent, uint16_t type) {
     struct proc_inode *inode = proc_inodes + ino;
     uint32_t b = proc_free_block();
-    if (b == PROC_NBLOCK) return 0;
+    if (b == PROC_NBLOCKS) {
+        klogf(Log_error, "procfs", "no free blocks");
+        return 0;
+    }
 
     inode->in_block[0] = (uint64_t)(proc_blocks + b);
     inode->st.st_size  = 0;
@@ -107,8 +101,10 @@ uint32_t proc_lookup(const char *fname, ino_t parent,
 
     start:
         if (!dir->d_ino) break;
-        if (!strncmp(fname, dir->d_name, 255))
+        if (!strncmp(fname, dir->d_name, dir->d_name_len) &&
+            !fname[dir->d_name_len]) {
             break;
+        }
 
         len += dir->d_rec_len;
         len_in_block += dir->d_rec_len;
@@ -258,8 +254,17 @@ uint32_t proc_mkdir(ino_t parent, const char *fname, uint16_t type,
         return 0;
     }
 
-    if (!proc_init_dir(ino, parent, type)) return 0;
-    if (!proc_add_dirent(p, ino, fname)) return 0;
+    if (!proc_init_dir(ino, parent, type)) {
+        klogf(Log_error, "procfs", "failed to init dir %d in parent %d",
+              ino, parent);
+        return 0;
+    }
+
+    if (!proc_add_dirent(p, ino, fname)) {
+        klogf(Log_error, "procfs", "failed to add dirent %d in parent %d",
+              ino, parent);
+        return 0;
+    }
 
     klogf(Log_verb, "procfs", "mkdir %s inode %d", fname, ino);
 
@@ -282,7 +287,10 @@ uint32_t proc_create(pid_t pid) {
     sprintf(buf, "%d", pid);
     ino = proc_mkdir(PROC_ROOT_INO, buf,
                      TYPE_DIR|0600, &dev->dev_info);
-    if (!ino) return 0;
+    if (!ino) {
+        klogf(Log_error, "procfs", "failed to mkdir /proc/%d", pid);
+        return 0;
+    }
 
     struct proc_inode *proc = proc_inodes + ino;
     struct dirent *dir = proc_opendir(ino, &dev->dev_info);
@@ -326,7 +334,6 @@ uint32_t proc_create(pid_t pid) {
         fd->st.st_size += dir->d_rec_len;
 
         proc_inodes[c->chann_vfile->vf_stat.st_ino].st.st_nlink++;
-
         dir = proc_readdir(dir);
 
         // TODO problem if not same fs

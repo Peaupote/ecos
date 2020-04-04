@@ -14,13 +14,18 @@ int list_files(const char *fname) {
     struct dirent *dir;
     struct stat st;
     char buf[256], buf2[1024];
+    int rc = 0;
 
     while ((dir = readdir(dirp))) {
         memcpy(buf, dir->d_name, dir->d_name_len);
         buf[dir->d_name_len] = 0;
 
         sprintf(buf2, "%s/%s", fname, buf);
-        stat(buf2, &st);
+        rc = stat(buf2, &st);
+        if (rc < 0) {
+            printf("error on stat %s\n", buf2);
+            break;
+        }
 
         if (flag_inode) {
             printf("%d ", st.st_ino);
@@ -34,7 +39,7 @@ int list_files(const char *fname) {
     }
 
     closedir(dirp);
-    return 0;
+    return rc;
 }
 
 void read_flags(const char *flags) {
