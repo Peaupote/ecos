@@ -312,7 +312,10 @@ uint32_t proc_create(pid_t pid) {
     proc_fill_dirent(dir, 0, "");
 
     rc = proc_mkdir(ino, "fd", TYPE_DIR|0600, &dev->dev_info);
-    if (!rc) return 0;
+    if (!rc) {
+        klogf(Log_error, "procfs", "failed to create /proc/%d/fd", pid);
+        return 0;
+    }
 
     proc_t *p = state.st_proc + pid;
     dir = proc_opendir(rc, &dev->dev_info);
@@ -424,7 +427,7 @@ uint32_t proc_alloc_std_streams(pid_t pid) {
 ino_t proc_destroy_dirent(ino_t p, ino_t ino, struct mount_info *info) {
     struct proc_inode *parent = proc_inodes + p;
     struct dirent *ndir, *dir;
-    size_t size;
+    size_t size, rec_len;
 
     dir = (struct dirent*)parent->in_block[0];
 
@@ -433,17 +436,21 @@ ino_t proc_destroy_dirent(ino_t p, ino_t ino, struct mount_info *info) {
         if (dir->d_ino == ino) break;
     }
 
-    if (size == parent->st.st_size) return 0;
+    if (size == parent->st.st_size) {
+        kAssert(false);
+        return 0;}
 
-    if (size + dir->d_rec_len == parent->st.st_size) goto ret;
+    rec_len = dir->d_rec_len;
+
+    if (size + rec_len == parent->st.st_size) goto ret;
 
     ndir = proc_readdir(dir);
-    memmove(dir, ndir, parent->st.st_size - size - dir->d_rec_len);
+    memmove(dir, ndir, parent->st.st_size - size - rec_len);
 
 ret:
     // TODO if not in this device
     proc_rm(ino, info);
-    parent->st.st_size -= dir->d_rec_len;
+    parent->st.st_size -= rec_len;
     return ino;
 }
 

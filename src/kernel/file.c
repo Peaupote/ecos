@@ -21,7 +21,7 @@ void vfs_init() {
 
     for (size_t i = 0; i < NFILE; i++) {
         state.st_files[i].vf_cnt = 0;
-        state.st_files[i].vf_waiting = 0;
+        state.st_files[i].vf_waiting = -1;
     }
 
     klogf(Log_info, "vfs", "setup proc file system");
@@ -161,12 +161,14 @@ vfile_t *vfs_load(const char *filename) {
         return 0;
     }
 
+    vfile_t *v;
     size_t free = NFILE;
     for (size_t i = 0; i < NFILE; i++) {
-        if (state.st_files[i].vf_cnt) {
-            if (state.st_files[i].vf_stat.st_ino == st.st_ino &&
-                state.st_files[i].vf_stat.st_dev == dev->dev_id) {
-                state.st_files[i].vf_cnt++;
+        v = state.st_files + i;
+        if (v->vf_cnt) {
+            if (v->vf_stat.st_ino == st.st_ino &&
+                v->vf_stat.st_dev == dev->dev_id) {
+                v->vf_cnt++;
                 klogf(Log_info, "vfs", "file %s is open %d times",
                       fname, state.st_files[i].vf_cnt);
                 return state.st_files + i;
@@ -191,7 +193,8 @@ vfile_t *vfs_load(const char *filename) {
 }
 
 int vfs_read(vfile_t *vfile, void *buf, off_t pos, size_t len) {
-    struct device *dev = devices + vfile->vf_stat.st_dev;
+    dev_t dev_id = vfile->vf_stat.st_dev;
+    struct device *dev = devices + dev_id;
     struct fs *fs = fst + dev->dev_fs;
 
     klogf(Log_verb, "vfs", "read %d (dev %d)",
@@ -199,25 +202,38 @@ int vfs_read(vfile_t *vfile, void *buf, off_t pos, size_t len) {
 
     int rc = fs->fs_read(vfile->vf_stat.st_ino, buf, pos, len, &dev->dev_info);
     fs->fs_stat(vfile->vf_stat.st_ino, &vfile->vf_stat, &dev->dev_info);
+    vfile->vf_stat.st_dev = dev_id;
     return rc;
 }
 
 int vfs_write(vfile_t *vfile, void *buf, off_t pos, size_t len) {
-    struct device *dev = devices + vfile->vf_stat.st_dev;
+    dev_t dev_id = vfile->vf_stat.st_dev;
+    struct device *dev = devices + dev_id;
     struct fs *fs = fst + dev->dev_fs;
 
     int rc = fs->fs_write(vfile->vf_stat.st_ino, buf, pos, len, &dev->dev_info);
     fs->fs_stat(vfile->vf_stat.st_ino, &vfile->vf_stat, &dev->dev_info);
+    vfile->vf_stat.st_dev = dev_id;
 
     // TODO : what happend for waiting ps if error ?
     if (rc > 0) {
         proc_t *p;
-        pid_t npid;
-        for (pid_t pid = vfile->vf_waiting; pid > 0; pid = npid) {
-            p = state.st_proc + pid;
-            npid = p->p_nxwf;
-            sched_add_proc(pid);
-            klogf(Log_info, "vfs", "write unblock %d", pid);
+        chann_t *c;
+        pid_t pid;
+        cid_t cid;
+
+        for (cid = vfile->vf_waiting; cid >= 0; cid = c->chann_nxw) {
+            c = state.st_chann + cid;
+
+            klogf(Log_info, "vfs", "write unblock cid %d", cid);
+
+            for (pid = c->chann_waiting; pid > 0; pid = p->p_nxwf) {
+                p = state.st_proc + pid;
+                sched_add_proc(pid);
+                klogf(Log_info, "vfs", "write unblock pid %d", pid);
+            }
+
+            c->chann_waiting = -1;
         }
 
         vfile->vf_waiting = -1;
@@ -265,6 +281,7 @@ vfs_alloc(struct device *dev, const char *parent, const char *fname,
     if (!rc || fs->fs_stat(rc, &state.st_files[i].vf_stat, &dev->dev_info) < 0)
         return 0;
 
+    state.st_files[i].vf_stat.st_dev = dev->dev_id;
     state.st_files[i].vf_cnt = 1;
     return state.st_files + i;
 }
@@ -391,6 +408,9 @@ ino_t vfs_rmdir(const char *fname, uint32_t rec) {
 
 destroy_root:
     fs->fs_destroy_dirent(parent, root, &dev->dev_info);
+    vfs_close(vf);
+
+    SET(parent); // dont forget to update parent
 
     // update vfiles
     for (size_t i = 0; i < NFILE; i++) {
@@ -399,6 +419,7 @@ destroy_root:
             fs->fs_stat(state.st_files[i].vf_stat.st_ino,
                        &state.st_files[i].vf_stat,
                        &dev->dev_info);
+            state.st_files[i].vf_stat.st_dev = dev->dev_id;
 
             if (state.st_files[i].vf_stat.st_nlink == 0) {
                 vfs_destroy(state.st_files + i);

@@ -9,11 +9,29 @@
 static int flag_inode = 0;
 static int flag_long  = 0;
 
+#define MODE_LEN 10
+void sprint_mode(mode_t mode, char *buf) {
+    switch (mode&0xf000) {
+    case TYPE_DIR:  *buf++ = 'd'; break;
+    case TYPE_CHAR: *buf++ = 'c'; break;
+    case TYPE_FIFO: *buf++ = 'p'; break;
+    case TYPE_BLK:  *buf++ = 'b'; break;
+    case TYPE_SYM:  *buf++ = 'l'; break;
+    case TYPE_SOCK: *buf++ = 's'; break;
+    case TYPE_REG:  *buf++ = '-'; break;
+    }
+
+    char c[3] = { 'x', 'w', 'r' };
+    for (size_t i = 0; i < 9; i++) {
+        buf[9 - i - 1] = mode & (1 << i) ? c[i%3] : '-';
+    }
+}
+
 int list_files(const char *fname) {
     struct dirp *dirp = opendir(fname);
     struct dirent *dir;
     struct stat st;
-    char buf[256], buf2[1024];
+    char buf[256], buf2[1024], bufmode[MODE_LEN + 1] = { 0 };
     int rc = 0;
 
     while ((dir = readdir(dirp))) {
@@ -32,7 +50,8 @@ int list_files(const char *fname) {
         }
 
         if (flag_long) {
-            printf("%d %d ", st.st_size, st.st_nlink);
+            sprint_mode(st.st_mode, bufmode);
+            printf("%s %d %d ", bufmode, st.st_size, st.st_nlink);
         }
 
         printf("%s\n", buf);

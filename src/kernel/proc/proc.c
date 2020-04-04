@@ -89,6 +89,7 @@ void proc_start() {
     for (cid_t cid = 3; cid < NCHAN; cid++) {
         state.st_chann[cid].chann_id   = cid;
         state.st_chann[cid].chann_mode = UNUSED;
+        state.st_chann[cid].chann_waiting = -1;
     }
 
     // set all remaining slots to free processus
@@ -269,13 +270,19 @@ void proc_write_stdin(char *buf, size_t len) {
     vfs_close(vf);
 }
 
-void wait_file(pid_t pid, vfile_t *file) {
-    klogf(Log_info, "proc", "pid %d waiting for file %d",
-          pid, file->vf_stat.st_ino);
+void wait_file(pid_t pid, cid_t cid) {
+    klogf(Log_info, "proc", "pid %d waiting for channel %d", pid, cid);
     proc_t *p = state.st_proc + pid;
+    chann_t *c = state.st_chann + cid;
+    vfile_t *vf = c->chann_vfile;
+
     p->p_stat = BLOCK;
-    p->p_nxwf = file->vf_waiting;
-    file->vf_waiting = pid;
+    p->p_nxwf = c->chann_waiting;
+    c->chann_waiting = pid;
+
+    c->chann_nxw   = vf->vf_waiting;
+    vf->vf_waiting = cid;
+
     schedule_proc();
     never_reached;
 }

@@ -147,7 +147,7 @@ uint8_t do_kprint = 0;
 extern uint8_t t0_data[];
 
 #include <fs/proc.h>
-void ls () {
+void ls() {
     struct dirent *dir;
     vfile_t *vf = vfs_load(cmd_decomp + cmd_decomp_idx[1]);
     if (!vf) {
@@ -164,10 +164,12 @@ void ls () {
     struct fs *fs = fst + dev->dev_fs;
     struct stat st;
 
+    kprintf("size %d\n", vf->vf_stat.st_size);
+
     for (size_t size = 0; size < vf->vf_stat.st_size;
          size += dir->d_rec_len, dir = fs->fs_readdir(dir)) {
         fs->fs_stat(dir->d_ino, &st, &dev->dev_info);
-        kprintf("(%d) %d    ", dir->d_ino, st.st_nlink);
+        kprintf("(%d) %d %d    ", dir->d_ino, dir->d_rec_len, st.st_nlink);
         for (size_t i = 0; i < dir->d_name_len; i++)
             kprintf("%c", dir->d_name[i]);
         kprintf("\n");

@@ -60,7 +60,7 @@ typedef struct proc {
     priority_t       p_prio;     // priority of the process
     int              p_fds[NFD]; // table of file descriptors
     phy_addr         p_pml4;     // paging
-	uint_ptr         p_brk;      // program break
+    uint_ptr         p_brk;      // program break
     struct reg       p_reg;      // saved registers
     char             p_cmd[256]; // cmd to exec the process
 
@@ -79,6 +79,9 @@ typedef struct channel {
     // and current writing/reading position in the buffer
     vfile_t        *chann_vfile;
     off_t           chann_pos;
+
+    cid_t           chann_nxw;     // next chann waiting same file
+    pid_t           chann_waiting; // first pid waiting for this channel
 
     enum chann_mode chann_mode; // kind of operations channel allowed
     uint64_t        chann_acc;  // number of times the channel is referenced
@@ -181,7 +184,7 @@ proc_t *switch_proc(pid_t pid);
 void proc_ps();
 
 void proc_write_stdin(char *buf, size_t len);
-void wait_file(pid_t pid, vfile_t *file);
+void wait_file(pid_t pid, cid_t cid);
 //
 
 static inline pid_t find_new_pid() {
