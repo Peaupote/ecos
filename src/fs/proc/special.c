@@ -39,11 +39,9 @@ int stat_stat(pid_t pid, ino_t ino, struct stat *st) {
     st->st_ino   = ino;
     st->st_mode  = TYPE_REG|400;
     st->st_nlink = 1;
-    st->st_uid   = 0;
-    st->st_gid   = 0;
     st->st_size  = stat_read(pid, 0, 0, 256);
     st->st_blksize = 1024;
-    st->st_blocks = st->st_size >> 3;
+    st->st_blocks = st->st_size >> 9;
     return ino;
 }
 

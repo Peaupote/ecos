@@ -105,6 +105,7 @@ void proc_start() {
     for (cid_t cid = 3; cid < NCHAN; cid++) {
         state.st_chann[cid].chann_id   = cid;
         state.st_chann[cid].chann_mode = UNUSED;
+        state.st_chann[cid].chann_waiting = -1;
     }
 
     // set all remaining slots to free processus
@@ -123,6 +124,7 @@ void proc_start() {
     st_curr_reg       = &p_init->p_reg;
 
     proc_create(PID_INIT);
+	proc_create(PID_STOP);
     proc_alloc_std_streams(PID_INIT);
 
     klogf(Log_info, "init", "Start process init @ %p", p_init->p_reg.b.rip);
@@ -193,7 +195,7 @@ void schedule_proc() {
     }
 
     // Le processus IDLE empêche que l'on arrive ici
-	never_reached
+    never_reached
 }
 
 pid_t schedule_proc_ev() {
@@ -297,18 +299,21 @@ void proc_write_stdin(char *buf, size_t len) {
     vfs_close(vf);
 }
 
-void wait_file(pid_t pid, vfile_t *file) {
-    klogf(Log_error, "proc", "pid %d waiting for file %d",
-          pid, file->vf_stat.st_ino);
+void wait_file(pid_t pid, cid_t cid) {
+    klogf(Log_info, "proc", "pid %d waiting for channel %d", pid, cid);
     proc_t *p = state.st_proc + pid;
+    chann_t *c = state.st_chann + cid;
+    vfile_t *vf = c->chann_vfile;
+
     p->p_stat = BLOCK;
-   
-	p->p_nxwl = file->vf_waiting;
-	if (~file->vf_waiting)
-		state.st_proc[file->vf_waiting].p_prwl = &p->p_nxwl;
-    file->vf_waiting = pid;
-	p->p_prwl = &file->vf_waiting;
-	klogf(Log_error, "blk", "%p := %d", &file->vf_waiting, file->vf_waiting);
+	p->p_nxwl = c->chann_waiting;
+	if (~c->chann_waiting)
+		state.st_proc[c->chann_waiting].p_prwl = &p->p_nxwl;
+    c->chann_waiting = pid;
+	p->p_prwl = &c->chann_waiting;
+
+    c->chann_nxw   = vf->vf_waiting;
+    vf->vf_waiting = cid;
 
     schedule_proc();
 }
@@ -401,6 +406,7 @@ static void kill_proc_remove(pid_t pid, proc_t* p, proc_t* pp) {
     else
         pp->p_fchd = p->p_nxsb;
 
+	for (int fd = 0; fd < NFD; fd++) sys_close(fd);
     proc_exit(pid);
 }
 

@@ -129,8 +129,9 @@ static ino_t vfs_lookup(struct mount_info *info, struct fs *fs,
         memcpy(name, start, end - start);
         name[end - start] = 0;
 
-        if (!(ino = fs->fs_lookup(name, ino, info)))
+        if (!(ino = fs->fs_lookup(name, ino, info))) {
             return 0;
+        }
 
         if (!*end || !*(end+1)) break;
         start = end+1;
@@ -160,13 +161,16 @@ vfile_t *vfs_load(const char *filename) {
         return 0;
     }
 
+    vfile_t *v;
     size_t free = NFILE;
     for (size_t i = 0; i < NFILE; i++) {
-        if (state.st_files[i].vf_cnt) {
-            if (state.st_files[i].vf_stat.st_ino == st.st_ino &&
-                state.st_files[i].vf_stat.st_dev == dev->dev_id) {
-                klogf(Log_info, "vfs", "file %s is already open", fname);
-                state.st_files[i].vf_cnt++;
+        v = state.st_files + i;
+        if (v->vf_cnt) {
+            if (v->vf_stat.st_ino == st.st_ino &&
+                v->vf_stat.st_dev == dev->dev_id) {
+                v->vf_cnt++;
+                klogf(Log_info, "vfs", "file %s is open %d times",
+                      fname, state.st_files[i].vf_cnt);
                 return state.st_files + i;
             }
 
@@ -189,28 +193,40 @@ vfile_t *vfs_load(const char *filename) {
 }
 
 int vfs_read(vfile_t *vfile, void *buf, off_t pos, size_t len) {
-    struct device *dev = devices + vfile->vf_stat.st_dev;
+    dev_t dev_id = vfile->vf_stat.st_dev;
+    struct device *dev = devices + dev_id;
     struct fs *fs = fst + dev->dev_fs;
 
-    klogf(Log_info, "vfs", "read %d (dev %d)",
+    klogf(Log_verb, "vfs", "read %d (dev %d)",
           vfile->vf_stat.st_ino, vfile->vf_stat.st_dev);
 
     int rc = fs->fs_read(vfile->vf_stat.st_ino, buf, pos, len, &dev->dev_info);
     fs->fs_stat(vfile->vf_stat.st_ino, &vfile->vf_stat, &dev->dev_info);
+    vfile->vf_stat.st_dev = dev_id;
     return rc;
 }
 
 int vfs_write(vfile_t *vfile, void *buf, off_t pos, size_t len) {
-    struct device *dev = devices + vfile->vf_stat.st_dev;
+    dev_t dev_id = vfile->vf_stat.st_dev;
+    struct device *dev = devices + dev_id;
     struct fs *fs = fst + dev->dev_fs;
 
     int rc = fs->fs_write(vfile->vf_stat.st_ino, buf, pos, len, &dev->dev_info);
     fs->fs_stat(vfile->vf_stat.st_ino, &vfile->vf_stat, &dev->dev_info);
+    vfile->vf_stat.st_dev = dev_id;
 
     // TODO : what happend for waiting ps if error ?
     if (rc > 0) {
-    	klogf(Log_info, "vfs", "write unblock");
-		proc_unblock_list(&vfile->vf_waiting);
+        chann_t *c;
+        cid_t cid;
+
+        for (cid = vfile->vf_waiting; cid >= 0; cid = c->chann_nxw) {
+            c = state.st_chann + cid;
+            klogf(Log_info, "vfs", "write unblock cid %d", cid);
+			proc_unblock_list(&c->chann_waiting);
+        }
+
+        vfile->vf_waiting = -1;
     }
 
     return rc;
@@ -230,6 +246,7 @@ int vfs_close(vfile_t *vf) {
         klogf(Log_info, "vfs", "close file %d (device %d)",
               vf->vf_stat.st_ino, vf->vf_stat.st_dev);
         --vf->vf_cnt;
+        klogf(Log_info, "vfs", "still open %d times", vf->vf_cnt);
     }
     return 0;
 }
@@ -254,6 +271,7 @@ vfs_alloc(struct device *dev, const char *parent, const char *fname,
     if (!rc || fs->fs_stat(rc, &state.st_files[i].vf_stat, &dev->dev_info) < 0)
         return 0;
 
+    state.st_files[i].vf_stat.st_dev = dev->dev_id;
     state.st_files[i].vf_cnt = 1;
     return state.st_files + i;
 }
@@ -339,9 +357,10 @@ ino_t vfs_rmdir(const char *fname, uint32_t rec) {
     dir = fs->fs_opendir(root, &dev->dev_info);
     for (size_t size = 0; size < vf->vf_stat.st_size;
          size += dir->d_rec_len, dir = fs->fs_readdir(dir)) {
-        if (!strcmp(dir->d_name, ".."))
+        if (dir->d_name_len == 2 && !strncmp(dir->d_name, "..", 2))
             parent = dir->d_ino;
-        else if (dir->d_ino && strcmp(dir->d_name, "."))
+        else if (dir->d_ino &&
+                 !(dir->d_name_len == 1 && dir->d_name[0] == '.'))
             is_empty = 0;
     }
 
@@ -368,7 +387,8 @@ ino_t vfs_rmdir(const char *fname, uint32_t rec) {
             dir = fs->fs_opendir(ino, &dev->dev_info);
             for (size = 0; size < st.st_size;
                  size += dir->d_rec_len, dir = fs->fs_readdir(dir)) {
-                if (dir->d_ino != ino && strcmp(dir->d_name, "..")) {
+                if (dir->d_ino != ino &&
+                    !(dir->d_name_len == 2 && !strncmp("..", dir->d_name, 2))) {
                     PUSH(dir->d_ino);
                 }
                 fs->fs_rm(dir->d_ino, &dev->dev_info);
@@ -378,6 +398,9 @@ ino_t vfs_rmdir(const char *fname, uint32_t rec) {
 
 destroy_root:
     fs->fs_destroy_dirent(parent, root, &dev->dev_info);
+    vfs_close(vf);
+
+    SET(parent); // dont forget to update parent
 
     // update vfiles
     for (size_t i = 0; i < NFILE; i++) {
@@ -386,6 +409,7 @@ destroy_root:
             fs->fs_stat(state.st_files[i].vf_stat.st_ino,
                        &state.st_files[i].vf_stat,
                        &dev->dev_info);
+            state.st_files[i].vf_stat.st_dev = dev->dev_id;
 
             if (state.st_files[i].vf_stat.st_nlink == 0) {
                 vfs_destroy(state.st_files + i);

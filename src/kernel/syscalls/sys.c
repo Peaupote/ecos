@@ -175,7 +175,9 @@ pid_t sys_fork() {
         }
     }
 
-    proc_create(fpid);
+    if (!proc_create(fpid)) {
+        klogf(Log_error, "syscall", "fail proc create");
+    }
     fp->p_reg.b.rax = 0;
 
     sched_add_proc(fpid);
@@ -241,6 +243,8 @@ int sys_close(int filedes) {
         c->chann_mode = UNUSED;
     }
 
+    p->p_fds[filedes] = -1;
+
     return 0;
 }
 
@@ -303,9 +307,10 @@ ssize_t sys_read(int fd, uint8_t *d, size_t len) {
     if (!d || fd < 0 || fd > NFD || p->p_fds[fd] == -1)
         return -1;
 
-    chann_t *chann = &state.st_chann[p->p_fds[fd]];
-    klogf(Log_info, "syscall", "process %d read %d on %d (cid %d)",
-          state.st_curr_pid, len, fd, p->p_fds[fd]);
+    cid_t cid = p->p_fds[fd];
+    chann_t *chann = state.st_chann + cid;
+    klogf(Log_verb, "syscall", "process %d read %d on %d (cid %d)",
+          state.st_curr_pid, len, fd, cid);
 
     vfile_t *vfile = chann->chann_vfile;
     int rc;
@@ -328,7 +333,7 @@ ssize_t sys_read(int fd, uint8_t *d, size_t len) {
     case TYPE_CHAR:
     case TYPE_FIFO:
         if (vfile->vf_stat.st_size == 0) {
-            wait_file(state.st_curr_pid, vfile);
+            wait_file(state.st_curr_pid, cid);
         }
 
         return vfs_read(vfile, d, 0, len);
@@ -352,6 +357,7 @@ ssize_t sys_write(int fd, uint8_t *s, size_t len) {
 
     size_t c = 0;
     int rc = 0;
+
     if (chann->chann_mode != WRITE && chann->chann_mode != RDWR) return -1;
 
     switch (vfile->vf_stat.st_mode&0xf000) {
@@ -419,22 +425,22 @@ int sys_fstat(int fd, struct stat *st) {
 
 void* sys_sbrk(intptr_t inc) {//TODO: protect
     proc_t *p = state.st_proc + state.st_curr_pid;
-	uint_ptr nbrk = (uint_ptr)( ((intptr_t)p->p_brk) + inc );
+    uint_ptr nbrk = (uint_ptr)( ((intptr_t)p->p_brk) + inc );
 
-	kmem_paging_alloc_rng(align_to(p->p_brk, PAGE_SIZE), nbrk,
-			PAGING_FLAG_W | PAGING_FLAG_U,
-			PAGING_FLAG_W | PAGING_FLAG_U);
-	
-	for (uint_ptr a = align_to(nbrk, PAGE_SIZE); a < p->p_brk;
-			a += PAGE_SIZE) {
-		uint64_t *e = paging_page_entry(a);
-		kAssert(*e & PAGING_FLAG_P);
-		kmem_free_page(*e & PAGE_MASK);
-		*e &= ~(uint64_t)PAGING_FLAG_P;
-	}
-	void *rt = (void*) p->p_brk;
-	p->p_brk = nbrk;
-	return rt;
+    kmem_paging_alloc_rng(align_to(p->p_brk, PAGE_SIZE), nbrk,
+            PAGING_FLAG_W | PAGING_FLAG_U,
+            PAGING_FLAG_W | PAGING_FLAG_U);
+
+    for (uint_ptr a = align_to(nbrk, PAGE_SIZE); a < p->p_brk;
+            a += PAGE_SIZE) {
+        uint64_t *e = paging_page_entry(a);
+        kAssert(*e & PAGING_FLAG_P);
+        kmem_free_page(*e & PAGE_MASK);
+        *e &= ~(uint64_t)PAGING_FLAG_P;
+    }
+    void *rt = (void*) p->p_brk;
+    p->p_brk = nbrk;
+    return rt;
 }
 
 int sys_debug_block(int v) {

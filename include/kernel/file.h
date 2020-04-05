@@ -10,7 +10,7 @@
 typedef struct vfile {
     struct stat vf_stat;    // information about the file
     uint8_t     vf_cnt;     // nb of channel pointing at the file
-    pid_t       vf_waiting; // pid of a process waiting to read something
+    cid_t       vf_waiting; // first channel waiting to read something
 } vfile_t;
 
 // File system table

@@ -1,15 +1,11 @@
 #include <libc/string.h>
 
 int strncmp(const char *lhs, const char *rhs, size_t len) {
-	if (!len) return 0;
-	if (*lhs < *rhs) return -1;
-	if (*lhs > *rhs) return  1;
-	if (!*lhs) return 0;
-    while(len-- && *lhs) {
-        ++lhs;
-        ++rhs;
-		if (*lhs < *rhs) return -1;
-		if (*lhs > *rhs) return  1;
-    }
-	return 0;
+    const unsigned char *l = (const unsigned char*)lhs;
+    const unsigned char *r = (const unsigned char*)rhs;
+
+    while (len && *l && *l == *r) --len, ++l, ++r;
+
+    if (len > 0) return *l - *r;
+    return 0;
 }

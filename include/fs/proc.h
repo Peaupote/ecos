@@ -27,6 +27,15 @@ struct proc_block {
     char    content[PROC_BLOCK_SIZE];
 } proc_blocks[PROC_NBLOCKS];
 
+static inline uint32_t proc_free_block() {
+    size_t b;
+    for (b = 0; b < PROC_NBLOCKS; b++) {
+        if (!(proc_block_bitmap[b >> 3] & (1 << (b&7)))) break;
+    }
+
+    return b;
+}
+
 // ino 0 means end of dirent list
 #define PROC_NULL_INO 0
 #define PROC_ROOT_INO 1
@@ -39,6 +48,15 @@ struct proc_inode {
     // pointers to auxiliary memory if necessary
     uint64_t in_block[PROC_NBLOCK];
 } proc_inodes[PROC_NINODES];
+
+static inline uint32_t proc_free_inode() {
+    uint32_t ino;
+    for (ino = 2; ino < PROC_NINODES; ino++) {
+        if (!proc_inodes[ino].st.st_nlink) break;
+    }
+
+    return ino == PROC_NINODES ? 0 : ino;
+}
 
 int proc_mount(void*, struct mount_info *info);
 uint32_t proc_lookup(const char *fname, ino_t parent, struct mount_info*);
@@ -58,15 +76,5 @@ ino_t proc_destroy_dirent(ino_t p, ino_t ino, struct mount_info*);
 uint32_t proc_create(pid_t pid);
 uint32_t proc_alloc_std_streams(pid_t pid);
 uint32_t proc_exit(pid_t pid);
-
-static inline uint32_t proc_free_inode() {
-    uint32_t ino;
-    for (ino = 2; ino < PROC_NINODES; ino++) {
-        if (!proc_inodes[ino].st.st_nlink) break;
-    }
-
-    return ino == PROC_NINODES ? 0 : ino;
-}
-
 
 #endif

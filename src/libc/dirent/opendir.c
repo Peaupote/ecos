@@ -5,9 +5,6 @@
 #include <libc/unistd.h>
 #include <libc/stdio.h>
 
-// temporapy because malloc PF
-static struct dirp static_dirp;
-
 struct dirp *opendir(const char *fname) {
     int fd = open(fname, READ);
     struct stat st;
@@ -16,8 +13,7 @@ struct dirp *opendir(const char *fname) {
     fstat(fd, &st);
     if (!(st.st_mode&TYPE_DIR)) goto error;
 
-    dirp = &static_dirp;
-    /* dirp = malloc(sizeof(struct dirp)); */
+    dirp = malloc(sizeof(struct dirp));
     if (!dirp) goto error;
 
     if (read(fd, dirp->buf, DIRP_BUF_SIZE) < 0) goto error;
@@ -31,13 +27,13 @@ struct dirp *opendir(const char *fname) {
 
 error:
     close(fd);
-    /* free(dirp); */
+    free(dirp);
     return 0;
 }
 
 int closedir(struct dirp *dir) {
     if (!dir) return -1;
     int fd = dir->fd;
-    /* free(dir); */
+    free(dir);
     return close(fd);
 }
