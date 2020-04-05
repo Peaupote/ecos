@@ -33,6 +33,9 @@ tests:
 start: $(ISO)
 	@echo "QEMU RUN"
 	qemu-system-x86_64 -cdrom $(ISO) -monitor stdio | tee qemu.out
+start-bochs: $(ISO)
+	@echo "BOCHS RUN"
+	bochs -qf bochsrc
 
 depends:
 	$(MAKE) -B -C src/kernel         .depends
