@@ -367,13 +367,19 @@ uint32_t proc_alloc_std_streams(pid_t pid) {
     cid_t cid_in, cid_out, cid_err;
 
     cid_in = free_chann();
-    state.st_chann[cid_in].chann_mode = READ;
+    state.st_chann[cid_in].chann_mode     = READ;
+	state.st_chann[cid_in].chann_waiting  = PID_NONE;
+	state.st_chann[cid_in].chann_nxw      = cid_in;
 
     cid_out = free_chann();
-    state.st_chann[cid_out].chann_mode = WRITE;
+    state.st_chann[cid_out].chann_mode    = WRITE;
+	state.st_chann[cid_out].chann_waiting = PID_NONE;
+	state.st_chann[cid_out].chann_nxw     = cid_out;
 
     cid_err = free_chann();
-    state.st_chann[cid_err].chann_mode = WRITE;
+    state.st_chann[cid_err].chann_mode    = WRITE;
+	state.st_chann[cid_err].chann_waiting = PID_NONE;
+	state.st_chann[cid_err].chann_nxw     = cid_err;
 
     if (cid_in == NCHAN || cid_out == NCHAN || cid_out == NCHAN) {
         vfs_close(vf);

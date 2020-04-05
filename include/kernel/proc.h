@@ -103,6 +103,7 @@ typedef struct channel {
     off_t           chann_pos;
 
     cid_t           chann_nxw;     // next chann waiting same file
+	                               //  ~0 = last, self_cid = not waiting
     pid_t           chann_waiting; // first pid waiting for this channel
 
     enum chann_mode chann_mode; // kind of operations channel allowed

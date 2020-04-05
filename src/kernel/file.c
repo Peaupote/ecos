@@ -220,13 +220,16 @@ int vfs_write(vfile_t *vfile, void *buf, off_t pos, size_t len) {
         chann_t *c;
         cid_t cid;
 
-        for (cid = vfile->vf_waiting; cid >= 0; cid = c->chann_nxw) {
+        for (cid = vfile->vf_waiting; ~cid; ) {
             c = state.st_chann + cid;
             klogf(Log_info, "vfs", "write unblock cid %d", cid);
 			proc_unblock_list(&c->chann_waiting);
+			cid_t ncid   = c->chann_nxw;
+			c->chann_nxw = cid;
+			cid = ncid;
         }
 
-        vfile->vf_waiting = -1;
+        vfile->vf_waiting = ~0;
     }
 
     return rc;

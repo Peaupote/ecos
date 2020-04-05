@@ -52,7 +52,7 @@ void reg_free(void* addr, size_t sz) {
 
 void sq_test_malloc() {
 	buf_alloc = buf_allocd = 0;
-	malloc_init();
+	_malloc_init();
 
 	struct {
 		void* addr;
