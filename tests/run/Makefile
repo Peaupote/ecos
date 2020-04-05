@@ -2,7 +2,6 @@ ROOT=../..
 
 .PHONY:clean sys home
 
-include $(ROOT)/vars_local.Makefile
 include $(ROOT)/vars.Makefile
 unexport $(VARS_NAME)
 

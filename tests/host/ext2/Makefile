@@ -1,7 +1,7 @@
+ROOT=../../..
 include ../vars.Makefile
 FLAGS_K=$(FLAGS_T)
 
-ROOT=../../..
 NAME=./test_ext2.out
 IMG=../../run/home.img
 INCLUDES=-I $(ROOT)/include

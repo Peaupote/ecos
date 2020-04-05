@@ -1,6 +1,12 @@
+$(ROOT)/vars_local.Makefile:
+	touch $(ROOT)/vars_local.Makefile
+
+include $(ROOT)/vars_local.Makefile
+
 export NAME_LC?=libc
 export NAME_LK?=libk
 export TSFX?=
+OPT?=-O2
 
 #Communs
 FLAGS_C?=$(OPT) -Wall -Wextra -std=gnu99 -nostdlib -mno-red-zone -D__is_debug

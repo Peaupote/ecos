@@ -1,6 +1,6 @@
+ROOT=../../..
 include ../vars.Makefile
 
-ROOT=../../..
 SRC_LIBC=$(ROOT)/src/libc
 ASFILES=
 include list.Makefile

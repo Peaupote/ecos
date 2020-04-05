@@ -1,7 +1,7 @@
 export CC=x86_64-elf-gcc
 export AS=x86_64-elf-as
-include ../../vars_local.Makefile
-include ../../vars.Makefile
+ROOT=../..
+include $(ROOT)/vars.Makefile
 
 CFILES=init1.c sh.c cat.c echo.c stat.c ls.c ps.c test.c
 OUT=$(CFILES:.c=.out)

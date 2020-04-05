@@ -37,7 +37,7 @@ extern char proc_state_char[6];
 #define RIP 8
 #define RSP 16
 
-typedef uint64_t reg_t;
+typedef uint64_t __attribute__((__may_alias__)) reg_t;
 struct base_reg { // sz = 17 * 8 = 8 [16]
 	reg_t rip, rsp,
 	rax, rbx, rcx, rdx, rsi,

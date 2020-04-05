@@ -1,6 +1,6 @@
+ROOT=../../..
 include ../vars.Makefile
 
-ROOT=../../..
 TESTC=page_alloc.c shared_ptr.c malloc.c
 TESTDEP=$(foreach file,$(TESTC),"-MT $(file:.c=.out) $(file)") $(CFILES)
 TESTRUN=$(TESTC:.c=.out)
