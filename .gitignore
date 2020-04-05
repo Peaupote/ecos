@@ -10,4 +10,6 @@ isodir
 *.tst
 *.img
 *.a
+*.log
 tests/run/home
+vars_local.Makefile

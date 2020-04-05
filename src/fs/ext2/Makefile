@@ -1,6 +1,7 @@
 export CC?=x86_64-elf-gcc
 export AS?=x86_64-elf-as
 export AR?=x86_64-elf-ar
+include ../../../vars_local.Makefile
 include ../../../vars.Makefile
 
 FILES=ext2.c inode.c dir.c

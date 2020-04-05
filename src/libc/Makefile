@@ -1,6 +1,7 @@
 CC?=x86_64-elf-gcc
 AS?=x86_64-elf-as
 AR?=x86_64-elf-ar
+include ../../vars_local.Makefile
 include ../../vars.Makefile
 
 include list.Makefile

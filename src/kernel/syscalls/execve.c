@@ -34,7 +34,7 @@ struct execve_tr {
     int        argc;
     char**     argv;
     char**     envv;
-	sigset_t   sigblk_save;
+    sigset_t   sigblk_save;
 };
 struct section {
     uint_ptr   dst;
@@ -137,7 +137,7 @@ bool read_bytes(int fd, void* buf, size_t count) {
     }
     return true;
 }
-inline bool execve_lseek(int fd, off_t ofs) {
+static inline bool execve_lseek(int fd, off_t ofs) {
     return ~lseek(fd, ofs);
 }
 
@@ -354,8 +354,8 @@ int sys_execve(reg_t fname, reg_t argv, reg_t env) {
 
     // On arrête processus appelant en le passant en BLOCK
     p->p_stat          = BLOCK;
-	trf()->sigblk_save = p->p_shnd.blk;
-	p->p_shnd.blk      = 0;
+    trf()->sigblk_save = p->p_shnd.blk;
+    p->p_shnd.blk      = 0;
 
     // On bascule sur le processus auxiliaire
     state.st_curr_pid = epid;
@@ -407,11 +407,11 @@ void proc_execve_end() {
     pp->p_reg.b.rsi = (uint_ptr)trf()->argv;
     pp->p_reg.b.rdx = (uint_ptr)trf()->envv;
     pp->p_pml4      = mp->p_pml4;
-	pp->p_brk       = align_to(trf()->args_ed, 8);
-	pp->p_shnd.usr  = NULL;
-	pp->p_shnd.blk  = trf()->sigblk_save;
-	//on hérite p_shnd.ign
-	pp->p_shnd.dfl  = ~pp->p_shnd.ign;
+    pp->p_brk       = align_to(trf()->args_ed, 8);
+    pp->p_shnd.usr  = NULL;
+    pp->p_shnd.blk  = trf()->sigblk_save;
+    //on hérite p_shnd.ign
+    pp->p_shnd.dfl  = ~pp->p_shnd.ign;
 
     --pp->p_nchd;
     free_pid(state.st_curr_pid);

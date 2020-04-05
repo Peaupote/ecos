@@ -2,6 +2,7 @@ export TRG=64
 export CC=x86_64-elf-gcc
 export AS=x86_64-elf-as
 export AR=x86_64-elf-ar
+include ../../vars_local.Makefile
 include ../../vars.Makefile
 export FLAGS_U=$(FLAGS_K)
 

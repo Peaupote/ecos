@@ -1,6 +1,7 @@
 export TRG=32
 export CC=i686-elf-gcc
 export AS=i686-elf-as
+include ../../vars_local.Makefile
 include ../../vars.Makefile
 export FLAGS_U=$(FLAGS_B)
 
