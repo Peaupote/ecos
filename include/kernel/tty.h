@@ -25,7 +25,7 @@ void   tty_afficher_buffer_all();
 size_t tty_new_prompt(void);
 void   tty_afficher_prompt(void);
 size_t tty_update_prompt_pos(void);
-size_t tty_prompt_to_buffer(size_t in_begin, size_t in_len);
+size_t tty_prompt_to_buffer(size_t in_len);
 
 size_t tty_buffer_cur_idx ();
 size_t tty_buffer_next_idx();

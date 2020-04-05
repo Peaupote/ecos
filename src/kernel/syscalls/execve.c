@@ -34,6 +34,7 @@ struct execve_tr {
     int        argc;
     char**     argv;
     char**     envv;
+	sigset_t   sigblk_save;
 };
 struct section {
     uint_ptr   dst;
@@ -83,7 +84,7 @@ void proc_execve_error_1() {
 
     proc_set_curr_pid(ppid);
     pp->p_stat = RUN;
-    rei_cast(int, pp->p_reg.rax) = -1;
+    rei_cast(int, pp->p_reg.b.rax) = -1;
     free_tr();
     iret_to_proc(pp);
 }
@@ -345,15 +346,16 @@ int sys_execve(reg_t fname, reg_t argv, reg_t env) {
     ep->p_prio = p->p_prio;
     for (size_t i = 0; i < NFD; i++) ep->p_fds[i] = -1;
     ep->p_pml4 = p->p_pml4;
-    ep->p_reg.rsp = (uint_ptr)trf()->stack + AUX_STACK_SIZE;
-    ep->p_reg.rip = (uint_ptr)&proc_execve_entry;
-    ep->p_reg.rdi = fname;
-    ep->p_reg.rsi = argv;
-    ep->p_reg.rdx = env;
+    ep->p_reg.b.rsp = (uint_ptr)trf()->stack + AUX_STACK_SIZE;
+    ep->p_reg.b.rip = (uint_ptr)&proc_execve_entry;
+    ep->p_reg.b.rdi = fname;
+    ep->p_reg.b.rsi = argv;
+    ep->p_reg.b.rdx = env;
 
-    // On arrête processus appelant en le passant en waitpid
-    p->p_stat    = WAIT;
-    p->p_reg.rax = epid;
+    // On arrête processus appelant en le passant en BLOCK
+    p->p_stat          = BLOCK;
+	trf()->sigblk_save = p->p_shnd.blk;
+	p->p_shnd.blk      = 0;
 
     // On bascule sur le processus auxiliaire
     state.st_curr_pid = epid;
@@ -398,14 +400,18 @@ void proc_execve_entry(const char *fname,
 void proc_execve_end() {
     proc_t* mp = state.st_proc + state.st_curr_pid;
     proc_t* pp = state.st_proc + mp->p_ppid;
-    pp->p_reg.rip = trf()->ehdr.e_entry;
+    pp->p_reg.b.rip = trf()->ehdr.e_entry;
 
-    pp->p_reg.rsp = make_proc_stack();
-    pp->p_reg.rdi = trf()->argc;
-    pp->p_reg.rsi = (uint_ptr)trf()->argv;
-    pp->p_reg.rdx = (uint_ptr)trf()->envv;
-    pp->p_pml4    = mp->p_pml4;
-	pp->p_brk     = align_to(trf()->args_ed, 8);
+    pp->p_reg.b.rsp = make_proc_stack();
+    pp->p_reg.b.rdi = trf()->argc;
+    pp->p_reg.b.rsi = (uint_ptr)trf()->argv;
+    pp->p_reg.b.rdx = (uint_ptr)trf()->envv;
+    pp->p_pml4      = mp->p_pml4;
+	pp->p_brk       = align_to(trf()->args_ed, 8);
+	pp->p_shnd.usr  = NULL;
+	pp->p_shnd.blk  = trf()->sigblk_save;
+	//on hérite p_shnd.ign
+	pp->p_shnd.dfl  = ~pp->p_shnd.ign;
 
     --pp->p_nchd;
     free_pid(state.st_curr_pid);

@@ -4,6 +4,7 @@
 #include <stdint.h>
 #include <stddef.h>
 
+#include <headers/unistd.h>
 #include <headers/proc.h>
 #include <headers/file.h>
 #include <headers/types.h>

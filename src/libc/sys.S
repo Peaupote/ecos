@@ -1,4 +1,3 @@
-// auto-generated file containing syscall interruptions
 #define ASM_FILE
 #include<headers/sys.h>
 #include<kernel/int.h>
@@ -38,6 +37,9 @@ mksc fstat        SYS_FSTAT
 mksc _setpriority SYS_SETPRIO
 mksc _getpriority SYS_GETPRIO
 mksc sbrk         SYS_SBRK
+mksc _sigreturn   SYS_SIGRT
+mksc _sigsethnd   SYS_SIGHND
+mksc _signal      SYS_SIGNAL
 mksc debug_block  SYS_DEBUG_BLOCK
 
 mksc1 r1_prires  SYS_R1_PRIRES

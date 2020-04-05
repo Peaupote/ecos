@@ -31,6 +31,7 @@ tests:
 	$(MAKE) -C tests/host all
 
 start: $(ISO)
+	@echo "QEMU RUN"
 	qemu-system-x86_64 -cdrom $(ISO) -monitor stdio | tee qemu.out
 
 depends:

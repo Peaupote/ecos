@@ -7,6 +7,7 @@ CFILES=main.c \
 		tests.c \
 		file.c \
 		proc/proc.c \
+		proc/signal.c \
 		syscalls/sleep.c \
 		syscalls/sys.c \
 		syscalls/execve.c \

@@ -81,8 +81,12 @@ char *strncpy(char *dest, const char *src, size_t n);
 char *index(const char *s, int c);
 
 char *strtok_r(char *str, const char *delim, char** saveptr);
+// Reconnait le dernier token même si '\0' n'est pas précédé
+// d'un délimiteur
+char *strtok_rnull(char *str, const char *delim, char** saveptr);
 
-//Ne pas utiliser dans le kernel
+#ifndef __is_kernel
 char *strtok(char *str, const char *delim);
+#endif
 
 #endif

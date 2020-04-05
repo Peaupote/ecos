@@ -2,6 +2,9 @@
 #define _H_PROC
 
 #include <headers/proc.h>
+#include <headers/signal.h>
+
+#include <util/misc.h>
 
 #include "kutil.h"
 #include "int.h"
@@ -22,8 +25,8 @@
 enum proc_state {
     FREE,  // unused
     SLEEP, // sleeping
-    WAIT,  // waiting
     BLOCK, // blocked by a syscall
+    BLOCR, // blocked by a syscall, in file to return
     RUN,   // running
     ZOMB   // just terminated
 };
@@ -35,21 +38,37 @@ extern char proc_state_char[6];
 #define RSP 16
 
 typedef uint64_t reg_t;
-struct reg {
-    reg_t rflags, rip, rsp,
-        rax, rbx, rcx, rdx, rsi,
-        rdi, rbp, r8, r9, r10, r11,
-        r12, r13, r14, r15;
+struct base_reg { // sz = 17 * 8 = 8 [16]
+	reg_t rip, rsp,
+	rax, rbx, rcx, rdx, rsi,
+	rdi, rbp, r8, r9, r10, r11,
+	r12, r13, r14, r15;
 } __attribute__((packed));
+struct reg { // sz = 18 * 8 = 0 [16]
+    reg_t rflags;
+	struct base_reg b;
+} __attribute__((packed));
+
+struct proc_shnd {
+	sigset_t         blk;     // blocked signals: 0 = blocked
+	sigset_t         ign;     // 1 = ignore signal
+	sigset_t         dfl;     // 1 = default signal disposition
+	sighandler_t     usr;     // user sig handler
+};
 
 typedef struct proc {
     pid_t            p_ppid;     // parent pid
     union {
-        pid_t        p_nxpf;     // if in a file: next in priority file
-        pid_t        p_nxfr;     // if FREE: next free
-        pid_t        p_nxzb;     // if ZOMB: next ZOMB sibling
-        pid_t        p_nxwf;     // if BLOCK: next waiting file
+        pid_t        p_nxpf;     // if in a file (BLOCK|BLOKR):
+		                         //               next in priority file
+        pid_t        p_nxwl;     // if BLOCK:     next waiting list
+        pid_t        p_nxfr;     // if FREE:      next free
+        pid_t        p_nxzb;     // if ZOMB:      next ZOMB sibling
     };
+	union {
+		pid_t*       p_prpf;     // if in a file: ref in priority file
+		pid_t*       p_prwl;     // if BLOCK:     !=NULL, ref in waiting list
+	};
     pid_t            p_prsb;     // prev sibling
     pid_t            p_nxsb;     // next sibling
     pid_t            p_fchd;     // first child
@@ -66,6 +85,9 @@ typedef struct proc {
 
     ino_t            p_cino;     // inode of current dir
     dev_t            p_dev;      // device of current dir
+
+	sigset_t         p_spnd;     // pending signals
+	struct proc_shnd p_shnd;
 } proc_t;
 
 /**
@@ -84,16 +106,17 @@ typedef struct channel {
     uint64_t        chann_acc;  // number of times the channel is referenced
 } chann_t;
 
-// Contient les processus en mode RUN à l'exception du processus courant
-// Ainsi que les processus BLOCK qui peuvent être repris
+// Contient les processus en mode RUN ou BLOCR 
+// à l'exception du processus courant
+struct scheduler_file {
+	pid_t   first;
+	pid_t   last;
+};
 struct scheduler {
     // le bit p est set ssi un processus de priorité p est présent
     uint64_t    pres;
     // contient les processus de chaque priorités
-    struct {
-        pid_t   first;
-        pid_t   last;
-    } files[NB_PRIORITY_LVL];
+    struct scheduler_file files[NB_PRIORITY_LVL];
     // nombre de processus dans la structure
     size_t      nb_proc;
 };
@@ -104,6 +127,7 @@ struct scheduler {
 
 struct {
     pid_t       st_curr_pid;          // pid of current running process
+                                      //   should be RUN or BLOCR 
     struct scheduler st_sched;
     pid_t       st_free_proc;         // head of the free linked list
     proc_t      st_proc[NPROC];       // table containing all processes
@@ -113,6 +137,10 @@ struct {
 
 // pointer to current proc registers
 struct reg *st_curr_reg;
+
+static inline proc_t* cur_proc() {
+	return state.st_proc + state.st_curr_pid;
+}
 
 /**
  * Initialize state of the machine
@@ -127,13 +155,22 @@ void  sched_add_proc(pid_t);
 pid_t sched_pop_proc();
 
 __attribute__ ((noreturn))
-void  schedule_proc();
+void  schedule_proc(); // TODO: reset rsp to avoid stack overflow
 // Renvoi le nouveau processus
 pid_t schedule_proc_ev();
 
 //! change le paging vers celui du processus
 //  les objets doivent se trouver dans l'espace du kernel
 uint8_t proc_create_userspace(void* prg_elf, proc_t *proc);
+
+// 0 <= sigid < SIG_COUNT
+void proc_hndl_sig_i(int sigid);
+static inline void proc_hndl_sigs() {
+	proc_t* p = cur_proc();
+	while(p->p_spnd & p->p_shnd.blk)
+		proc_hndl_sig_i(
+				find_bit_32(p->p_spnd & p->p_shnd.blk, 1, 5));
+}
 
 // prennent en argument le sélecteur du CS destination
 // (étendu à 8 octets par des zéros)
@@ -158,20 +195,11 @@ static inline void eoi_iret_to_proc(const proc_t* p) {
 
 __attribute__ ((noreturn))
 static inline void run_proc(proc_t* p) {
-    if (p->p_stat == RUN) iret_to_proc(p);
-    else { //blocked
+    if (p->p_stat == RUN)
+		iret_to_proc(p);
+    else { //BLOCR
         p->p_stat = RUN;
-        p->p_reg.rax = continue_syscall();
-        iret_to_proc(p);
-    }
-}
-__attribute__ ((noreturn))
-static inline void eoi_run_proc(proc_t* p) {
-    if (p->p_stat == RUN) eoi_iret_to_proc(p);
-    else { //blocked
-        p->p_stat = RUN;
-        write_eoi();
-        p->p_reg.rax = continue_syscall();
+        p->p_reg.b.rax = continue_syscall();
         iret_to_proc(p);
     }
 }
@@ -181,7 +209,18 @@ proc_t *switch_proc(pid_t pid);
 void proc_ps();
 
 void proc_write_stdin(char *buf, size_t len);
+__attribute__((noreturn))
 void wait_file(pid_t pid, vfile_t *file);
+
+// Retourne true ssi une action (kill...) a été effectué immédiatement
+// sur le processus cible
+// Peut modifier le processus courant
+bool send_sig_to_proc(pid_t pid, int sigid);
+
+__attribute__((noreturn))
+void kill_proc_nr(int status);
+void kill_proc(int status);
+
 //
 
 static inline pid_t find_new_pid() {
@@ -220,6 +259,51 @@ static inline cid_t free_chann() {
     }
 
     return NCHAN;
+}
+
+// Enlève un processus BLOCK de la liste où il se trouve
+static inline void proc_extract_blk(proc_t* p) {
+	*p->p_prwl = p->p_nxwl;
+}
+
+static inline void proc_blocr(pid_t pid, proc_t* p) {
+	p->p_stat  = BLOCR;
+	sched_add_proc(pid);
+}
+
+static inline void proc_unblock_1(pid_t pid, proc_t* p) {
+	proc_extract_blk(p);
+	proc_blocr(pid, p);
+}
+
+static inline void proc_unblock_list(pid_t* first) {
+	proc_t* p;
+	klogf(Log_error, "unblk", "%p = %d", first, *first);
+	for (pid_t pid = *first; ~pid;) {
+		p = state.st_proc + pid;
+		p->p_stat  = BLOCR;
+		pid_t npid = p->p_nxwl;
+		sched_add_proc(pid);
+		pid = npid;
+	}
+	*first = PID_NONE;
+}
+
+// Enlève un processus RUN ou BLOCR de la file où il se trouve
+static inline void proc_extract_pf(proc_t* p) {
+	*p->p_prpf = p->p_nxpf;
+	if (!~p->p_nxpf && !~state.st_sched.files[p->p_prio].first)
+		clear_bit_64(&state.st_sched.pres, p->p_prio);
+
+#ifdef __is_debug
+	p->p_prpf = NULL;
+#endif
+}
+
+static inline void proc_self_block(proc_t* p) {
+	p->p_stat = BLOCK;
+	p->p_nxwl = PID_NONE;
+	p->p_prwl = &p->p_nxwl;
 }
 
 #endif

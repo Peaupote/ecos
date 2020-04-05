@@ -1,8 +1,12 @@
-#include <fs/proc.h>
-#include <fs/pipe.h>
-#include <libc/string.h>
+#include <headers/unistd.h>
+
 #include <kernel/file.h>
 #include <kernel/proc.h>
+
+#include <fs/proc.h>
+#include <fs/pipe.h>
+
+#include <libc/string.h>
 
 #include "special.h"
 
@@ -389,7 +393,7 @@ uint32_t proc_alloc_std_streams(pid_t pid) {
     state.st_chann[cid_in].chann_mode  = READ;
     state.st_chann[cid_in].chann_pos   = 0;
     state.st_chann[cid_in].chann_acc   = 1;
-    p->p_fds[0] = cid_in;
+    p->p_fds[STDIN_FILENO] = cid_in;
 
     // stdout
     inode = proc_inodes + stdout->vf_stat.st_ino;
@@ -398,7 +402,7 @@ uint32_t proc_alloc_std_streams(pid_t pid) {
     state.st_chann[cid_out].chann_mode  = WRITE;
     state.st_chann[cid_out].chann_pos   = 0;
     state.st_chann[cid_out].chann_acc   = 1;
-    p->p_fds[1] = cid_out;
+    p->p_fds[STDOUT_FILENO] = cid_out;
 
     // stderr
     inode = proc_inodes + stderr->vf_stat.st_ino;
@@ -407,7 +411,7 @@ uint32_t proc_alloc_std_streams(pid_t pid) {
     state.st_chann[cid_err].chann_mode  = WRITE;
     state.st_chann[cid_err].chann_pos   = 0;
     state.st_chann[cid_err].chann_acc   = 1;
-    p->p_fds[2] = cid_err;
+    p->p_fds[STDERR_FILENO] = cid_err;
 
     uint32_t ino = vf->vf_stat.st_ino;
     vfs_close(vf);

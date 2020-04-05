@@ -18,7 +18,6 @@
 #define SB_MASK  0x7f
 
 #define IB_LENGTH 256
-#define IB_MASK  0xff
 
 //Screen Buffer
 // SB_HEIGHT       |.....|bbb|ddd|......|
@@ -34,7 +33,6 @@ bool     sb_dtcd; // scroll détaché
 
 //Input Buffer
 char     ibuffer[IB_LENGTH];
-size_t   ib_ashift;
 size_t   ib_size;
 size_t   ib_printed;
 const size_t input_width = 80 - 2;
@@ -76,7 +74,7 @@ void tty_init(enum tty_mode m) {
     input_color = vga_entry_color (
                 VGA_COLOR_LIGHT_GREY, VGA_COLOR_BLACK);
 
-    ib_printed = ib_size = ib_ashift = 0;
+    ib_printed = ib_size = 0;
     input_height = 0;
     input_bottom_line = input_top_line = ~0;
 
@@ -116,35 +114,7 @@ void tty_set_mode(enum tty_mode m) {
         vga_putentryat('>', prompt_color, 0, input_top_line);
 }
 
-char cmd_decomp[IB_LENGTH + 10];
-size_t cmd_decomp_idx[10];
-
-void decomp_cmd(size_t in_begin, size_t in_len) {
-    size_t i = 0, i_d = 0;
-    char c;
-    for(size_t j=0; j < 10; ++j){
-        while(i < in_len
-                && (c = ibuffer[(in_begin + i) & IB_MASK]) == ' ')
-            ++i;
-        if (i >= in_len) {
-            cmd_decomp[i_d] = '\0';
-            for(; j<10; ++j)
-                cmd_decomp_idx[j] = i_d;
-            return;
-        }
-        ++i;
-        cmd_decomp_idx[j] = i_d;
-        do{
-            cmd_decomp[i_d++] = c;
-        } while(i < in_len
-                && ((c = ibuffer[(in_begin + i++) & IB_MASK]) != ' '));
-        cmd_decomp[i_d++] = '\0';
-    }
-}
-
 uint8_t do_kprint = 0;
-
-extern uint8_t t0_data[];
 
 static struct device *dev;
 int print_dir(struct dirent *dir) {
@@ -159,11 +129,13 @@ int print_dir(struct dirent *dir) {
 }
 
 #include <fs/proc.h>
-void ls () {
+void ls (char** tokpt) {
+	char* arg1 = strtok_rnull(NULL, " ", tokpt);
+	if (!arg1) return;
     struct dirent *dir;
-    vfile_t *vf = vfs_load(cmd_decomp + cmd_decomp_idx[1]);
+    vfile_t *vf = vfs_load(arg1);
     if (!vf) {
-        kprintf("%s don't exist\n", cmd_decomp + cmd_decomp_idx[1]);
+        kprintf("%s don't exist\n", arg1);
         return;
     }
 
@@ -185,19 +157,24 @@ uint_ptr read_ptr(const char str[]) {
     return int64_of_str_hexa(str);
 }
 
-size_t built_in_exec(size_t in_begin, size_t in_len) {
-    decomp_cmd(in_begin, in_len);
-    char* cmd_name = cmd_decomp + cmd_decomp_idx[0];
+size_t built_in_exec() {
+	char* tokpt;
+    char* cmd_name = strtok_rnull(ibuffer, " ", &tokpt);
+	if (!cmd_name) return 0;
     if (!strcmp(cmd_name, "tprint"))
         return tty_writestring("test print");
     else if (!strcmp(cmd_name, "memat")) {
-        uint_ptr ptr = read_ptr(cmd_decomp + cmd_decomp_idx[1]);
+		char* arg1 = strtok_rnull(NULL, " ", &tokpt);
+		if (!arg1) return 0;
+        uint_ptr ptr = read_ptr(arg1);
         char data_str[3];
         data_str[2] = '\0';
         int8_to_str_hexa(data_str, *(uint8_t*)ptr);
         return tty_writestring(data_str);
     } else if (!strcmp(cmd_name, "pg2")) {
-        uint_ptr ptr = read_ptr(cmd_decomp + cmd_decomp_idx[1]);
+		char* arg1 = strtok_rnull(NULL, " ", &tokpt);
+		if (!arg1) return 0;
+        uint_ptr ptr = read_ptr(arg1);
         kmem_print_paging(ptr);
     } else if (!strcmp(cmd_name, "kprint"))
         do_kprint = !do_kprint;
@@ -206,19 +183,42 @@ size_t built_in_exec(size_t in_begin, size_t in_len) {
     else if (!strcmp(cmd_name, "q"))
         use_azerty = 0;
     else if (!strcmp(cmd_name, "test")) {
-        char *arg1 = cmd_decomp + cmd_decomp_idx[1];
+		char* arg1 = strtok_rnull(NULL, " ", &tokpt);
+		if (!arg1) return 0;
         if (!strcmp(arg1, "statut"))      test_print_statut();
         else if(!strcmp(arg1, "kheap"))   test_kheap();
     } else if (!strcmp(cmd_name, "ps"))
         proc_ps();
     else if (!strcmp(cmd_name, "unblock")) {
-        pid_t pid = (pid_t)int64_of_str_hexa(
-                        cmd_decomp + cmd_decomp_idx[1]);
-        int   val = ( int )int64_of_str_hexa(
-                        cmd_decomp + cmd_decomp_idx[2]);
-        state.st_proc[pid].p_reg.rdi = val;
-        sched_add_proc(pid);
-    } else if (!strcmp(cmd_name, "ls")) ls();
+		char* arg1 = strtok_rnull(NULL, " ", &tokpt);
+		if (!arg1) return 0;
+		char* arg2 = strtok_rnull(NULL, " ", &tokpt);
+		if (!arg2) return 0;
+        int   ipid, val = 0;
+		sscanf(arg1, "%d", &ipid);
+		pid_t pid = ipid;
+		sscanf(arg2, "%i", &val);
+        state.st_proc[pid].p_reg.b.rdi = val;
+		proc_unblock_1(pid, state.st_proc + pid);
+	} else if (!strcmp(cmd_name, "ls")) ls(&tokpt);
+	else if (!strcmp(cmd_name, "kill")) {
+		char* arg1 = strtok_rnull(NULL, " ", &tokpt);
+		if (!arg1) return 0;
+		char* arg2 = strtok_rnull(NULL, " ", &tokpt);
+		if (!arg2) return 0;
+        int   ipid, signum = 0;
+		sscanf(arg1, "%d", &ipid);
+		pid_t pid = ipid;
+		sscanf(arg2, "%i", &signum);
+
+		pid_t cproc = state.st_curr_pid;
+		bool spr = pid == state.st_curr_pid;
+		bool afc = send_sig_to_proc(pid, signum - 1);
+		if (spr && afc)
+			klogf(Log_error, "warning", "processus courant");
+		if (cproc != state.st_curr_pid)
+			switch_proc(cproc);
+	}
 
     return 0;
 }
@@ -241,14 +241,16 @@ void tty_input(scancode_byte s, key_event ev) {
     if (ev.key && !(ev.flags & 0x1)) {//évènement appui
         if ((ev.key&KEYS_MASK) == KEYS_ENTER) {
             p_updt = 1;
-            sq.shift += tty_prompt_to_buffer(ib_ashift, ib_size);
+            sq.shift += tty_prompt_to_buffer(ib_size);
 
             switch(tty_mode) {
             case ttym_def:
-                proc_write_stdin(ibuffer + ib_ashift, ib_size);
+				ibuffer[ib_size] = '\n';
+                proc_write_stdin(ibuffer, ib_size);
                 break;
             default:
-                sq.shift += built_in_exec(ib_ashift, ib_size);
+				ibuffer[ib_size] = '\0';
+                sq.shift += built_in_exec();
                 break;
             }
 
@@ -292,8 +294,8 @@ void tty_input(scancode_byte s, key_event ev) {
             }
         } else {
             char kchar = keycode_to_printable(ev.key);
-            if (kchar && ib_size < IB_LENGTH) {
-                ibuffer[(ib_ashift + ib_size++) & IB_MASK] = kchar;
+            if (kchar && ib_size < IB_LENGTH - 1) {
+                ibuffer[ib_size++] = kchar;
                 tty_afficher_prompt();
             }
         }
@@ -363,7 +365,7 @@ void tty_afficher_prompt_do(uint8_t fill) {
             }
             pos.x = 2;
         }
-        vga_putentryat(ibuffer[(ib_ashift + i) & IB_MASK],
+        vga_putentryat(ibuffer[i],
                 input_color, pos.x, pos.y);
     }
 
@@ -425,11 +427,11 @@ size_t tty_update_prompt_pos() {
     return 0;//Pas de prompt
 }
 
-size_t tty_prompt_to_buffer(size_t in_begin, size_t in_len) {
+size_t tty_prompt_to_buffer(size_t in_len) {
     size_t index;
     size_t rt = tty_new_buffer_line(&index);
     size_t x = 2;
-    size_t it = in_begin;
+    size_t it = 0;
 
     size_t l_lim = in_len + 2;
     if(l_lim > VGA_WIDTH) {
@@ -439,7 +441,7 @@ size_t tty_prompt_to_buffer(size_t in_begin, size_t in_len) {
 
     sbuffer[index][0] = vga_entry('>', vprompt_color);
     sbuffer[index][1] = vga_entry(' ', input_color);
-    for (; x < l_lim; it = IB_MASK & (it + 1), ++x)
+    for (; x < l_lim; ++it, ++x)
         sbuffer[index][x] = vga_entry(ibuffer[it], input_color);
 
     while (in_len) {
@@ -451,7 +453,7 @@ size_t tty_prompt_to_buffer(size_t in_begin, size_t in_len) {
         } else in_len = 0;
         sbuffer[index][0] = vga_entry(' ', input_color);
         sbuffer[index][1] = vga_entry(' ', input_color);
-        for (x=2; x < l_lim; it = IB_MASK & (it + 1), ++x)
+        for (x=2; x < l_lim; ++it, ++x)
             sbuffer[index][x] = vga_entry(ibuffer[it], input_color);
     }
 

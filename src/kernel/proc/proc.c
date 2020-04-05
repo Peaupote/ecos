@@ -3,22 +3,24 @@
 #include <stddef.h>
 #include <stdint.h>
 
+#include <kernel/kutil.h>
 #include <kernel/int.h>
 #include <kernel/sys.h>
+#include <kernel/int.h>
+#include <kernel/tty.h>
+#include <kernel/gdt.h>
+#include <kernel/memory/kmem.h>
 
 #include <libc/sys.h>
 #include <libc/stdio.h>
 #include <libc/string.h>
+
 #include <util/elf64.h>
-#include <kernel/memory/kmem.h>
-#include <kernel/int.h>
-#include <kernel/tty.h>
-#include <kernel/kutil.h>
-#include <kernel/gdt.h>
 #include <util/misc.h>
+
 #include <fs/proc.h>
 
-char proc_state_char[6] = {'f', 's', 'w', 'b', 'R', 'Z'};
+char proc_state_char[6] = {'f', 's', 'b', 'L', 'R', 'Z'};
 
 extern void proc_idle_entry(void);
 extern void proc_init_entry(void);
@@ -47,8 +49,12 @@ void proc_start() {
     p_idle->p_prio = 0; //priorité minimale
     p_idle->p_pml4 = (phy_addr)NULL;
 	p_idle->p_brk  = 0;
-    p_idle->p_reg.rsp = (uint_ptr)kernel_stack_top;
-    p_idle->p_reg.rip = (uint_ptr)&proc_idle_entry;
+    p_idle->p_reg.b.rsp = (uint_ptr)kernel_stack_top;
+    p_idle->p_reg.b.rip = (uint_ptr)&proc_idle_entry;
+	p_idle->p_spnd = 0;
+	p_idle->p_shnd.blk = 0;
+	p_idle->p_shnd.ign = ~(sigset_t)0;
+	p_idle->p_shnd.dfl = 0;
 
     // processus 1: init
     proc_t *p_init = &state.st_proc[PID_INIT];
@@ -61,24 +67,34 @@ void proc_start() {
     p_init->p_prio = NB_PRIORITY_LVL - 2; //priorité maximale
     p_init->p_pml4 = (phy_addr)NULL;
 	p_init->p_brk  = 0x1000;
-    p_init->p_reg.rsp = (uint_ptr)NULL;
-    p_init->p_reg.rip = (uint_ptr)&proc_init_entry;
+    p_init->p_reg.b.rsp = (uint_ptr)NULL;
+    p_init->p_reg.b.rip = (uint_ptr)&proc_init_entry;
     strcpy(p_init->p_cmd, "init");
+	p_init->p_spnd = 0;
+	p_init->p_shnd.blk = ~(sigset_t)0;
+	p_init->p_shnd.ign = 0;
+	p_init->p_shnd.dfl = ~(sigset_t)0;
 
     // processus 2: stop, utilisé en cas de panic
     proc_t *p_stop = &state.st_proc[PID_STOP];
     p_stop->p_ppid = PID_STOP;
+	p_stop->p_nxwl = PID_NONE;
+	p_stop->p_prwl = &p_stop->p_nxwl;
     p_stop->p_prsb = p_stop->p_nxsb = PID_NONE;
     p_stop->p_fchd = PID_STOP;
     p_stop->p_nchd = 1;
-    p_stop->p_stat = WAIT;
+    p_stop->p_stat = BLOCK;
     p_stop->p_ring = 0;
     p_stop->p_prio = NB_PRIORITY_LVL - 1;
     p_stop->p_pml4 = (phy_addr)NULL;
 	p_stop->p_brk  = 0;
-    p_stop->p_reg.rsp = (uint_ptr)kernel_stack_top;
-    p_stop->p_reg.rip = (uint_ptr)&proc_idle_entry;
+    p_stop->p_reg.b.rsp = (uint_ptr)kernel_stack_top;
+    p_stop->p_reg.b.rip = (uint_ptr)&proc_idle_entry;
     strcpy(p_stop->p_cmd, "stop");
+	p_idle->p_spnd = 0;
+	p_idle->p_shnd.blk = 0;
+	p_idle->p_shnd.ign = ~(sigset_t)0;
+	p_idle->p_shnd.dfl = 0;
 
     // set unused file desc
     for (size_t i = 0; i < NFD; i++)
@@ -106,29 +122,33 @@ void proc_start() {
     state.st_curr_pid = PID_INIT;
     st_curr_reg       = &p_init->p_reg;
 
-    proc_create(1);
-    proc_alloc_std_streams(1);
+    proc_create(PID_INIT);
+    proc_alloc_std_streams(PID_INIT);
 
-    klogf(Log_info, "init", "Start process init @ %p", p_init->p_reg.rip);
+    klogf(Log_info, "init", "Start process init @ %p", p_init->p_reg.b.rip);
     iret_to_proc(p_init);
 }
 
 void sched_add_proc(pid_t pid) {
     proc_t     *p = state.st_proc + pid;
     priority_t pr = p->p_prio;
-    pid_t     prl = state.st_sched.files[pr].last;
+	struct scheduler_file* pf = state.st_sched.files + pr;
+    pid_t     prl = pf->last;
 
     klogf(Log_verb, "sched", "add %d @ %d", (int)pid, (int)pr);
 
     ++state.st_sched.nb_proc;
     p->p_nxpf = PID_NONE;
-    if (~prl)
+    if (~prl) {
         state.st_proc[prl].p_nxpf = pid;
-    else {
-        state.st_sched.files[pr].first = pid;
+		p->p_prpf = &state.st_proc[prl].p_nxpf;
+	} else {
+        pf->first = pid;
+		p->p_prpf = &pf->first;
+		set_bit_64(&state.st_sched.pres, pr);
         state.st_sched.pres |= ((uint64_t)1) << pr;
     }
-    state.st_sched.files[pr].last = pid;
+    pf->last = pid;
 }
 
 pid_t sched_pop_proc() {
@@ -137,12 +157,20 @@ pid_t sched_pop_proc() {
     pid_t     pid = s->files[pr].first;
     pid_t      nx = state.st_proc[pid].p_nxpf;
     klogf(Log_verb, "sched", "rem %d @ %d", (int)pid, (int)pr);
+
+#ifdef __is_debug
+	state.st_proc[pid].p_prpf = NULL;
+#endif
+
     --s->nb_proc;
     s->files[pr].first = nx;
-    if (!~nx) {
+	if (~nx)
+		state.st_proc[nx].p_prpf = &s->files[pr].first;
+	else {
         s->files[pr].last = PID_NONE;
-        s->pres &= ~(((uint64_t)1) << pr);
+		clear_bit_64(&s->pres, pr);
     }
+
     return pid;
 }
 
@@ -157,9 +185,10 @@ void schedule_proc() {
               "nb R %d, run proc %d :\n"
               "   rip %p, rsp %p",
               state.st_sched.nb_proc + 1, pid,
-              p->p_reg.rip,
-              p->p_reg.rsp);
+              p->p_reg.b.rip,
+              p->p_reg.b.rsp);
 
+		proc_hndl_sigs();
         run_proc(p);
     }
 
@@ -234,10 +263,10 @@ uint8_t proc_create_userspace(void* prg_elf, proc_t *proc) {
     set_interrupt_flag();
 
     //On est désormais dans le paging du processus
-    proc->p_reg.rsp = make_proc_stack();
+    proc->p_reg.b.rsp = make_proc_stack();
 
     err = 0;
-    proc->p_reg.rip = elf_load(proc_ldr, &err, prg_elf);
+    proc->p_reg.b.rip = elf_load(proc_ldr, &err, prg_elf);
     if (err) return 2;
 
     proc->p_pml4    = pml4_loc;
@@ -269,12 +298,177 @@ void proc_write_stdin(char *buf, size_t len) {
 }
 
 void wait_file(pid_t pid, vfile_t *file) {
-    klogf(Log_info, "proc", "pid %d waiting for file %d",
+    klogf(Log_error, "proc", "pid %d waiting for file %d",
           pid, file->vf_stat.st_ino);
     proc_t *p = state.st_proc + pid;
     p->p_stat = BLOCK;
-    p->p_nxwf = file->vf_waiting;
+   
+	p->p_nxwl = file->vf_waiting;
+	if (~file->vf_waiting)
+		state.st_proc[file->vf_waiting].p_prwl = &p->p_nxwl;
     file->vf_waiting = pid;
+	p->p_prwl = &file->vf_waiting;
+	klogf(Log_error, "blk", "%p := %d", &file->vf_waiting, file->vf_waiting);
+
     schedule_proc();
-    never_reached;
+}
+
+static inline bool is_waiting_me(proc_t* pp, pid_t mpid) {
+	return pp->p_stat == BLOCK && (
+				pp->p_reg.b.rax == SYS_WAIT
+			|| (pp->p_reg.b.rax == SYS_WAITPID
+				&& rei_cast(pid_t, pp->p_reg.b.rdi) == mpid)
+			);
+}
+
+static void kill_proc_remove(pid_t pid, proc_t* p, proc_t* pp) {
+    if (~p->p_fchd) {
+        // Les enfants du processus reçoivent INIT comme nouveau parent
+        proc_t* fcp = state.st_proc + p->p_fchd;
+        proc_t*  ip = state.st_proc + PID_INIT;
+
+        if (fcp->p_stat == ZOMB) {
+
+            pid_t zcpid = p->p_fchd;
+            proc_t* zcp = fcp;
+            goto loop_enter_z;
+            while (~zcp->p_nxzb) {// Zombies
+                zcpid = zcp->p_nxzb;
+                zcp   = state.st_proc + zcpid;
+            loop_enter_z:
+                zcp->p_ppid = PID_INIT;
+            }
+            pid_t cpid = p->p_fchd;
+            proc_t* cp = fcp;
+            while (~cp->p_nxsb) {
+                cpid = cp->p_nxsb;
+                cp   = state.st_proc + cpid;
+                cp->p_ppid = PID_INIT;
+            }
+
+            if (~ip->p_fchd) {
+                proc_t* ifcp = state.st_proc + ip->p_fchd;
+                if (ifcp->p_stat == ZOMB) {
+                    cp ->p_nxsb = ifcp->p_nxsb;
+                    if (~ifcp->p_nxsb)
+                        state.st_proc[ifcp->p_nxsb].p_prsb = cpid;
+                    zcp->p_nxzb = ifcp->p_nxzb;
+                    if (~ifcp->p_nxzb)
+                        state.st_proc[ifcp->p_nxzb].p_prsb = zcpid;
+                } else {
+                    cp->p_nxsb   = ip->p_fchd;
+                    ifcp->p_prsb = cpid;
+                }
+            }
+            ip->p_fchd = p->p_fchd;
+
+        } else {
+
+            pid_t cpid = p->p_fchd;
+            proc_t* cp = fcp;
+            goto loop_enter_l;
+            while (~cp->p_nxsb) {
+                cpid = cp->p_nxsb;
+                cp   = state.st_proc + cpid;
+            loop_enter_l:
+                cp->p_ppid = PID_INIT;
+            }
+
+            if (~ip->p_fchd) {
+                proc_t* ifcp = state.st_proc + ip->p_fchd;
+                if (ifcp->p_stat == ZOMB) {
+                    cp -> p_nxsb = ifcp->p_nxsb;
+                    if (~ifcp->p_nxsb)
+                        state.st_proc[ifcp->p_nxsb].p_prsb = cpid;
+                    ifcp->p_nxsb = p->p_fchd;
+                    fcp ->p_prsb = ip->p_fchd;
+                } else {
+                    cp->p_nxsb   = ip->p_fchd;
+                    ifcp->p_prsb = cpid;
+                    ip->p_fchd   = p->p_fchd;
+                }
+            } else
+                ip->p_fchd = p->p_fchd;
+        }
+        ip->p_nchd += p->p_nchd;
+    }
+
+    if (~p->p_nxsb)
+        state.st_proc[p->p_nxsb].p_prsb = p->p_prsb;
+
+    if (~p->p_prsb)
+        state.st_proc[p->p_prsb].p_nxsb = p->p_nxsb;
+    else
+        pp->p_fchd = p->p_nxsb;
+
+    proc_exit(pid);
+}
+
+static void kill_proc_2zb(proc_t* p, proc_t* pp, int status) {
+	// on déplace le processus comme premier enfant
+	p->p_prsb = PID_NONE;
+	if (~pp->p_fchd) {
+		proc_t* fc = state.st_proc + pp->p_fchd;
+		fc->p_prsb = state.st_curr_pid;
+		if (fc->p_stat == ZOMB) {
+			if (~fc->p_nxsb)
+				state.st_proc[fc->p_nxsb].p_prsb = state.st_curr_pid;
+			p->p_nxsb = fc->p_nxsb;
+			p->p_nxzb = pp->p_fchd;
+		} else {
+			p->p_nxzb = PID_NONE;
+			p->p_nxsb = pp->p_fchd;
+		}
+	} else
+		p->p_nxsb = p->p_nxzb = PID_NONE;
+	pp->p_fchd = state.st_curr_pid;
+
+	kmem_free_paging(p->p_pml4, kernel_pml4);
+	p->p_stat      = ZOMB;
+	p->p_reg.b.rdi = status;
+}
+
+void kill_proc_nr(int status) {
+    proc_t  *p = state.st_proc + state.st_curr_pid;
+    pid_t ppid = p->p_ppid;
+    proc_t *pp = state.st_proc + ppid;
+
+	kill_proc_remove(state.st_curr_pid, p, pp);
+
+    if (is_waiting_me(pp, state.st_curr_pid)) {
+		
+		int* rt_st = pp->p_reg.b.rax == SYS_WAIT
+                   ? rei_cast(int*, pp->p_reg.b.rdi)
+                   : rei_cast(int*, pp->p_reg.b.rsi);
+
+        kmem_free_paging(p->p_pml4,
+                pp->p_pml4 ? pp->p_pml4 : kernel_pml4);
+
+        free_pid(state.st_curr_pid);
+        pp->p_nchd--;
+        pp->p_reg.b.rax = state.st_curr_pid;
+        pp->p_stat    = RUN;
+
+        proc_set_curr_pid(ppid);
+
+        if (rt_st)
+            *rt_st = status;
+
+        iret_to_proc(pp);
+
+    } else {
+		kill_proc_2zb(p, pp, status);
+        schedule_proc();
+    }
+}
+
+void kill_proc(int status) {
+    proc_t  *p = state.st_proc + state.st_curr_pid;
+    pid_t ppid = p->p_ppid;
+    proc_t *pp = state.st_proc + ppid;
+
+	kill_proc_remove(state.st_curr_pid, p, pp);
+	if (is_waiting_me(pp, state.st_curr_pid))
+		proc_blocr(ppid, pp);
+	kill_proc_2zb(p, pp, status);
 }

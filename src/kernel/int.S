@@ -31,6 +31,9 @@ syscall_tab:
     .quad sys_setpriority
     .quad sys_getpriority
     .quad sys_sbrk
+    .quad sys_sigsethnd
+    .quad sys_sigreturn
+	.quad sys_signal
     .quad sys_debug_block
 syscall_ring1_tab:
     .quad sys_prires
@@ -319,8 +322,7 @@ irq_sys_ring1:
     set_data_segments
 
     movabs $syscall_ring1_tab, %r10
-    lea    (%r10,  %rax, 8), %rax
-    movq   (%rax), %rax
+    movq   (%r10,  %rax, 8), %rax
     jmpq   *%rax
 
 irq_sys_ring1_end:

@@ -10,7 +10,7 @@
  * Renvoie l'index (commence 0) de maximal d'une partie non nulle
  * Renvoie 0 si toutes les parties sont nulles
  */
-#define GEN_FBIT(N, T) \
+#define GEN_BIT(N, T) \
 static inline uint8_t find_bit_##N(T p, uint8_t sz, uint8_t nstep) {\
     T p2;\
     uint8_t i = 0;\
@@ -22,12 +22,18 @@ static inline uint8_t find_bit_##N(T p, uint8_t sz, uint8_t nstep) {\
     }\
 \
     return i;\
+}\
+static inline void set_bit_##N(T* p, uint8_t i) {\
+	*p |= ((T)1) << i;\
+}\
+static inline void clear_bit_##N(T* p, uint8_t i) {\
+	*p &= ~(((T)1) << i);\
 }
 
-GEN_FBIT(64, uint64_t)
-GEN_FBIT(32, uint32_t)
-GEN_FBIT(8,   uint8_t)
-#undef GEN_FBIT
+GEN_BIT(64, uint64_t)
+GEN_BIT(32, uint32_t)
+GEN_BIT(8,   uint8_t)
+#undef GEN_BIT
 
 #include "paging.h"
 

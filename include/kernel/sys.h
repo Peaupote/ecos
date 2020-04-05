@@ -6,6 +6,7 @@
 #ifndef ASM_FILE
 
 #include <headers/types.h>
+#include <headers/signal.h>
 
 #include "proc.h"
 
@@ -38,6 +39,15 @@ int      sys_setpriority(int prio);
 int      sys_getpriority();
 
 void*    sys_sbrk(intptr_t inc);
+
+void     sys_sigsethnd(sighandler_t);
+
+__attribute__ ((noreturn))
+void     sys_sigreturn();
+
+// 0 <= sigid < SIG_COUNT
+// hnd[0]: ign, hnd[1]: dfl
+int      sys_signal(int sigid, uint8_t hnd);
 
 int      sys_debug_block(int v);
 

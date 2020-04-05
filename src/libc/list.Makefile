@@ -1,4 +1,4 @@
-LIBC_AS_FILES?=sys.S
+LIBC_AS_FILES?=sys.S signal/signal_as.S
 LIBC_CFILES?=libc_main.c \
 	  string/memcmp.c \
 	  string/memcpy.c \
@@ -25,7 +25,8 @@ LIBC_CFILES?=libc_main.c \
 	  sys/ressource.c \
 	  sys/stat.c \
 	  dirent/opendir.c \
-	  dirent/readdir.c
+	  dirent/readdir.c \
+	  signal/signal.c
 LIBC_DEP=$(foreach file,$(LIBC_CFILES),\
 			"-MT $(file:.c=.$(NAME_LC).o) $(file)")
 LIBC_OBJ=$(LIBC_CFILES:%.c=%.$(NAME_LC).o)\

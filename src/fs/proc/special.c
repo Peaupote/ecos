@@ -11,8 +11,8 @@ int stat_read(pid_t pid, void *buf, off_t pos, size_t len) {
     char st = 'F';
     switch (p->p_stat) {
     case SLEEP: st = 'S'; break;
-    case WAIT:  st = 'W'; break;
     case BLOCK: st = 'B'; break;
+    case BLOCR: st = 'L'; break;
     case RUN:   st = 'R'; break;
     case ZOMB:  st = 'Z'; break;
     case FREE:

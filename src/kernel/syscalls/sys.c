@@ -17,140 +17,10 @@
  */
 
 void sys_exit(int status) {
-    proc_t  *p = state.st_proc + state.st_curr_pid;
-    pid_t ppid = p->p_ppid;
-    proc_t *pp = state.st_proc + ppid;
+    klogf(Log_info, "syscall", "exit pid %d with status %d",
+          state.st_curr_pid, status);
 
-    klogf(Log_info, "syscall", "kill pid %d with status %d ppid=%d(%c)",
-          state.st_curr_pid, status, ppid,
-          proc_state_char[pp->p_stat]);
-
-    if (~p->p_fchd) {
-        // Les enfants du processus reçoivent INIT comme nouveau parent
-        proc_t* fcp = state.st_proc + p->p_fchd;
-        proc_t*  ip = state.st_proc + PID_INIT;
-
-        if (fcp->p_stat == ZOMB) {
-
-            pid_t zcpid = p->p_fchd;
-            proc_t* zcp = fcp;
-            goto loop_enter_z;
-            while (~zcp->p_nxzb) {// Zombies
-                zcpid = zcp->p_nxzb;
-                zcp   = state.st_proc + zcpid;
-            loop_enter_z:
-                zcp->p_ppid = PID_INIT;
-            }
-            pid_t cpid = p->p_fchd;
-            proc_t* cp = fcp;
-            while (~cp->p_nxsb) {
-                cpid = cp->p_nxsb;
-                cp   = state.st_proc + cpid;
-                cp->p_ppid = PID_INIT;
-            }
-
-            if (~ip->p_fchd) {
-                proc_t* ifcp = state.st_proc + ip->p_fchd;
-                if (ifcp->p_stat == ZOMB) {
-                    cp ->p_nxsb = ifcp->p_nxsb;
-                    if (~ifcp->p_nxsb)
-                        state.st_proc[ifcp->p_nxsb].p_prsb = cpid;
-                    zcp->p_nxzb = ifcp->p_nxzb;
-                    if (~ifcp->p_nxzb)
-                        state.st_proc[ifcp->p_nxzb].p_prsb = zcpid;
-                } else {
-                    cp->p_nxsb   = ip->p_fchd;
-                    ifcp->p_prsb = cpid;
-                }
-            }
-            ip->p_fchd = p->p_fchd;
-
-        } else {
-
-            pid_t cpid = p->p_fchd;
-            proc_t* cp = fcp;
-            goto loop_enter_l;
-            while (~cp->p_nxsb) {
-                cpid = cp->p_nxsb;
-                cp   = state.st_proc + cpid;
-            loop_enter_l:
-                cp->p_ppid = PID_INIT;
-            }
-
-            if (~ip->p_fchd) {
-                proc_t* ifcp = state.st_proc + ip->p_fchd;
-                if (ifcp->p_stat == ZOMB) {
-                    cp -> p_nxsb = ifcp->p_nxsb;
-                    if (~ifcp->p_nxsb)
-                        state.st_proc[ifcp->p_nxsb].p_prsb = cpid;
-                    ifcp->p_nxsb = p->p_fchd;
-                    fcp ->p_prsb = ip->p_fchd;
-                } else {
-                    cp->p_nxsb   = ip->p_fchd;
-                    ifcp->p_prsb = cpid;
-                    ip->p_fchd   = p->p_fchd;
-                }
-            } else
-                ip->p_fchd = p->p_fchd;
-        }
-        ip->p_nchd += p->p_nchd;
-    }
-
-    if (~p->p_nxsb)
-        state.st_proc[p->p_nxsb].p_prsb = p->p_prsb;
-
-    if (~p->p_prsb)
-        state.st_proc[p->p_prsb].p_nxsb = p->p_nxsb;
-    else
-        pp->p_fchd = p->p_nxsb;
-
-    proc_exit(state.st_curr_pid);
-
-    if (pp->p_stat == WAIT
-        && (rei_cast(pid_t, pp->p_reg.rax) == PID_NONE
-            || rei_cast(pid_t, pp->p_reg.rax) == state.st_curr_pid)) {
-
-        int* rt_st = rei_cast(pid_t, pp->p_reg.rax) == PID_NONE
-                   ? rei_cast(int*, pp->p_reg.rdi)
-                   : rei_cast(int*, pp->p_reg.rsi);
-
-        kmem_free_paging(p->p_pml4,
-                pp->p_pml4 ? pp->p_pml4 : kernel_pml4);
-
-        free_pid(state.st_curr_pid);
-        pp->p_nchd--;
-        pp->p_reg.rax = state.st_curr_pid;
-        pp->p_stat    = RUN;
-
-        proc_set_curr_pid(ppid);
-
-        if (rt_st)
-            *rt_st = status;
-
-        iret_to_proc(pp);
-    } else {
-        // on réajoute le processus comme premier enfant
-        p->p_prsb = PID_NONE;
-        if (~pp->p_fchd) {
-            proc_t* fc = state.st_proc + pp->p_fchd;
-            fc->p_prsb = state.st_curr_pid;
-            if (fc->p_stat == ZOMB) {
-                if (~fc->p_nxsb)
-                    state.st_proc[fc->p_nxsb].p_prsb = state.st_curr_pid;
-                p->p_nxsb = fc->p_nxsb;
-                p->p_nxzb = pp->p_fchd;
-            } else {
-                p->p_nxzb = PID_NONE;
-                p->p_nxsb = pp->p_fchd;
-            }
-        } else
-            p->p_nxsb = p->p_nxzb = PID_NONE;
-        pp->p_fchd = state.st_curr_pid;
-
-        kmem_free_paging(p->p_pml4, kernel_pml4);
-        p->p_stat = ZOMB;// statut dans rdi
-        schedule_proc();
-    }
+	kill_proc_nr(status);
 }
 
 pid_t sys_getpid() {
@@ -188,7 +58,7 @@ pid_t sys_wait(int* rt_st) {
 
             pid_t cpid = p->p_fchd;
             if (rt_st)
-                *rt_st = cp->p_reg.rdi;
+                *rt_st = cp->p_reg.b.rdi;
 
             rem_child_Z0(p, cp);
 
@@ -197,8 +67,7 @@ pid_t sys_wait(int* rt_st) {
             return cpid;
 
         } else {
-            p->p_stat = WAIT;
-            rei_cast(pid_t, p->p_reg.rax) = PID_NONE;
+			proc_self_block(p);
             klogf(Log_info, "syscall", "process %d wait %d childs",
                     state.st_curr_pid, p->p_nchd);
             schedule_proc();
@@ -222,7 +91,7 @@ pid_t sys_waitpid(pid_t cpid, int* rt_st) {
 
         if (cp->p_stat == ZOMB) {
 
-            if (rt_st) *rt_st = cp->p_reg.rdi;
+            if (rt_st) *rt_st = cp->p_reg.b.rdi;
 
             if (~cp->p_prsb) {
                 state.st_proc[cp->p_prsb].p_nxzb = cp->p_nxzb;
@@ -236,9 +105,9 @@ pid_t sys_waitpid(pid_t cpid, int* rt_st) {
             return cpid;
         }
 
-        p->p_stat = WAIT;
-        rei_cast(pid_t, p->p_reg.rax) = cpid;
-        klogf(Log_info, "syscall", "process %d wait child %d", mpid, cpid);
+		proc_self_block(p);
+        klogf(Log_info, "syscall", "process %d wait child %d",
+				mpid, cpid);
         schedule_proc();
         never_reached return 0;
 
@@ -284,6 +153,9 @@ pid_t sys_fork() {
     fp->p_stat  = RUN;
     fp->p_ring  = pp->p_ring;
     fp->p_prio  = pp->p_prio;
+	fp->p_brk   = pp->p_brk;
+	fp->p_spnd  = 0;
+	fp->p_shnd  = pp->p_shnd;
 
     pp->p_nchd++; // one more child
     memcpy(&fp->p_reg, &pp->p_reg, sizeof(struct reg));
@@ -304,7 +176,7 @@ pid_t sys_fork() {
     }
 
     proc_create(fpid);
-    fp->p_reg.rax = 0;
+    fp->p_reg.b.rax = 0;
 
     sched_add_proc(fpid);
 
@@ -499,7 +371,7 @@ ssize_t sys_write(int fd, uint8_t *s, size_t len) {
         return c;
 
     default:
-        p->p_reg.rax = -1;
+        p->p_reg.b.rax = -1;
         return -1;
     }
 }
@@ -569,14 +441,15 @@ int sys_debug_block(int v) {
     if (~v) return v;
 
     //On bloque le processus actuel
-    state.st_proc[state.st_curr_pid].p_stat = BLOCK;
+	proc_t* p = cur_proc();
+	proc_self_block(p);
     schedule_proc();
     never_reached return -1;
 }
 
 uint64_t invalid_syscall() {
     proc_t *p = &state.st_proc[state.st_curr_pid];
-    klogf(Log_error, "syscall", "invalid syscall code %d", p->p_reg.rax);
+    klogf(Log_error, "syscall", "invalid syscall code %d", p->p_reg.b.rax);
     return ~(uint64_t)0;
 }
 

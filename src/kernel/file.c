@@ -21,7 +21,7 @@ void vfs_init() {
 
     for (size_t i = 0; i < NFILE; i++) {
         state.st_files[i].vf_cnt = 0;
-        state.st_files[i].vf_waiting = 0;
+        state.st_files[i].vf_waiting = PID_NONE;
     }
 
     klogf(Log_info, "vfs", "setup proc file system");
@@ -209,16 +209,8 @@ int vfs_write(vfile_t *vfile, void *buf, off_t pos, size_t len) {
 
     // TODO : what happend for waiting ps if error ?
     if (rc > 0) {
-        proc_t *p;
-        pid_t npid;
-        for (pid_t pid = vfile->vf_waiting; pid > 0; pid = npid) {
-            p = state.st_proc + pid;
-            npid = p->p_nxwf;
-            sched_add_proc(pid);
-            klogf(Log_info, "vfs", "write unblock %d", pid);
-        }
-
-        vfile->vf_waiting = -1;
+    	klogf(Log_info, "vfs", "write unblock");
+		proc_unblock_list(&vfile->vf_waiting);
     }
 
     return rc;

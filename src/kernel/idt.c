@@ -89,6 +89,7 @@ bool pit_hdl(void) {
     }
 
     write_eoi();
+	proc_hndl_sigs();
     return false;
 }
 
@@ -98,8 +99,11 @@ void pit_hdl_switch(void) {
           "pit switch, nb R %d, run proc %d :\n"
           "   rip %p, rsp %p",
           state.st_sched.nb_proc + 1, state.st_curr_pid,
-          p->p_reg.rip, p->p_reg.rsp);
-    eoi_run_proc(p);
+          p->p_reg.b.rip, p->p_reg.b.rsp);
+
+	write_eoi();
+	proc_hndl_sigs();
+    run_proc(p);
 }
 
 //--#PF errcode--

@@ -27,11 +27,11 @@ uint64_t int64_of_str_hexa(const char src[]);
 static inline char hexa_digit(uint8_t p){
     return (p<10 ? '0': ('A'-10)) + p;
 }
-extern uint8_t hexa_digit_of_char_tb0[16];
-extern uint8_t hexa_digit_of_char_tb1[16 * 3 - 9 - 1];
+extern uint8_t u_hexa_digit_of_char_tb0[16];
+extern uint8_t u_hexa_digit_of_char_tb1[16 * 3 - 9 - 1];
 static inline uint8_t hexa_digit_of_char(char c){
-    return hexa_digit_of_char_tb1[
-            hexa_digit_of_char_tb0[(c>>4)&0xf] + (c&0xf)];
+    return u_hexa_digit_of_char_tb1[
+            u_hexa_digit_of_char_tb0[(c>>4)&0xf] + (c&0xf)];
 }
 
 #endif

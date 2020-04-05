@@ -3,6 +3,7 @@
 
 #include <headers/proc.h>
 #include <headers/file.h>
+#include <headers/signal.h>
 
 void     _libc_init();
 
@@ -23,6 +24,10 @@ int      debug_block(int v);
 
 int fstat(int fd, struct stat *st);
 int stat(const char *fname, struct stat *st);
+
+void     _sigsethnd(sighandler_t);
+void     _sigreturn();
+uint8_t  _signal(int sigid, uint8_t hnd);
 
 // Appel avec privilège ring 1
 

@@ -3,7 +3,7 @@ export NAME_LK?=libk
 export TSFX?=
 
 #Communs
-FLAGS_C?=-O1 -Wall -Wextra -std=gnu99 -nostdlib -mno-red-zone
+FLAGS_C?=-g -O1 -Wall -Wextra -std=gnu99 -nostdlib -mno-red-zone -D__is_debug
 #Kernel
 FLAGS_K?=$(FLAGS_C) -mcmodel=large -ffreestanding -D__is_kernel
 #Boot

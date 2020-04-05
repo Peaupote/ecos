@@ -38,7 +38,7 @@ struct free_bloc {
 uint_ptr    up_lim;
 free_bloc_t root;
 
-void malloc_init() {
+void _malloc_init() {
     up_lim    = (uint_ptr) sbrk(0);
     if (up_lim % MALLOC_ALIGN != 0) {
         uint_ptr  add = MALLOC_ALIGN - (up_lim % MALLOC_ALIGN);
