@@ -1,7 +1,7 @@
 #ifndef _U_MISC_H
 #define _U_MISC_H
 
-//reinterpret_cast
+//reinterpret_cast TODO
 #define rei_cast(T, V) (*(T*)(&(V)))
 
 /*

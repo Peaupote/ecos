@@ -70,7 +70,7 @@ void proc_hndl_sig_i(int sigid) {
 	iret_to_proc(p);
 }
 
-bool send_sig_to_proc(pid_t pid, int sigid) {
+int8_t send_sig_to_proc(pid_t pid, int sigid) {
 	klogf(Log_info, "send", "send i%d to %d", sigid, (int)pid);
 	proc_t* p  = state.st_proc + pid;
 	if (sigid + 1 == SIGKILL) {
@@ -78,9 +78,10 @@ bool send_sig_to_proc(pid_t pid, int sigid) {
 			switch (p->p_stat) {
 				case BLOCK:
 					if (p->p_reg.b.rax == SYS_EXECVE) {
-						return true;//TODO
-					}
-					proc_extract_blk(p);
+						pid_t aux_proc = rei_cast(pid_t, p->p_reg.b.rdi);
+						proc_execve_abort(aux_proc);
+					} else
+						proc_extract_blk(p);
 					break;
 				case RUN: case BLOCR:
 					proc_extract_pf(p);
@@ -91,10 +92,28 @@ bool send_sig_to_proc(pid_t pid, int sigid) {
 			switch_proc(pid);
 		}
 		kill_proc(SIGKILL * 0x100);
-		return true;
+		return 1;
 	}
 	p->p_spnd |= ((sigset_t)1) << sigid;
 	if (p->p_stat == BLOCK)
 		proc_unblock_1(pid, p);
-	return false;
+	return 0;
+}
+
+int sys_kill(pid_t pid, int signum) {
+	if (pid < 0 || pid >= NPROC || signum < 0 || signum > SIG_COUNT)
+		return -1;
+	proc_t* d = state.st_proc + pid;
+	if (!proc_alive(d))
+		return -1;
+	
+	if (!signum)       return 0;
+	if (d->p_ring < 3) return -1;
+
+	bool self = state.st_curr_pid == pid;
+	int8_t  r = send_sig_to_proc(pid, signum - 1);
+	if (r == -1)     return -1;
+	if (!r || !self) return  0;
+	
+	schedule_proc();
 }

@@ -133,7 +133,8 @@ struct {
     pid_t       st_curr_pid;          // pid of current running process
                                       //   should be RUN or BLOCR 
     struct scheduler st_sched;
-    pid_t       st_free_proc;         // head of the free linked list
+    pid_t       st_free_proc;         // head of the free file
+	pid_t       st_free_proc_last;    // last of the free file
     proc_t      st_proc[NPROC];       // table containing all processes
     chann_t     st_chann[NCHAN];      // table containing all channels
     vfile_t     st_files[NFILE];      // table containing all opened files
@@ -214,10 +215,12 @@ void proc_ps();
 
 void proc_write_stdin(char *buf, size_t len);
 
-// Retourne true ssi une action (kill...) a été effectué immédiatement
-// sur le processus cible
+// Renvoi -1 en cas d'erreur
+// Renvoi  1 si une action (kill) a été effectuée immédiatement
+// sur le processus cible et l'envoi dans un état non exécutable
+// Renvoi  0 sinon
 // Peut modifier le processus courant
-bool send_sig_to_proc(pid_t pid, int sigid);
+int8_t send_sig_to_proc(pid_t pid, int sigid);
 
 __attribute__((noreturn))
 void kill_proc_nr(int status);
@@ -229,16 +232,25 @@ void wait_file(pid_t pid, cid_t cid);
 
 static inline pid_t find_new_pid() {
     pid_t pid = state.st_free_proc;
-    if (~pid)
+    if (~pid) {
         state.st_free_proc = state.st_proc[pid].p_nxfr;
-    else
-        klogf(Log_error, "proc", "can't find a new pid");
+		if (!~state.st_free_proc)
+			state.st_free_proc_last = PID_NONE;
+	} else
+        kpanic("can't find a new pid");
     return pid;
 }
 
 static inline void free_pid(pid_t p) {
-    state.st_proc[p].p_nxfr = state.st_free_proc;
-    state.st_free_proc = p;
+	// On rajoute le pid en fin de file afin d'éviter qu'il ne
+	// soit réutilisé immédiatement
+	if (~state.st_free_proc_last) {
+		state.st_proc[state.st_free_proc_last].p_nxfr = p;
+		state.st_free_proc_last = p;
+	} else {
+		state.st_free_proc = state.st_free_proc_last = p;
+	}
+	state.st_proc[p].p_nxfr = PID_NONE;
     state.st_proc[p].p_stat = FREE;
 }
 
@@ -247,6 +259,12 @@ static inline void proc_set_curr_pid(pid_t pid) {
     st_curr_reg = &state.st_proc[pid].p_reg;
 }
 
+static inline bool proc_alive(proc_t* p) {
+	enum proc_state s = p->p_stat;
+	return s != FREE && s != ZOMB;
+}
+
+void proc_execve_abort(pid_t aux_pid);
 
 static inline uintptr_t make_proc_stack() {
     *kmem_acc_pts_entry(paging_add_lvl(pgg_pd, USER_STACK_PD),

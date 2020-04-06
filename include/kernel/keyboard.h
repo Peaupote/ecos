@@ -7,6 +7,10 @@
 #define KEY_LSHIFT		0x2A
 #define KEY_RSHIFT		0x36
 #define KEY_TAB         0x0F
+#define KEY_LCTRL       0x1D
+#define KEY_RCTRL       0x9D
+
+#define KEY_C           0x2E
 
 #define KEY_KP_ENTER	0x9C
 #define KEY_ALTGR		0xB8
@@ -47,6 +51,9 @@ static inline bool key_state_maj() {
 }
 static inline bool key_state_altgr() {
     return key_state(KEY_ALTGR);
+}
+static inline bool key_state_ctrl() {
+	return key_state(KEY_LCTRL) || key_state(KEY_RCTRL);
 }
 
 

@@ -34,9 +34,12 @@ syscall_tab:
     .quad sys_sigsethnd
     .quad sys_sigreturn
 	.quad sys_signal
+	.quad sys_kill
     .quad sys_debug_block
-syscall_ring1_tab:
+syscall_ring1j_tab:
     .quad sys_prires
+syscall_ring1c_tab:
+    .quad tty_set_owner
 
     .section .text
 .global irq_sys
@@ -321,9 +324,16 @@ irq_sys_ring1:
     movw   $SEG_SEL(GDT_RING0_DATA,0), %r10w
     set_data_segments
 
-    movabs $syscall_ring1_tab, %r10
+	testq  $0x100, %rax
+	jne    irq_sys_ring1c
+    movabs $syscall_ring1j_tab, %r10
     movq   (%r10,  %rax, 8), %rax
     jmpq   *%rax
+irq_sys_ring1c:
+    movabs $syscall_ring1c_tab, %r10
+	andq   $0xff,  %rax
+    movq   (%r10,  %rax, 8), %rax
+    callq  *%rax
 
 irq_sys_ring1_end:
     restore_data_segments

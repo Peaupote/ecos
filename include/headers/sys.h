@@ -1,7 +1,7 @@
 #ifndef _HD_SYS_H
 #define _HD_SYS_H
 
-#define NSYSCALL 23
+#define NSYSCALL 24
 
 #define SYS_SLEEP    0
 #define SYS_FORK     1
@@ -25,8 +25,10 @@
 #define SYS_SIGHND  19
 #define SYS_SIGRT   20
 #define SYS_SIGNAL  21
-#define SYS_DEBUG_BLOCK 22
+#define SYS_KILL    22
+#define SYS_DEBUG_BLOCK 23
 
-#define SYS_R1_PRIRES    0
+#define SYS_R1J_PRIRES   0
+#define SYS_R1C_TTYOWN   0
 
 #endif

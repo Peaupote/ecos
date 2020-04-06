@@ -116,6 +116,7 @@ void proc_start() {
         state.st_proc[pid].p_nxfr = pid + 1;
     }
     state.st_proc[NPROC - 1].p_nxfr = PID_NONE;
+	state.st_free_proc_last = NPROC - 1;
 
     vfs_init();
 

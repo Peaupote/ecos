@@ -5,6 +5,7 @@
 #include <stdint.h>
 
 #include <kernel/keyboard.h>
+#include <headers/proc.h>
 
 #define SB_HEIGHT 128
 
@@ -16,6 +17,7 @@ enum tty_mode {
 
 void   tty_init(enum tty_mode);
 void   tty_set_mode(enum tty_mode);
+void   tty_set_owner(pid_t p);
 void   tty_input(scancode_byte scb, key_event ev);
 
 //L'affichage du prompt doit être mis à jour (tty_update_prompt_pos)

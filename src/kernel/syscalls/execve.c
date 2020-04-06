@@ -26,6 +26,7 @@
 // permet de conserver des données lors du changement de paging
 struct execve_tr {
     uint8_t    stack[AUX_STACK_SIZE];
+	uint8_t    phase;
     Elf64_Ehdr ehdr;
     size_t     nb_sections;
     uint_ptr   args_bg;
@@ -76,7 +77,7 @@ static inline void free_tr() {
 }
 
 void proc_execve_error_1() {
-    proc_t* mp = state.st_proc + state.st_curr_pid;
+    proc_t* mp = cur_proc();
     pid_t ppid = mp->p_ppid;
     proc_t *pp = state.st_proc + ppid;
     --pp->p_nchd;
@@ -89,7 +90,7 @@ void proc_execve_error_1() {
     iret_to_proc(pp);
 }
 void proc_execve_error_2() {
-    proc_t* mp = state.st_proc + state.st_curr_pid;
+    proc_t* mp = cur_proc();
     pid_t ppid = mp->p_ppid;
     proc_t* pp = state.st_proc + ppid;
     kmem_free_paging(mp->p_pml4, pp->p_pml4);
@@ -106,6 +107,7 @@ void execve_switch_pml4() {
            | PAGING_FLAG_P | PAGING_FLAG_W;
     pml4_to_cr3(npml4);
     state.st_proc[state.st_curr_pid].p_pml4 = npml4;
+	trf()->phase = 1;
 }
 
 // --Ring 1 -> 0 defined in int7Ecall.S
@@ -338,6 +340,8 @@ int sys_execve(reg_t fname, reg_t argv, reg_t env) {
             ini_ind < PAGE_ENT; ++ini_ind)
         *paging_acc_pdpt(PML4_PSKD, ini_ind) = 0;
 
+	trf()->phase = 0;
+
     // Initialisation du processus auxiliaire
     ep->p_ppid = pid;
     ep->p_nchd = 0;
@@ -356,6 +360,7 @@ int sys_execve(reg_t fname, reg_t argv, reg_t env) {
     p->p_stat          = BLOCK;
     trf()->sigblk_save = p->p_shnd.blk;
     p->p_shnd.blk      = 0;
+	rei_cast(pid_t, p->p_reg.b.rdi) = epid;
 
     // On bascule sur le processus auxiliaire
     state.st_curr_pid = epid;
@@ -425,4 +430,14 @@ void proc_execve_end() {
     free_tr();
     proc_set_curr_pid(mp->p_ppid);
     iret_to_proc(pp);
+}
+
+void proc_execve_abort(pid_t aux_pid) {
+	switch_proc(aux_pid);
+	uint8_t phase = trf()->phase;
+    for (int fd = 0; fd < NFD; fd++) sys_close(fd);
+	proc_t* mp = state.st_proc + aux_pid;
+	free_tr();
+	if (phase == 1)
+		kmem_free_paging(mp->p_pml4, kernel_pml4);
 }
