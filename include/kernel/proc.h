@@ -37,16 +37,31 @@ extern char proc_state_char[6];
 #define RIP 8
 #define RSP 16
 
-typedef uint64_t __attribute__((__may_alias__)) reg_t;
-struct base_reg { // sz = 17 * 8 = 8 [16]
-	reg_t rip, rsp,
-	rax, rbx, rcx, rdx, rsi,
-	rdi, rbp, r8, r9, r10, r11,
-	r12, r13, r14, r15;
+typedef uint64_t reg_data_t;
+
+typedef union {
+	reg_data_t rd;
+	uint64_t   ll;
+	int         i;
+	void*       p;
+	pid_t   pid_t;
+} reg_t;
+
+struct reg_rsv { //calleR - saved, 9 * 8
+	reg_t rax, rcx, rdx, rsi,
+		  rdi, r8,  r9,  r10,
+		  r11;
 } __attribute__((packed));
+
+struct reg_esv { //calleE - saved, 6 * 8
+	reg_t rbx, rbp, r12, r13,
+		  r14, r15;
+} __attribute__((packed));
+
 struct reg { // sz = 18 * 8 = 0 [16]
-    reg_t rflags;
-	struct base_reg b;
+    reg_t   rflags, rip, rsp;
+	struct reg_rsv r;
+	struct reg_esv e;
 } __attribute__((packed));
 
 struct proc_shnd {
@@ -204,7 +219,7 @@ static inline void run_proc(proc_t* p) {
 		iret_to_proc(p);
     else { //BLOCR
         p->p_stat = RUN;
-        p->p_reg.b.rax = continue_syscall();
+        p->p_reg.r.rax = continue_syscall();
         iret_to_proc(p);
     }
 }
@@ -266,11 +281,11 @@ static inline bool proc_alive(proc_t* p) {
 
 void proc_execve_abort(pid_t aux_pid);
 
-static inline uintptr_t make_proc_stack() {
+static inline void* make_proc_stack() {
     *kmem_acc_pts_entry(paging_add_lvl(pgg_pd, USER_STACK_PD),
                             2, PAGING_FLAG_U | PAGING_FLAG_W)
         = SPAGING_FLAG_P | PAGING_FLAG_W | PAGING_FLAG_U;
-    return paging_add_lvl(pgg_pd, USER_STACK_PD + 1);
+    return (void*)paging_add_lvl(pgg_pd, USER_STACK_PD + 1);
 }
 
 static inline cid_t free_chann() {

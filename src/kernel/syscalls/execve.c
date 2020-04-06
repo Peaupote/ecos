@@ -85,7 +85,7 @@ void proc_execve_error_1() {
 
     proc_set_curr_pid(ppid);
     pp->p_stat = RUN;
-    rei_cast(int, pp->p_reg.b.rax) = -1;
+    pp->p_reg.r.rax.i = -1;
     free_tr();
     iret_to_proc(pp);
 }
@@ -318,8 +318,7 @@ void proc_execve_entry(const char *fname, const char **argv, const char **env);
 int sys_execve(reg_t fname, reg_t argv, reg_t env) {
     pid_t  pid = state.st_curr_pid;
     klogf(Log_info, "syscall", "process %d called execve", (int)pid);
-    proc_t  *p = state.st_proc + pid;
-    strncpy(p->p_cmd, (char*)fname, 256);
+    proc_t  *p = cur_proc();
 
     pid_t epid = find_new_pid();
     if (!~epid) return -1;
@@ -350,17 +349,19 @@ int sys_execve(reg_t fname, reg_t argv, reg_t env) {
     ep->p_prio = p->p_prio;
     for (size_t i = 0; i < NFD; i++) ep->p_fds[i] = -1;
     ep->p_pml4 = p->p_pml4;
-    ep->p_reg.b.rsp = (uint_ptr)trf()->stack + AUX_STACK_SIZE;
-    ep->p_reg.b.rip = (uint_ptr)&proc_execve_entry;
-    ep->p_reg.b.rdi = fname;
-    ep->p_reg.b.rsi = argv;
-    ep->p_reg.b.rdx = env;
+    ep->p_reg.rsp.p = trf()->stack + AUX_STACK_SIZE;
+    ep->p_reg.rip.p = &proc_execve_entry;
+    ep->p_reg.r.rdi = fname;
+    ep->p_reg.r.rsi = argv;
+    ep->p_reg.r.rdx = env;
+    strncpy(ep->p_cmd, (char*)fname.p, 256);
 
     // On arrête processus appelant en le passant en BLOCK
-    p->p_stat          = BLOCK;
-    trf()->sigblk_save = p->p_shnd.blk;
-    p->p_shnd.blk      = 0;
-	rei_cast(pid_t, p->p_reg.b.rdi) = epid;
+    p->p_stat            = BLOCK;
+	++p->p_nchd;
+    trf()->sigblk_save   = p->p_shnd.blk;
+    p->p_shnd.blk        = 0;
+	p->p_reg.r.rdi.pid_t = epid;
 
     // On bascule sur le processus auxiliaire
     state.st_curr_pid = epid;
@@ -403,20 +404,21 @@ void proc_execve_entry(const char *fname,
 
 // Ring 0
 void proc_execve_end() {
-    proc_t* mp = state.st_proc + state.st_curr_pid;
-    proc_t* pp = state.st_proc + mp->p_ppid;
-    pp->p_reg.b.rip = trf()->ehdr.e_entry;
+    proc_t* mp      = state.st_proc + state.st_curr_pid;
+    proc_t* pp      = state.st_proc + mp->p_ppid;
+    pp->p_reg.rip.p = (void*)trf()->ehdr.e_entry;
 
-    pp->p_reg.b.rsp = make_proc_stack();
-    pp->p_reg.b.rdi = trf()->argc;
-    pp->p_reg.b.rsi = (uint_ptr)trf()->argv;
-    pp->p_reg.b.rdx = (uint_ptr)trf()->envv;
-    pp->p_pml4      = mp->p_pml4;
-    pp->p_brk       = align_to(trf()->args_ed, 8);
-    pp->p_shnd.usr  = NULL;
-    pp->p_shnd.blk  = trf()->sigblk_save;
+    pp->p_reg.rsp.p   = make_proc_stack();
+    pp->p_reg.r.rdi.i = trf()->argc;
+    pp->p_reg.r.rsi.p = trf()->argv;
+    pp->p_reg.r.rdx.p = trf()->envv;
+    pp->p_pml4        = mp->p_pml4;
+    pp->p_brk         = align_to(trf()->args_ed, 8);
+    pp->p_shnd.usr    = NULL;
+    pp->p_shnd.blk    = trf()->sigblk_save;
     //on hérite p_shnd.ign
-    pp->p_shnd.dfl  = ~pp->p_shnd.ign;
+    pp->p_shnd.dfl    = ~pp->p_shnd.ign;
+    strncpy(pp->p_cmd, mp->p_cmd, 256);
 
     --pp->p_nchd;
     free_pid(state.st_curr_pid);

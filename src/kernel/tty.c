@@ -226,7 +226,7 @@ size_t built_in_exec() {
 		sscanf(arg1, "%d", &ipid);
 		pid_t pid = ipid;
 		sscanf(arg2, "%i", &val);
-        state.st_proc[pid].p_reg.b.rdi = val;
+        state.st_proc[pid].p_reg.r.rdi.i = val;
 		proc_unblock_1(pid, state.st_proc + pid);
 	} else if (!strcmp(cmd_name, "ls")) ls(&tokpt);
 	else if (!strcmp(cmd_name, "kill")) {

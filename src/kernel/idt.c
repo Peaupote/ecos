@@ -99,7 +99,7 @@ void pit_hdl_switch(void) {
           "pit switch, nb R %d, run proc %d :\n"
           "   rip %p, rsp %p",
           state.st_sched.nb_proc + 1, state.st_curr_pid,
-          p->p_reg.b.rip, p->p_reg.b.rsp);
+          p->p_reg.rip.p, p->p_reg.rsp.p);
 
 	write_eoi();
 	proc_hndl_sigs();

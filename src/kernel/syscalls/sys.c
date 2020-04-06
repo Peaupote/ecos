@@ -58,7 +58,7 @@ pid_t sys_wait(int* rt_st) {
 
             pid_t cpid = p->p_fchd;
             if (rt_st)
-                *rt_st = cp->p_reg.b.rdi;
+                *rt_st = cp->p_reg.r.rdi.i;
 
             rem_child_Z0(p, cp);
 
@@ -91,7 +91,7 @@ pid_t sys_waitpid(pid_t cpid, int* rt_st) {
 
         if (cp->p_stat == ZOMB) {
 
-            if (rt_st) *rt_st = cp->p_reg.b.rdi;
+            if (rt_st) *rt_st = cp->p_reg.r.rdi.i;
 
             if (~cp->p_prsb) {
                 state.st_proc[cp->p_prsb].p_nxzb = cp->p_nxzb;
@@ -178,7 +178,7 @@ pid_t sys_fork() {
     if (!proc_create(fpid)) {
         klogf(Log_error, "syscall", "fail proc create");
     }
-    fp->p_reg.b.rax = 0;
+    fp->p_reg.r.rax.pid_t = 0;
 
     sched_add_proc(fpid);
 
@@ -332,12 +332,9 @@ ssize_t sys_read(int fd, uint8_t *d, size_t len) {
 
     case TYPE_CHAR:
     case TYPE_FIFO:
-        if (vfile->vf_stat.st_size == 0) {
+        if (vfile->vf_stat.st_size == 0)
             wait_file(state.st_curr_pid, cid);
-        }
-
-        return vfs_read(vfile, d, 0, len);
-        break;
+		return vfs_read(vfile, d, 0, len);
 
     default:
         return -1;
@@ -345,7 +342,7 @@ ssize_t sys_read(int fd, uint8_t *d, size_t len) {
 }
 
 ssize_t sys_write(int fd, uint8_t *s, size_t len) {
-    proc_t *p  = &state.st_proc[state.st_curr_pid];;
+    proc_t *p = cur_proc();
 
     if (!s || fd < 0 || fd > NFD || p->p_fds[fd] == -1)
         return -1;
@@ -377,7 +374,6 @@ ssize_t sys_write(int fd, uint8_t *s, size_t len) {
         return c;
 
     default:
-        p->p_reg.b.rax = -1;
         return -1;
     }
 }
@@ -455,7 +451,8 @@ int sys_debug_block(int v) {
 
 uint64_t invalid_syscall() {
     proc_t *p = &state.st_proc[state.st_curr_pid];
-    klogf(Log_error, "syscall", "invalid syscall code %d", p->p_reg.b.rax);
+    klogf(Log_error, "syscall", "invalid syscall code %lld",
+			p->p_reg.r.rax.ll);
     return ~(uint64_t)0;
 }
 

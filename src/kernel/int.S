@@ -79,16 +79,16 @@ syscall_ring1c_tab:
     movabs $st_curr_reg, %r15
     movq   (%r15), %r15
     movq   %rax, 0x18(%r15)
-    movq   %rbx, 0x20(%r15)
-    movq   %rcx, 0x28(%r15)
-    movq   %rdx, 0x30(%r15)
-    movq   %rsi, 0x38(%r15)
-    movq   %rdi, 0x40(%r15)
-    movq   %rbp, 0x48(%r15)
-    movq   %r8,  0x50(%r15)
-    movq   %r9,  0x58(%r15)
-    movq   %r10, 0x60(%r15)
-    movq   %r11, 0x68(%r15)
+    movq   %rbx, 0x60(%r15)
+    movq   %rcx, 0x20(%r15)
+    movq   %rdx, 0x28(%r15)
+    movq   %rsi, 0x30(%r15)
+    movq   %rdi, 0x38(%r15)
+    movq   %rbp, 0x68(%r15)
+    movq   %r8,  0x40(%r15)
+    movq   %r9,  0x48(%r15)
+    movq   %r10, 0x50(%r15)
+    movq   %r11, 0x58(%r15)
     movq   %r12, 0x70(%r15)
     movq   %r13, 0x78(%r15)
     movq   %r14, 0x80(%r15)
@@ -98,62 +98,54 @@ syscall_ring1c_tab:
 
     // Sauvegarde des données présentes dans la structure d'iret
     movq   0x20(%rsp), %r11
-    movq   %r11,      (%r10) // reg.rflags
+    movq   %r11,  0x00(%r10) // reg.rflags
     movq   0x10(%rsp), %r11
-    movq   %r11,   0x8(%r10) // reg.rip
+    movq   %r11,  0x08(%r10) // reg.rip
     movq   0x28(%rsp), %r11
     movq   %r11,  0x10(%r10) // reg.rsp
 .endm
 
-.macro restore_curr_proc_reg
-    movabs $st_curr_reg, %r15
-    movq   (%r15), %r15
-    movq   0x18(%r15), %rax
-    movq   0x20(%r15), %rbx
-    movq   0x28(%r15), %rcx
-    movq   0x30(%r15), %rdx
-    movq   0x38(%r15), %rsi
-    movq   0x40(%r15), %rdi
-    movq   0x48(%r15), %rbp
-    movq   0x50(%r15), %r8
-    movq   0x58(%r15), %r9
-    movq   0x60(%r15), %r10
-    movq   0x68(%r15), %r11
+.macro restore_curr_proc_reg_rbx_r15
+    movq   0x60(%r15), %rbx
+    movq   0x20(%r15), %rcx
+    movq   0x28(%r15), %rdx
+    movq   0x30(%r15), %rsi
+    movq   0x38(%r15), %rdi
+    movq   0x68(%r15), %rbp
+    movq   0x40(%r15), %r8
+    movq   0x48(%r15), %r9
+    movq   0x50(%r15), %r10
+    movq   0x58(%r15), %r11
     movq   0x70(%r15), %r12
     movq   0x78(%r15), %r13
     movq   0x80(%r15), %r14
     movq   0x88(%r15), %r15
+.endm
+.macro restore_curr_proc_reg
+    movabs $st_curr_reg, %r15
+    movq   (%r15), %r15
+    movq   0x18(%r15), %rax
+	restore_curr_proc_reg_rbx_r15
 .endm
 
 .macro restore_curr_proc_reg_exc_rax
     movabs $st_curr_reg, %r15
     movq   (%r15), %r15
-    movq   0x20(%r15), %rbx
-    movq   0x28(%r15), %rcx
-    movq   0x30(%r15), %rdx
-    movq   0x38(%r15), %rsi
-    movq   0x40(%r15), %rdi
-    movq   0x48(%r15), %rbp
-    movq   0x50(%r15), %r8
-    movq   0x58(%r15), %r9
-    movq   0x60(%r15), %r10
-    movq   0x68(%r15), %r11
-    movq   0x70(%r15), %r12
-    movq   0x78(%r15), %r13
-    movq   0x80(%r15), %r14
-    movq   0x88(%r15), %r15
+	restore_curr_proc_reg_rbx_r15
 .endm
 
+// Charge à partir de st_curr_reg les registres pouvant transmettre des
+// paramètres aux appels système
 .macro load_curr_prog_regp
     movabs $st_curr_reg, %r15
     movq   (%r15), %r15
     movq   0x18(%r15), %rax
-    movq   0x28(%r15), %rcx
-    movq   0x30(%r15), %rdx
-    movq   0x38(%r15), %rsi
-    movq   0x40(%r15), %rdi
-    movq   0x50(%r15), %r8
-    movq   0x58(%r15), %r9
+    movq   0x20(%r15), %rcx
+    movq   0x32(%r15), %rdx
+    movq   0x30(%r15), %rsi
+    movq   0x38(%r15), %rdi
+    movq   0x40(%r15), %r8
+    movq   0x48(%r15), %r9
 .endm
 
 // Sauvegarde des registres pouvant être modifiés par un appel à une
@@ -395,7 +387,7 @@ kpanic_do_stop:
     movq   %rsp,        (%r10)
     movabs $st_curr_reg, %r10
     movq   (%r10),       %r10
-    movq   %rsp,    0x10(%r10)
+    movq   %rsp,    0x10(%r10)//.rsp
     sti
 1:  hlt
     jmp 1b
