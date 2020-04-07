@@ -118,11 +118,11 @@ uint8_t do_kprint = 0;
 
 #include <fs/proc.h>
 void ls (char** tokpt) {
-	char* arg1 = strtok_rnull(NULL, " ", tokpt);
-	if (!arg1) return;
-    
-	struct dirent *dir;
-    vfile_t *vf = vfs_load(arg1);
+    char* arg1 = strtok_rnull(NULL, " ", tokpt);
+    if (!arg1) return;
+
+    struct dirent *dir;
+    vfile_t *vf = vfs_load(arg1, 0);
     if (!vf) {
         kprintf("%s don't exist\n", arg1);
         return;
@@ -138,11 +138,13 @@ void ls (char** tokpt) {
     struct stat st;
 
     kprintf("size %d\n", vf->vf_stat.st_size);
+    kprintf("INO    TYPE    SIZE    NLINK        NAME\n");
 
     for (size_t size = 0; size < vf->vf_stat.st_size;
          size += dir->d_rec_len, dir = fs->fs_readdir(dir)) {
         fs->fs_stat(dir->d_ino, &st, &dev->dev_info);
-        kprintf("(%d) %d %d    ", dir->d_ino, dir->d_rec_len, st.st_nlink);
+        kprintf("%d    %x    %d    %d        ",
+                dir->d_ino, st.st_mode, st.st_size, st.st_nlink);
         for (size_t i = 0; i < dir->d_name_len; i++)
             kprintf("%c", dir->d_name[i]);
         kprintf("\n");
@@ -153,20 +155,23 @@ void ls (char** tokpt) {
 }
 
 void inspect_vfiles() {
+    kprintf("FILE    INO    DEV    CNT\n");
     for (size_t i = 0; i < NFILE; i++) {
         vfile_t *vf = state.st_files + i;
         if (vf->vf_cnt > 0)
-            kprintf("file %d : ino %d (device %d), cnt %d\n",
+            kprintf("%d    %d    %d    %d\n",
                     i, vf->vf_stat.st_ino, vf->vf_stat.st_dev, vf->vf_cnt);
     }
 }
 
 void inspect_channs() {
+    kprintf("CID    VFILE    MODE    ACC\n");
     for (size_t i = 0; i < NCHAN; i++) {
         chann_t *c = state.st_chann + i;
         if (c->chann_acc > 0) {
-            kprintf("cid %d : mode %d, acc %d\n",
-                    i, c->chann_mode, c->chann_acc);
+            kprintf("%d    %d    %d    %d\n",
+                    i, (c->chann_vfile - state.st_files) / sizeof(vfile_t),
+                    c->chann_mode, c->chann_acc);
         }
     }
 
@@ -180,22 +185,22 @@ uint_ptr read_ptr(const char str[]) {
 }
 
 size_t built_in_exec() {
-	char* tokpt;
+    char* tokpt;
     char* cmd_name = strtok_rnull(ibuffer, " ", &tokpt);
-	if (!cmd_name) return 0;
+    if (!cmd_name) return 0;
     if (!strcmp(cmd_name, "tprint"))
         return tty_writestring("test print");
     else if (!strcmp(cmd_name, "memat")) {
-		char* arg1 = strtok_rnull(NULL, " ", &tokpt);
-		if (!arg1) return 0;
+        char* arg1 = strtok_rnull(NULL, " ", &tokpt);
+        if (!arg1) return 0;
         uint_ptr ptr = read_ptr(arg1);
         char data_str[3];
         data_str[2] = '\0';
         int8_to_str_hexa(data_str, *(uint8_t*)ptr);
         return tty_writestring(data_str);
     } else if (!strcmp(cmd_name, "pg2")) {
-		char* arg1 = strtok_rnull(NULL, " ", &tokpt);
-		if (!arg1) return 0;
+        char* arg1 = strtok_rnull(NULL, " ", &tokpt);
+        if (!arg1) return 0;
         uint_ptr ptr = read_ptr(arg1);
         kmem_print_paging(ptr);
     } else if (!strcmp(cmd_name, "kprint"))
@@ -205,42 +210,42 @@ size_t built_in_exec() {
     else if (!strcmp(cmd_name, "q"))
         use_azerty = 0;
     else if (!strcmp(cmd_name, "test")) {
-		char* arg1 = strtok_rnull(NULL, " ", &tokpt);
-		if (!arg1) return 0;
+        char* arg1 = strtok_rnull(NULL, " ", &tokpt);
+        if (!arg1) return 0;
         if (!strcmp(arg1, "statut"))      test_print_statut();
         else if(!strcmp(arg1, "kheap"))   test_kheap();
     } else if (!strcmp(cmd_name, "ps"))
         proc_ps();
     else if (!strcmp(cmd_name, "unblock")) {
-		char* arg1 = strtok_rnull(NULL, " ", &tokpt);
-		if (!arg1) return 0;
-		char* arg2 = strtok_rnull(NULL, " ", &tokpt);
-		if (!arg2) return 0;
+        char* arg1 = strtok_rnull(NULL, " ", &tokpt);
+        if (!arg1) return 0;
+        char* arg2 = strtok_rnull(NULL, " ", &tokpt);
+        if (!arg2) return 0;
         int   ipid, val = 0;
-		sscanf(arg1, "%d", &ipid);
-		pid_t pid = ipid;
-		sscanf(arg2, "%i", &val);
+        sscanf(arg1, "%d", &ipid);
+        pid_t pid = ipid;
+        sscanf(arg2, "%i", &val);
         state.st_proc[pid].p_reg.b.rdi = val;
-		proc_unblock_1(pid, state.st_proc + pid);
-	} else if (!strcmp(cmd_name, "ls")) ls(&tokpt);
-	else if (!strcmp(cmd_name, "kill")) {
-		char* arg1 = strtok_rnull(NULL, " ", &tokpt);
-		if (!arg1) return 0;
-		char* arg2 = strtok_rnull(NULL, " ", &tokpt);
-		if (!arg2) return 0;
+        proc_unblock_1(pid, state.st_proc + pid);
+    } else if (!strcmp(cmd_name, "ls")) ls(&tokpt);
+    else if (!strcmp(cmd_name, "kill")) {
+        char* arg1 = strtok_rnull(NULL, " ", &tokpt);
+        if (!arg1) return 0;
+        char* arg2 = strtok_rnull(NULL, " ", &tokpt);
+        if (!arg2) return 0;
         int   ipid, signum = 0;
-		sscanf(arg1, "%d", &ipid);
-		pid_t pid = ipid;
-		sscanf(arg2, "%i", &signum);
+        sscanf(arg1, "%d", &ipid);
+        pid_t pid = ipid;
+        sscanf(arg2, "%i", &signum);
 
-		pid_t cproc = state.st_curr_pid;
-		bool spr = pid == state.st_curr_pid;
-		bool afc = send_sig_to_proc(pid, signum - 1);
-		if (spr && afc)
-			klogf(Log_error, "warning", "processus courant");
-		if (cproc != state.st_curr_pid)
-			switch_proc(cproc);
-	}
+        pid_t cproc = state.st_curr_pid;
+        bool spr = pid == state.st_curr_pid;
+        bool afc = send_sig_to_proc(pid, signum - 1);
+        if (spr && afc)
+            klogf(Log_error, "warning", "processus courant");
+        if (cproc != state.st_curr_pid)
+            switch_proc(cproc);
+    }
     else if (!strcmp(cmd_name, "vfiles")) inspect_vfiles();
     else if (!strcmp(cmd_name, "channs")) inspect_channs();
 
@@ -269,11 +274,11 @@ void tty_input(scancode_byte s, key_event ev) {
 
             switch(tty_mode) {
             case ttym_def:
-				ibuffer[ib_size] = '\n';
+                ibuffer[ib_size] = '\n';
                 proc_write_stdin(ibuffer, ib_size);
                 break;
             default:
-				ibuffer[ib_size] = '\0';
+                ibuffer[ib_size] = '\0';
                 sq.shift += built_in_exec();
                 break;
             }

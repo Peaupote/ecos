@@ -17,6 +17,7 @@ LIBC_CFILES?=libc_main.c \
 	  stdio/printf.c \
 	  stdio/putchar.c \
 	  stdio/puts.c \
+	  stdio/perror.c \
 	  stdlib/atoi.c \
 	  stdlib/malloc.c \
 	  unistd/brk.c \
@@ -26,7 +27,8 @@ LIBC_CFILES?=libc_main.c \
 	  sys/stat.c \
 	  dirent/opendir.c \
 	  dirent/readdir.c \
-	  signal/signal.c
+	  signal/signal.c \
+	  assert/assert.c
 LIBC_DEP=$(foreach file,$(LIBC_CFILES),\
 			"-MT $(file:.c=.$(NAME_LC).o) $(file)")
 LIBC_OBJ=$(LIBC_CFILES:%.c=%.$(NAME_LC).o)\

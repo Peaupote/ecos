@@ -11,7 +11,7 @@ int main(int argc, char *argv[]) {
     if (argc == 1) goto start;
 
     for (; i < argc; i++) {
-        fd = open(argv[i], READ);
+        fd = open(argv[i], O_RDONLY);
         if (fd < 0) {
             printf("file %s not found\n", argv[i]);
             continue;

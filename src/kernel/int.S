@@ -22,6 +22,7 @@ syscall_tab:
     .quad sys_open
     .quad sys_close
     .quad sys_dup
+    .quad sys_dup2
     .quad sys_pipe
     .quad sys_write
     .quad sys_read
@@ -33,7 +34,7 @@ syscall_tab:
     .quad sys_sbrk
     .quad sys_sigsethnd
     .quad sys_sigreturn
-	.quad sys_signal
+    .quad sys_signal
     .quad sys_debug_block
 syscall_ring1_tab:
     .quad sys_prires

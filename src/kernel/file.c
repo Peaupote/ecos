@@ -26,31 +26,33 @@ void vfs_init() {
 
     klogf(Log_info, "vfs", "setup proc file system");
     memcpy(fst[PROC_FS].fs_name, "proc", 4);
-    fst[PROC_FS].fs_mnt     = &proc_mount;
-    fst[PROC_FS].fs_lookup  = &proc_lookup;
-    fst[PROC_FS].fs_stat    = &proc_stat;
-    fst[PROC_FS].fs_read    = &proc_read;
-    fst[PROC_FS].fs_write   = &proc_write;
-    fst[PROC_FS].fs_touch   = &proc_touch;
-    fst[PROC_FS].fs_mkdir   = &proc_mkdir;
-    fst[PROC_FS].fs_opendir = &proc_opendir;
-    fst[PROC_FS].fs_readdir = &proc_readdir;
-    fst[PROC_FS].fs_rm      = &proc_rm;
+    fst[PROC_FS].fs_mnt            = &proc_mount;
+    fst[PROC_FS].fs_lookup         = &proc_lookup;
+    fst[PROC_FS].fs_stat           = &proc_stat;
+    fst[PROC_FS].fs_read           = &proc_read;
+    fst[PROC_FS].fs_write          = &proc_write;
+    fst[PROC_FS].fs_touch          = &proc_touch;
+    fst[PROC_FS].fs_mkdir          = &proc_mkdir;
+    fst[PROC_FS].fs_opendir        = &proc_opendir;
+    fst[PROC_FS].fs_readdir        = &proc_readdir;
+    fst[PROC_FS].fs_rm             = &proc_rm;
     fst[PROC_FS].fs_destroy_dirent = &proc_destroy_dirent;
+    fst[PROC_FS].fs_readsymlink    = &proc_readsymlink;
 
     klogf(Log_info, "vfs", "setup ext2 file system");
     memcpy(fst[EXT2_FS].fs_name, "ext2", 4);
-    fst[EXT2_FS].fs_mnt     = (fs_mnt_t*)&ext2_mount;
-    fst[EXT2_FS].fs_lookup  = (fs_lookup_t*)&ext2_lookup;
-    fst[EXT2_FS].fs_stat    = (fs_stat_t*)&ext2_stat;
-    fst[EXT2_FS].fs_read    = (fs_rdwr_t*)&ext2_read;
-    fst[EXT2_FS].fs_write   = (fs_rdwr_t*)&ext2_write;
-    fst[EXT2_FS].fs_touch   = (fs_create_t*)ext2_touch;
-    fst[EXT2_FS].fs_mkdir   = 0; // not implemented yet
-    fst[EXT2_FS].fs_opendir = (fs_opendir_t*)&ext2_opendir;
-    fst[EXT2_FS].fs_readdir = (fs_readdir_t*)&ext2_readdir;
-    fst[EXT2_FS].fs_rm      = 0; // not implemted yet
+    fst[EXT2_FS].fs_mnt            = (fs_mnt_t*)&ext2_mount;
+    fst[EXT2_FS].fs_lookup         = (fs_lookup_t*)&ext2_lookup;
+    fst[EXT2_FS].fs_stat           = (fs_stat_t*)&ext2_stat;
+    fst[EXT2_FS].fs_read           = (fs_rdwr_t*)&ext2_read;
+    fst[EXT2_FS].fs_write          = (fs_rdwr_t*)&ext2_write;
+    fst[EXT2_FS].fs_touch          = (fs_create_t*)ext2_touch;
+    fst[EXT2_FS].fs_mkdir          = 0; // not implemented yet
+    fst[EXT2_FS].fs_opendir        = (fs_opendir_t*)&ext2_opendir;
+    fst[EXT2_FS].fs_readdir        = (fs_readdir_t*)&ext2_readdir;
+    fst[EXT2_FS].fs_rm             = 0; // not implemted yet
     fst[EXT2_FS].fs_destroy_dirent = 0;
+    fst[EXT2_FS].fs_readsymlink    = 0;
 
     vfs_mount("/proc", PROC_FS, 0);
     vfs_mount("/home", EXT2_FS, home_partition);
@@ -80,9 +82,9 @@ int vfs_mount(const char *path, uint8_t fs, void *partition) {
 }
 
 vfile_t *vfs_pipe() {
-    size_t free = 0;
-    for (size_t i = 0; i < NFILE; i++) {
-        if (!free && !state.st_files[i].vf_cnt) free = i;
+    int free = 0;
+    for (free = 0; free < NFILE; ++free) {
+        if (!state.st_files[free].vf_cnt) break;
     }
 
     if (free == NFILE) {
@@ -91,8 +93,27 @@ vfile_t *vfs_pipe() {
     }
 
     vfile_t *vf = state.st_files + free;
-    /* struct pipe_inode *p = pipe_alloc(); */
+    char buf[256];
+    sprintf(buf, "%d", free);
 
+    vfile_t *pipedir = vfs_load("/proc/pipes", 0);
+    if (!pipedir) {
+        return 0;
+    }
+
+    struct device *dev = devices + vf->vf_stat.st_dev;
+    ino_t ino = proc_touch(pipedir->vf_stat.st_ino, buf,
+                           TYPE_FIFO|0600, &dev->dev_info);
+    vfs_close(pipedir);
+
+    if (!ino) {
+        klogf(Log_error, "vfs", "Failed to create /proc/pipes/%d\n", free);
+    }
+
+    struct proc_inode *inode = proc_inodes + ino;
+    inode->in_block[0] = (uint64_t)pipe_alloc();
+
+    ++vf->vf_cnt;
     return vf;
 }
 
@@ -114,6 +135,7 @@ struct device *find_device(const char *fname) {
     return len > 0 ? devices + mnt : 0;
 }
 
+// TODO : follow symlink
 static ino_t vfs_lookup(struct mount_info *info, struct fs *fs,
                         const char *full_name, struct stat *st) {
     char name[256] = { 0 };
@@ -141,7 +163,9 @@ static ino_t vfs_lookup(struct mount_info *info, struct fs *fs,
     return fs->fs_stat(ino, st, info);
 }
 
-vfile_t *vfs_load(const char *filename) {
+vfile_t *vfs_load(const char *filename, int flags) {
+    if (!filename || !*filename) return 0;
+
     struct device *dev = find_device(filename);
     if (!dev) {
         klogf(Log_info, "vfs", "no mount point %s", filename);
@@ -159,6 +183,16 @@ vfile_t *vfs_load(const char *filename) {
     if (!rc) {
         klogf(Log_error, "vfs", "file %s dont exists", filename);
         return 0;
+    }
+
+    // TODO : follow symlink in lookup...
+    if ((st.st_mode&0xf000) == TYPE_SYM) {
+        if (flags&O_NOFOLLOW || flags&O_CREAT)
+            return 0;
+
+        char buf[256] = { 0 };
+        fs->fs_readsymlink(st.st_ino, buf, &dev->dev_info);
+        return vfs_load(buf, 0);
     }
 
     vfile_t *v;
@@ -223,10 +257,10 @@ int vfs_write(vfile_t *vfile, void *buf, off_t pos, size_t len) {
         for (cid = vfile->vf_waiting; ~cid; ) {
             c = state.st_chann + cid;
             klogf(Log_info, "vfs", "write unblock cid %d", cid);
-			proc_unblock_list(&c->chann_waiting);
-			cid_t ncid   = c->chann_nxw;
-			c->chann_nxw = cid;
-			cid = ncid;
+            proc_unblock_list(&c->chann_waiting);
+            cid_t ncid   = c->chann_nxw;
+            c->chann_nxw = cid;
+            cid = ncid;
         }
 
         vfile->vf_waiting = ~0;
@@ -332,7 +366,7 @@ struct dirent *vfs_readdir(vfile_t *vfile, struct dirent *dir) {
 }
 
 ino_t vfs_rmdir(const char *fname, uint32_t rec) {
-    vfile_t *vf = vfs_load(fname);
+    vfile_t *vf = vfs_load(fname, 0);
     if (!vf) return 0;
     if (!(vf->vf_stat.st_mode&TYPE_DIR)) return 0;
 

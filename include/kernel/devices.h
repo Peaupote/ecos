@@ -5,8 +5,7 @@
 
 #include <stdint.h>
 #include <kernel/param.h>
-
-//TODO #include <sys/stat.h>
+#include <fs/pipe.h>
 
 struct mount_info {
     void    *sp;

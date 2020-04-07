@@ -11,7 +11,7 @@
 #include <kernel/gdt.h>
 #include <kernel/memory/kmem.h>
 
-#include <libc/sys.h>
+#include <libc/sys/wait.h>
 #include <libc/stdio.h>
 #include <libc/string.h>
 
@@ -290,7 +290,7 @@ void proc_ps() {
 
 void proc_write_stdin(char *buf, size_t len) {
     // TODO : handle differently to dont block other processes
-    vfile_t *vf = vfs_load("/proc/1/fd/0");
+    vfile_t *vf = vfs_load("/proc/tty/tty0", 0);
     if (!vf) return;
 
     if (vfs_write(vf, buf, 0, len) < 0) {

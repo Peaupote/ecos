@@ -25,7 +25,6 @@ struct pipe_inode *pipe_alloc() {
 }
 
 int pipe_stat(struct pipe_inode *p, struct stat *st) {
-    st->st_mode    = TYPE_FIFO;
     st->st_size    = p->pp_size;
     st->st_blksize = PIPE_SZ;
     st->st_blocks  = st->st_size >> 9;

@@ -1,5 +1,5 @@
 #include <libc/dirent.h>
-#include <libc/sys.h>
+#include <libc/sys/stat.h>
 #include <libc/fcntl.h>
 #include <libc/stdlib.h>
 #include <libc/unistd.h>

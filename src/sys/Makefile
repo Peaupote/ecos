@@ -3,7 +3,7 @@ export AS=x86_64-elf-as
 ROOT=../..
 include $(ROOT)/vars.Makefile
 
-CFILES=init1.c sh.c cat.c echo.c stat.c ls.c ps.c test.c
+CFILES=init1.c sh.c cat.c echo.c stat.c ls.c ps.c test.c wc.c
 OUT=$(CFILES:.c=.out)
 SRCDEP=$(CFILES) start.S
 INCLUDE_LIBC?=-I ../../include/libc

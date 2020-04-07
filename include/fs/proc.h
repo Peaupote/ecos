@@ -16,6 +16,7 @@
 
 #include <kernel/proc.h>
 #include <kernel/file.h>
+#include <libc/string.h>
 
 #define PROC_NBLOCKS    256
 #define PROC_BLOCK_SIZE 1024
@@ -69,12 +70,27 @@ uint32_t proc_mkdir(ino_t, const char*, uint16_t, struct mount_info*);
 struct dirent *proc_opendir(ino_t, struct mount_info *);
 struct dirent *proc_readdir(struct dirent*);
 
+ino_t proc_readsymlink(ino_t, char*, struct mount_info *);
+
 ino_t proc_rm(ino_t ino, struct mount_info *);
 ino_t proc_rmdir(ino_t ino, struct mount_info *);
 ino_t proc_destroy_dirent(ino_t p, ino_t ino, struct mount_info*);
+
+uint32_t proc_alloc_pipe(ino_t parent, const char *fname, uint16_t type);
 
 uint32_t proc_create(pid_t pid);
 uint32_t proc_alloc_std_streams(pid_t pid);
 uint32_t proc_exit(pid_t pid);
 
+static inline void
+proc_fill_dirent(struct dirent *dir, uint32_t ino, const char *fname) {
+    dir->d_ino       = ino;
+    dir->d_file_type = proc_inodes[ino].st.st_mode;
+    dir->d_name_len  = strlen(fname);
+    dir->d_rec_len   = DIRENT_OFF + dir->d_name_len;
+    memcpy(dir->d_name, fname, dir->d_name_len);
+}
+
+uint32_t proc_add_dirent(struct proc_inode *, int32_t, const char*);
+uint32_t proc_init_dir(uint32_t ino, uint32_t parent, uint16_t type);
 #endif

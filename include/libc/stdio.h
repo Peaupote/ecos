@@ -13,6 +13,8 @@ int  printf(const char *fmt, ...);
 
 int  scanf(const char *format, ...);
 
+void perror(const char *str);
+
 #endif
 
 int sprintf(char *str, const char *format, ...);

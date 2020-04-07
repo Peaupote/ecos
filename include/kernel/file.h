@@ -67,26 +67,31 @@ typedef struct dirent *(fs_readdir_t)(struct dirent*);
 typedef ino_t (fs_destroy_dirent_t)(ino_t parent, ino_t ino, struct mount_info*);
 typedef ino_t (fs_rm_t)(ino_t, struct mount_info*);
 
+typedef ino_t (fs_readsymlink_t)(ino_t, char*, struct mount_info*);
+
 struct fs {
-    char           fs_name[4];
-    fs_mnt_t      *fs_mnt;
-    fs_lookup_t   *fs_lookup;
-    fs_stat_t     *fs_stat;
-    fs_rdwr_t     *fs_read;
-    fs_rdwr_t     *fs_write;
-    fs_create_t   *fs_touch;
-    fs_create_t   *fs_mkdir;
-    fs_opendir_t  *fs_opendir;
-    fs_readdir_t  *fs_readdir;
-    fs_rm_t       *fs_rm;
+    char                 fs_name[4];
+    fs_mnt_t            *fs_mnt;
+    fs_lookup_t         *fs_lookup;
+    fs_stat_t           *fs_stat;
+    fs_rdwr_t           *fs_read;
+    fs_rdwr_t           *fs_write;
+    fs_create_t         *fs_touch;
+    fs_create_t         *fs_mkdir;
+    fs_opendir_t        *fs_opendir;
+    fs_readdir_t        *fs_readdir;
+    fs_rm_t             *fs_rm;
     fs_destroy_dirent_t *fs_destroy_dirent;
+    fs_readsymlink_t    *fs_readsymlink;
 } fst [NFST];
 
 void vfs_init();
 int  vfs_mount(const char *path, uint8_t fs, void *partition);
 
 vfile_t *vfs_pipe();
-vfile_t *vfs_load(const char *path);
+
+vfile_t *vfs_load(const char *path, int flags);
+
 int      vfs_close(vfile_t *vfile);
 int      vfs_read(vfile_t *vfile, void *buf, off_t pos, size_t len);
 int      vfs_write(vfile_t *vfile, void *buf, off_t pos, size_t len);

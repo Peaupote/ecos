@@ -2,9 +2,14 @@
 #include <unistd.h>
 #include <fcntl.h>
 #include <stdio.h>
-#include <sys.h>
+#include <sys/stat.h>
 #include <string.h>
 #include <stdlib.h>
+
+int is_not_pid(const char *s) {
+    while (*s >= '0' && *s <= '9') ++s;
+    return *s;
+}
 
 int main () {
     struct dirp *dirp = opendir("/proc");
@@ -17,11 +22,11 @@ int main () {
         memcpy(buf, dir->d_name, dir->d_name_len);
         buf[dir->d_name_len] = 0;
 
-        if (!strcmp(buf, ".") || !strcmp(buf, "..")) continue;
+        if (is_not_pid(buf)) continue;
 
         pid = atoi(buf);
         sprintf(buf, "/proc/%d/stat", pid);
-        int fd = open(buf, READ);
+        int fd = open(buf, O_RDONLY);
 
         read(fd, buf, 1024);
         int p; char cmd[256]; char st;

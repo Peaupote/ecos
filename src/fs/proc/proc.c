@@ -10,64 +10,6 @@
 
 #include "special.h"
 
-static inline void
-proc_fill_dirent(struct dirent *dir, uint32_t ino, const char *fname) {
-    dir->d_ino       = ino;
-    dir->d_file_type = proc_inodes[ino].st.st_mode;
-    dir->d_name_len  = strlen(fname);
-    dir->d_rec_len   = DIRENT_OFF + dir->d_name_len;
-    memcpy(dir->d_name, fname, dir->d_name_len);
-}
-
-static inline uint32_t
-proc_add_dirent(struct proc_inode *p, int32_t ino, const char *fname) {
-    struct dirent *dir = (struct dirent*)p->in_block[0];
-    while (dir->d_ino) dir = proc_readdir(dir);
-    proc_fill_dirent(dir, ino, fname);
-    p->st.st_size += dir->d_rec_len;
-
-    proc_inodes[ino].st.st_nlink++;
-
-    dir = proc_readdir(dir);
-    proc_fill_dirent(dir, 0, "");
-    return ino;
-}
-
-static uint32_t proc_init_dir(uint32_t ino, uint32_t parent, uint16_t type) {
-    struct proc_inode *inode = proc_inodes + ino;
-    uint32_t b = proc_free_block();
-    if (b == PROC_NBLOCKS) {
-        klogf(Log_error, "procfs", "no free blocks");
-        return 0;
-    }
-
-    inode->in_block[0] = (uint64_t)(proc_blocks + b);
-    inode->st.st_size  = 0;
-
-    struct dirent *dir = (struct dirent*)inode->in_block[0];
-    proc_fill_dirent(dir, ino, ".");
-    inode->st.st_size += dir->d_rec_len;
-
-    dir = proc_readdir(dir);
-    proc_fill_dirent(dir, parent, "..");
-    proc_inodes[parent].st.st_nlink++;
-    inode->st.st_size += dir->d_rec_len;
-
-    dir = proc_readdir(dir);
-    proc_fill_dirent(dir, 0, "");
-
-    inode->st.st_mode  = type;
-    inode->st.st_uid   = 0;
-    inode->st.st_ctime = 0; // TODO now
-    inode->st.st_mtime = 0;
-    inode->st.st_gid   = 0;
-    inode->st.st_nlink = 1;
-
-    // set block b to used
-    proc_block_bitmap[b >> 3] |= 1 << (b&7);
-    return ino;
-}
-
 int proc_mount(void *partition __attribute__((unused)),
                struct mount_info *info) {
     for (size_t i = 0; i < NPROC; i++) {
@@ -82,45 +24,15 @@ int proc_mount(void *partition __attribute__((unused)),
 
     info->block_size = PROC_BLOCK_SIZE;
     info->root_ino   = PROC_ROOT_INO;
-    proc_init_dir(PROC_ROOT_INO, PROC_ROOT_INO, TYPE_DIR|0640);
+    proc_init_dir(PROC_ROOT_INO, PROC_ROOT_INO, TYPE_DIR|040);
+    proc_mkdir(PROC_ROOT_INO, "pipes", TYPE_DIR|0400, info);
+    ino_t tty = proc_mkdir(PROC_ROOT_INO, "tty", TYPE_DIR|0400, info);
+
+    proc_alloc_pipe(tty, "tty0", TYPE_CHAR|0400);
+    proc_alloc_pipe(tty, "tty1", TYPE_CHAR|0400);
+    proc_alloc_pipe(tty, "tty2", TYPE_CHAR|0400);
 
     return 1;
-}
-
-uint32_t proc_lookup(const char *fname, ino_t parent,
-                     struct mount_info *info) {
-    struct proc_inode *inode = proc_inodes + parent;
-    if (!(inode->st.st_mode&TYPE_DIR)) return 0;
-
-    size_t nbblk = 0, len = 0, len_in_block = 0;
-    struct dirent *dir = (struct dirent*)inode->in_block[0];
-    goto start;
-
-    do {
-        if (len_in_block == info->block_size) {
-            len_in_block = 0;
-            if (++nbblk >= PROC_NBLOCK) return 0;
-            dir = (struct dirent*)inode->in_block[++nbblk];
-        } else dir = proc_readdir(dir);
-
-    start:
-        if (!dir->d_ino) break;
-        if (!strncmp(fname, dir->d_name, dir->d_name_len) &&
-            !fname[dir->d_name_len]) {
-            break;
-        }
-
-        len += dir->d_rec_len;
-        len_in_block += dir->d_rec_len;
-    } while(len < inode->st.st_size);
-
-    if (len == inode->st.st_size) return 0;
-
-    return dir->d_ino;
-}
-
-struct dirent *proc_readdir(struct dirent *dir) {
-    return (struct dirent*)((char*)dir + dir->d_rec_len);
 }
 
 int proc_stat(ino_t ino, struct stat *st,
@@ -140,8 +52,21 @@ int proc_read(ino_t ino, void *buf, off_t pos __attribute__((unused)),
     proc_op_t *read;
     proc_st_t *stat;
     pid_t pid;
+    vfile_t *vf;
 
     switch (inode->st.st_mode&0xf000) {
+    case TYPE_SYM:
+        dst = (char*)inode->in_block;
+        vf = vfs_load(dst, 0);
+        if (!vf) {
+            klogf(Log_error, "procfs", "dangling reference %s", dst);
+            return -1;
+        }
+
+        rc = vfs_read(vf, buf, pos, len);
+        vfs_close(vf);
+        return rc;
+
     case TYPE_DIR:
         src = (char*)inode->in_block[0] + pos;
         dst = (char*)buf;
@@ -175,8 +100,22 @@ int proc_write(ino_t ino, void *buf, off_t pos __attribute__((unused)),
     struct proc_inode *inode = proc_inodes + ino;
     struct pipe_inode *pipe;
     int rc;
+    char *dst;
+    vfile_t *vf;
 
     switch (inode->st.st_mode&0xf000) {
+    case TYPE_SYM:
+        dst = (char*)inode->in_block;
+        vf = vfs_load(dst, 0);
+        if (!vf) {
+            klogf(Log_error, "procfs", "dangling reference %s", dst);
+            return -1;
+        }
+
+        rc = vfs_write(vf, buf, pos, len);
+        vfs_close(vf);
+        return rc;
+
     case TYPE_CHAR:
     case TYPE_FIFO:
         pipe = (struct pipe_inode*)inode->in_block[0];
@@ -190,30 +129,83 @@ int proc_write(ino_t ino, void *buf, off_t pos __attribute__((unused)),
     }
 }
 
+uint32_t proc_alloc_pipe(ino_t parent, const char *fname, uint16_t type) {
+
+    // dont create directories with touch
+    if (type&TYPE_DIR) {
+        klogf(Log_error, "procfs", "can't create directory");
+        return 0;
+    }
+
+    struct proc_inode *p = proc_inodes + parent;
+    if (!(p->st.st_mode&TYPE_DIR)) {
+        klogf(Log_error, "procfs", "invalid ino %d is not a directory", parent);
+        return 0;
+    }
+
+    uint32_t ino;
+    if (!(ino = proc_free_inode())) {
+        klogf(Log_error, "procfs", "no free inodes");
+        return 0;
+    }
+
+    struct proc_inode *inode = proc_inodes + ino;
+
+    memset(inode, 0, sizeof(struct proc_inode));
+    inode->in_block[0] = (uint64_t)pipe_alloc();
+    inode->st.st_mode = type;
+
+    if (!proc_add_dirent(p, ino, fname)) {
+        klogf(Log_error, "procfs", "failed to add dir entry");
+        return 0;
+    }
+
+    return ino;
+}
+
 uint32_t proc_touch(ino_t parent, const char *fname, uint16_t type,
                     struct mount_info *info) {
     uint32_t ino;
 
     // test if file already exists and is not a directory
     if ((ino = proc_lookup(fname, parent, info)) &&
-        !(proc_inodes[ino].st.st_mode&TYPE_DIR))
+        !(proc_inodes[ino].st.st_mode&TYPE_DIR)) {
+        klogf(Log_error, "procfs", "file already exists");
         return 0;
+    }
 
     // dont create directories with touch
-    if (type&TYPE_DIR) return 0;
+    if (type&TYPE_DIR) {
+        klogf(Log_error, "procfs", "can't create directory with touch");
+        return 0;
+    }
 
     struct proc_inode *p = proc_inodes + parent;
-    if (!(p->st.st_mode&TYPE_DIR)) return 0;
+    if (!(p->st.st_mode&TYPE_DIR)) {
+        klogf(Log_error, "procfs", "invalid ino %d is not a directory", parent);
+        return 0;
+    }
 
-    if (!(ino = proc_free_inode())) return 0;
+    if (!(ino = proc_free_inode())) {
+        klogf(Log_error, "procfs", "no free inodes");
+        return 0;
+    }
+
     struct proc_inode *inode = proc_inodes + ino;
 
     uint32_t b = proc_free_block();
-    if (b == PROC_NBLOCK) return 0;
+    if (b == PROC_NBLOCK) {
+        klogf(Log_error, "procfs", "no free block");
+        return 0;
+    }
+
     inode->in_block[0] = (uint64_t)(proc_blocks + b);
     inode->st.st_nlink = 0;
 
-    if (!proc_add_dirent(p, ino, fname)) return 0;
+    if (!proc_add_dirent(p, ino, fname)) {
+        klogf(Log_error, "procfs", "failed to add dir entry");
+        return 0;
+    }
 
     inode->st.st_mode  = type;
     inode->st.st_uid   = 0;
@@ -230,55 +222,14 @@ uint32_t proc_touch(ino_t parent, const char *fname, uint16_t type,
     return ino;
 }
 
-uint32_t proc_mkdir(ino_t parent, const char *fname, uint16_t type,
-                    struct mount_info *info) {
-    uint32_t ino;
 
-    // test if file already exists and is a directory
-    if ((ino = proc_lookup(fname, parent, info)) &&
-        (proc_inodes[ino].st.st_mode&TYPE_DIR)) {
-        klogf(Log_error, "procfs", "mkdir %s already exists", fname);
-        return 0;
-    }
-
-    // create only dir with mkdir
-    if (!(type&TYPE_DIR)) {
-        klogf(Log_error, "procfs", "mkdir create only directory");
-        return 0;
-    }
-
-    struct proc_inode *p = proc_inodes + parent;
-    if (!(p->st.st_mode&TYPE_DIR)) {
-        klogf(Log_error, "procfs", "parent (ino %d) is not a directory");
-        return 0;
-    }
-
-    if (!(ino = proc_free_inode())) {
-        klogf(Log_error, "procfs", "no free inodes");
-        return 0;
-    }
-
-    if (!proc_init_dir(ino, parent, type)) {
-        klogf(Log_error, "procfs", "failed to init dir %d in parent %d",
-              ino, parent);
-        return 0;
-    }
-
-    if (!proc_add_dirent(p, ino, fname)) {
-        klogf(Log_error, "procfs", "failed to add dirent %d in parent %d",
-              ino, parent);
-        return 0;
-    }
-
-    klogf(Log_verb, "procfs", "mkdir %s inode %d", fname, ino);
-
-    return ino;
-}
-
-struct dirent *
-proc_opendir(ino_t ino, struct mount_info *info __attribute__((unused))) {
+ino_t proc_readsymlink(ino_t ino, char *dst,
+                       struct mount_info *info __attribute__((unused))) {
     struct proc_inode *inode = proc_inodes + ino;
-    return (struct dirent*)inode->in_block[0];
+    if (!(inode->st.st_mode&TYPE_SYM)) return 0;
+
+    strcpy(dst, (char*)&inode->in_block);
+    return ino;
 }
 
 uint32_t proc_create(pid_t pid) {
@@ -355,7 +306,7 @@ uint32_t proc_create(pid_t pid) {
 uint32_t proc_alloc_std_streams(pid_t pid) {
     char buf[256] = { 0 };
     sprintf(buf, "/proc/%d/fd", pid);
-    vfile_t *vf = vfs_load(buf);
+    vfile_t *vf = vfs_load(buf, 0);
     if (!vf) return 0;
 
     klogf(Log_info, "proc", "alloc streams /proc/%d/fd ino %d dev %d",
@@ -363,67 +314,99 @@ uint32_t proc_alloc_std_streams(pid_t pid) {
 
     proc_t *p = state.st_proc + pid;
 
-    vfile_t *stdin, *stdout, *stderr;
+    ino_t stdin, stdout, stderr;
     cid_t cid_in, cid_out, cid_err;
 
     cid_in = free_chann();
     state.st_chann[cid_in].chann_mode     = READ;
-	state.st_chann[cid_in].chann_waiting  = PID_NONE;
-	state.st_chann[cid_in].chann_nxw      = cid_in;
+    state.st_chann[cid_in].chann_waiting  = PID_NONE;
+    state.st_chann[cid_in].chann_nxw      = cid_in;
 
     cid_out = free_chann();
     state.st_chann[cid_out].chann_mode    = WRITE;
-	state.st_chann[cid_out].chann_waiting = PID_NONE;
-	state.st_chann[cid_out].chann_nxw     = cid_out;
+    state.st_chann[cid_out].chann_waiting = PID_NONE;
+    state.st_chann[cid_out].chann_nxw     = cid_out;
 
     cid_err = free_chann();
     state.st_chann[cid_err].chann_mode    = WRITE;
-	state.st_chann[cid_err].chann_waiting = PID_NONE;
-	state.st_chann[cid_err].chann_nxw     = cid_err;
+    state.st_chann[cid_err].chann_waiting = PID_NONE;
+    state.st_chann[cid_err].chann_nxw     = cid_err;
 
     if (cid_in == NCHAN || cid_out == NCHAN || cid_out == NCHAN) {
         vfs_close(vf);
         return 0;
     }
 
-    stdin  = vfs_touch(buf, "0", TYPE_CHAR|0600);
-    stdout = vfs_touch(buf, "1", TYPE_CHAR|0600);
-    stderr = vfs_touch(buf, "2", TYPE_CHAR|0600);
+    stdin  = proc_free_inode();
+    proc_inodes[stdin].st.st_nlink = 1;
+
+    stdout = proc_free_inode();
+    proc_inodes[stdout].st.st_nlink = 1;
+
+    stderr = proc_free_inode();
+    proc_inodes[stderr].st.st_nlink = 1;
+
+    // add dirent increment number of link
+    // inodes are unused of fail
+    proc_inodes[stdin].st.st_nlink  = 0;
+    proc_inodes[stdout].st.st_nlink = 0;
+    proc_inodes[stderr].st.st_nlink = 0;
+
     if (!stdin || !stdout || !stderr) {
         state.st_chann[cid_in].chann_mode = UNUSED;
         state.st_chann[cid_out].chann_mode = UNUSED;
         state.st_chann[cid_err].chann_mode = UNUSED;
-        vfs_close(stdin);
-        vfs_close(stdout);
-        vfs_close(stderr);
         vfs_close(vf);
         return 0;
     }
 
     struct proc_inode *inode;
 
+    const char *ptty0  = "/proc/tty/tty0";
+    const char *ptty1  = "/proc/tty/tty1";
+    vfile_t *tty0  = vfs_load(ptty0, 0);
+    vfile_t *tty1  = vfs_load(ptty1, 0);
+
     // stdin
-    inode = proc_inodes + stdin->vf_stat.st_ino;
-    inode->in_block[0] = (uint64_t)pipe_alloc();
-    state.st_chann[cid_in].chann_vfile = stdin;
+    inode = proc_inodes + stdin;
+    inode->st.st_mode = TYPE_SYM;
+    memcpy(&inode->in_block, ptty0, 15);
+    if (!proc_add_dirent(proc_inodes + vf->vf_stat.st_ino, stdin, "0")) {
+        klogf(Log_error, "procfs", "failed to add dir entry");
+        return 0;
+    }
+
+    state.st_chann[cid_in].chann_vfile = tty0;
     state.st_chann[cid_in].chann_mode  = READ;
     state.st_chann[cid_in].chann_pos   = 0;
     state.st_chann[cid_in].chann_acc   = 1;
     p->p_fds[STDIN_FILENO] = cid_in;
 
     // stdout
-    inode = proc_inodes + stdout->vf_stat.st_ino;
-    inode->in_block[0] = (uint64_t)pipe_alloc();
-    state.st_chann[cid_out].chann_vfile = stdout;
+    inode = proc_inodes + stdout;
+    inode->st.st_mode = TYPE_SYM;
+    memcpy(&inode->in_block, ptty1, 15);
+    if (!proc_add_dirent(proc_inodes + vf->vf_stat.st_ino, stdout, "1")) {
+        klogf(Log_error, "procfs", "failed to add dir entry");
+        return 0;
+    }
+
+    state.st_chann[cid_out].chann_vfile = tty1;
     state.st_chann[cid_out].chann_mode  = WRITE;
     state.st_chann[cid_out].chann_pos   = 0;
     state.st_chann[cid_out].chann_acc   = 1;
     p->p_fds[STDOUT_FILENO] = cid_out;
 
     // stderr
-    inode = proc_inodes + stderr->vf_stat.st_ino;
-    inode->in_block[0] = (uint64_t)pipe_alloc();
-    state.st_chann[cid_err].chann_vfile = stderr;
+    inode = proc_inodes + stderr;
+    inode->st.st_mode = TYPE_SYM;
+    memcpy(&inode->in_block, ptty1, 15);
+    if (!proc_add_dirent(proc_inodes + vf->vf_stat.st_ino, stderr, "2")) {
+        klogf(Log_error, "procfs", "failed to add dir entry");
+        return 0;
+    }
+
+    state.st_chann[cid_err].chann_vfile = tty1;
     state.st_chann[cid_err].chann_mode  = WRITE;
     state.st_chann[cid_err].chann_pos   = 0;
     state.st_chann[cid_err].chann_acc   = 1;
@@ -431,36 +414,6 @@ uint32_t proc_alloc_std_streams(pid_t pid) {
 
     uint32_t ino = vf->vf_stat.st_ino;
     vfs_close(vf);
-    return ino;
-}
-
-ino_t proc_destroy_dirent(ino_t p, ino_t ino, struct mount_info *info) {
-    struct proc_inode *parent = proc_inodes + p;
-    struct dirent *ndir, *dir;
-    size_t size, rec_len;
-
-    dir = (struct dirent*)parent->in_block[0];
-
-    for (size = 0; size < parent->st.st_size;
-         size += dir->d_rec_len, dir = proc_readdir(dir)) {
-        if (dir->d_ino == ino) break;
-    }
-
-    if (size == parent->st.st_size) {
-        kAssert(false);
-        return 0;}
-
-    rec_len = dir->d_rec_len;
-
-    if (size + rec_len == parent->st.st_size) goto ret;
-
-    ndir = proc_readdir(dir);
-    memmove(dir, ndir, parent->st.st_size - size - rec_len);
-
-ret:
-    // TODO if not in this device
-    proc_rm(ino, info);
-    parent->st.st_size -= rec_len;
     return ino;
 }
 

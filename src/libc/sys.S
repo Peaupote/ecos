@@ -28,6 +28,7 @@ mksc getppid      SYS_GETPPID
 mksc open         SYS_OPEN
 mksc close        SYS_CLOSE
 mksc dup          SYS_DUP
+mksc dup2         SYS_DUP2
 mksc pipe         SYS_PIPE
 mksc write        SYS_WRITE
 mksc read         SYS_READ

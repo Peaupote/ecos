@@ -1,3 +1,5 @@
+include ../fs/proc/list.Makefile
+
 CFILES=main.c \
 		kutil.c \
 		idt.c \
@@ -10,14 +12,14 @@ CFILES=main.c \
 		proc/signal.c \
 		syscalls/sleep.c \
 		syscalls/sys.c \
+		syscalls/sys2.c \
 		syscalls/execve.c \
 		memory/kmem.c \
 		memory/page_alloc.c \
 		memory/shared_pages.c \
 		memory/shared_ptr.c \
 		../fs/pipe.c \
-		../fs/proc/proc.c \
-		../fs/proc/special.c
+		$(addprefix ../fs/proc/, $(PROCFS_CFILES))
 
 ASFILES=entry.S \
 		int.S \
