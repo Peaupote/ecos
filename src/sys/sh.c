@@ -5,6 +5,19 @@
 #include <string.h>
 #include <sys/wait.h>
 #include <assert.h>
+#include <signal.h>
+
+pid_t fg_proc_pid = PID_NONE;
+
+void int_handler(int signum) {
+    if (signum != SIGINT) {
+        printf("bas signal: %d\n", signum);
+        return;
+    }
+    if (kill(fg_proc_pid, SIGINT))
+        printf("error sending SIGINT to %d\n", fg_proc_pid);
+}
+
 
 #define NARGS  10
 #define NCMD   10
@@ -172,11 +185,17 @@ void exec_cmd() {
             exit(1);
         }
 
+        fg_proc_pid = rc;
+        sighandler_t prev_hnd = signal(SIGINT, &int_handler);
         int rs;
-        wait(&rs);
+        while (!~wait(&rs));
+        signal(SIGINT, prev_hnd);
+        fg_proc_pid = PID_NONE;
+
         printf("process %d exited with status %x\n", rc, rs);
     }
 }
+
 
 int main() {
     printf("ecos-shell version 0.1\n");

@@ -3,6 +3,7 @@
 
 #include<stddef.h>
 #include<stdint.h>
+#include<stdbool.h>
 
 #ifndef __is_test_unit
 #include "../../util/paging.h"
@@ -17,7 +18,10 @@
 //1: free
 //0: pris
 struct MemBlock {//Taille multiple de 8 octets
-	uint16_t nb_at_lvl[4];
+	union {
+		uint64_t n_empt;
+		uint16_t nb_at_lvl[4];
+	};
 	uint64_t lvl_2_0;      //8 * 8
 	uint32_t lvl_2_21;     //8 * (1+3)
 	uint32_t lvl_1_10[8];  //8 * (1+3)
@@ -75,11 +79,11 @@ void   mblock_split_lvl_2(struct MemBlock* b, uint16_t n, uint8_t keep);
 void   mblock_split_lvl_3(struct MemBlock* b, uint8_t keep);
 extern mblock_split_f mblock_split[3];
 
-uint8_t  mblock_non_empty(struct MemBlock* b);
-uint8_t  mblock_full_free(struct MemBlock* b);
-size_t   mblock_nb_page_free(struct MemBlock* b);
+bool   mblock_non_empty(struct MemBlock* b);
+bool   mblock_full_free(struct MemBlock* b);
+size_t mblock_nb_page_free(struct MemBlock* b);
 
-void mblock_free_rng(struct MemBlock* b, uint16_t begin, uint16_t end);
+void   mblock_free_rng(struct MemBlock* b, uint16_t begin, uint16_t end);
 
 //Le bloc ne doit pas être completement alloué
 uint16_t mblock_alloc_page(struct MemBlock* b);

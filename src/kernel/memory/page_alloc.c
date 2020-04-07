@@ -216,10 +216,10 @@ uint16_t mblock_alloc_page(struct MemBlock* b) {
     return rt;
 }
 
-uint8_t mblock_non_empty(struct MemBlock* b) {
-    return (*((uint64_t*)b->nb_at_lvl)) ? 1 : 0;
+bool mblock_non_empty(struct MemBlock* b) {
+    return b->n_empt;
 }
-uint8_t mblock_full_free(struct MemBlock* b) {
+bool mblock_full_free(struct MemBlock* b) {
     return b->nb_at_lvl[3];
 }
 size_t mblock_nb_page_free(struct MemBlock* b) {
@@ -407,8 +407,8 @@ phy_addr palloc_alloc_page(struct PageAllocator* a) {
         return 0; //Non atteint
     }
 
-    uint16_t prev_3 = mblock_full_free (a->mblocks + b);
-    uint16_t p_rel  = mblock_alloc_page(a->mblocks + b);
+    bool prev_3    = mblock_full_free (a->mblocks + b);
+    uint16_t p_rel = mblock_alloc_page(a->mblocks + b);
     if (prev_3) {
         mbtree_add(&a->mbt_part,  b);
         mbtree_rem(&a->mbt_full, b);

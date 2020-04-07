@@ -49,8 +49,8 @@ void proc_start() {
     p_idle->p_prio = 0; //priorité minimale
     p_idle->p_pml4 = (phy_addr)NULL;
     p_idle->p_brk  = 0;
-    p_idle->p_reg.b.rsp = (uint_ptr)kernel_stack_top;
-    p_idle->p_reg.b.rip = (uint_ptr)&proc_idle_entry;
+    p_idle->p_reg.rsp.p = kernel_stack_top;
+    p_idle->p_reg.rip.p = &proc_idle_entry;
     p_idle->p_spnd = 0;
     p_idle->p_shnd.blk = 0;
     p_idle->p_shnd.ign = ~(sigset_t)0;
@@ -67,8 +67,8 @@ void proc_start() {
     p_init->p_prio = NB_PRIORITY_LVL - 2; //priorité maximale
     p_init->p_pml4 = (phy_addr)NULL;
     p_init->p_brk  = 0x1000;
-    p_init->p_reg.b.rsp = (uint_ptr)NULL;
-    p_init->p_reg.b.rip = (uint_ptr)&proc_init_entry;
+    p_init->p_reg.rsp.p = NULL;
+    p_init->p_reg.rip.p = &proc_init_entry;
     strcpy(p_init->p_cmd, "init");
     p_init->p_spnd = 0;
     p_init->p_shnd.blk = ~(sigset_t)0;
@@ -88,8 +88,8 @@ void proc_start() {
     p_stop->p_prio = NB_PRIORITY_LVL - 1;
     p_stop->p_pml4 = (phy_addr)NULL;
     p_stop->p_brk  = 0;
-    p_stop->p_reg.b.rsp = (uint_ptr)kernel_stack_top;
-    p_stop->p_reg.b.rip = (uint_ptr)&proc_idle_entry;
+    p_stop->p_reg.rsp.p = kernel_stack_top;
+    p_stop->p_reg.rip.p = &proc_idle_entry;
     strcpy(p_stop->p_cmd, "stop");
     p_idle->p_spnd = 0;
     p_idle->p_shnd.blk = 0;
@@ -116,6 +116,7 @@ void proc_start() {
         state.st_proc[pid].p_nxfr = pid + 1;
     }
     state.st_proc[NPROC - 1].p_nxfr = PID_NONE;
+	state.st_free_proc_last = NPROC - 1;
 
     vfs_init();
 
@@ -128,7 +129,7 @@ void proc_start() {
     proc_create(PID_STOP);
     proc_alloc_std_streams(PID_INIT);
 
-    klogf(Log_info, "init", "Start process init @ %p", p_init->p_reg.b.rip);
+    klogf(Log_info, "init", "Start process init @ %p", p_init->p_reg.rip.p);
     iret_to_proc(p_init);
 }
 
@@ -188,8 +189,8 @@ void schedule_proc() {
               "nb R %d, run proc %d :\n"
               "   rip %p, rsp %p",
               state.st_sched.nb_proc + 1, pid,
-              p->p_reg.b.rip,
-              p->p_reg.b.rsp);
+              p->p_reg.rip.p,
+              p->p_reg.rsp.p);
 
         proc_hndl_sigs();
         run_proc(p);
@@ -266,10 +267,10 @@ uint8_t proc_create_userspace(void* prg_elf, proc_t *proc) {
     set_interrupt_flag();
 
     //On est désormais dans le paging du processus
-    proc->p_reg.b.rsp = make_proc_stack();
+    proc->p_reg.rsp.p = make_proc_stack();
 
     err = 0;
-    proc->p_reg.b.rip = elf_load(proc_ldr, &err, prg_elf);
+    proc->p_reg.rip.p = (void*)elf_load(proc_ldr, &err, prg_elf);
     if (err) return 2;
 
     proc->p_pml4    = pml4_loc;
@@ -323,9 +324,9 @@ void wait_file(pid_t pid, cid_t cid) {
 
 static inline bool is_waiting_me(proc_t* pp, pid_t mpid) {
     return pp->p_stat == BLOCK && (
-                pp->p_reg.b.rax == SYS_WAIT
-            || (pp->p_reg.b.rax == SYS_WAITPID
-                && rei_cast(pid_t, pp->p_reg.b.rdi) == mpid)
+                pp->p_reg.r.rax.ll == SYS_WAIT
+            || (pp->p_reg.r.rax.ll == SYS_WAITPID
+                && pp->p_reg.r.rdi.pid_t == mpid)
             );
 }
 
@@ -431,8 +432,8 @@ static void kill_proc_2zb(proc_t* p, proc_t* pp, int status) {
     pp->p_fchd = state.st_curr_pid;
 
     kmem_free_paging(p->p_pml4, kernel_pml4);
-    p->p_stat      = ZOMB;
-    p->p_reg.b.rdi = status;
+    p->p_stat        = ZOMB;
+    p->p_reg.r.rdi.i = status;
 }
 
 void kill_proc_nr(int status) {
@@ -444,17 +445,17 @@ void kill_proc_nr(int status) {
 
     if (is_waiting_me(pp, state.st_curr_pid)) {
 
-        int* rt_st = pp->p_reg.b.rax == SYS_WAIT
-                   ? rei_cast(int*, pp->p_reg.b.rdi)
-                   : rei_cast(int*, pp->p_reg.b.rsi);
+        int* rt_st = pp->p_reg.r.rax.ll == SYS_WAIT
+                   ? pp->p_reg.r.rdi.p
+                   : pp->p_reg.r.rsi.p;
 
         kmem_free_paging(p->p_pml4,
                 pp->p_pml4 ? pp->p_pml4 : kernel_pml4);
 
         free_pid(state.st_curr_pid);
         pp->p_nchd--;
-        pp->p_reg.b.rax = state.st_curr_pid;
-        pp->p_stat    = RUN;
+        pp->p_reg.r.rax.pid_t = state.st_curr_pid;
+        pp->p_stat            = RUN;
 
         proc_set_curr_pid(ppid);
 

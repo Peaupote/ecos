@@ -1,0 +1,19 @@
+NOM             USAGE           ofs(struct reg)
+rax				rt              18
+rbx				cee             60
+rcx				arg3            20
+rdx				arg2            28
+rsi				arg1            30
+rdi				arg0            38
+rbp				frame+cee       68
+rsp				pile            10
+r8				arg4            40
+r9				arg5            48
+r10				-               50
+r11				-               58
+r12				cee             70
+r13				cee             78
+r14				cee             80
+r15				cee             88
+
+cee: callee-saved

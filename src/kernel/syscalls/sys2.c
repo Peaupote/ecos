@@ -225,7 +225,6 @@ ssize_t sys_write(int fd, uint8_t *s, size_t len) {
         return c;
 
     default:
-        p->p_reg.b.rax = -1;
         return -1;
     }
 }

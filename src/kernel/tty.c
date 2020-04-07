@@ -45,6 +45,7 @@ uint8_t  prompt_color;
 uint8_t  vprompt_color;
 uint8_t  back_color;
 
+static pid_t tty_owner = PID_NONE;
 
 static inline size_t sb_rel_im_bg() {
     return sb_display_shift;
@@ -112,6 +113,11 @@ void tty_set_mode(enum tty_mode m) {
     tty_mode = m;
     if (~input_top_line)
         vga_putentryat('>', prompt_color, 0, input_top_line);
+}
+
+void tty_set_owner(pid_t p) {
+    klogf(Log_info, "tty", "tty owner is %d", (int)p);
+    tty_owner = p;
 }
 
 uint8_t do_kprint = 0;
@@ -225,7 +231,7 @@ size_t built_in_exec() {
         sscanf(arg1, "%d", &ipid);
         pid_t pid = ipid;
         sscanf(arg2, "%i", &val);
-        state.st_proc[pid].p_reg.b.rdi = val;
+        state.st_proc[pid].p_reg.r.rdi.i = val;
         proc_unblock_1(pid, state.st_proc + pid);
     } else if (!strcmp(cmd_name, "ls")) ls(&tokpt);
     else if (!strcmp(cmd_name, "kill")) {
@@ -240,7 +246,7 @@ size_t built_in_exec() {
 
         pid_t cproc = state.st_curr_pid;
         bool spr = pid == state.st_curr_pid;
-        bool afc = send_sig_to_proc(pid, signum - 1);
+        bool afc =  1  == send_sig_to_proc(pid, signum - 1);
         if (spr && afc)
             klogf(Log_error, "warning", "processus courant");
         if (cproc != state.st_curr_pid)
@@ -275,7 +281,7 @@ void tty_input(scancode_byte s, key_event ev) {
             switch(tty_mode) {
             case ttym_def:
                 ibuffer[ib_size] = '\n';
-                proc_write_stdin(ibuffer, ib_size);
+                proc_write_stdin(ibuffer, ib_size + 1);
                 break;
             default:
                 ibuffer[ib_size] = '\0';
@@ -315,11 +321,19 @@ void tty_input(scancode_byte s, key_event ev) {
                     sb_dtcd = false;
                 tty_afficher_buffer_all();
             }
-        } else if (ev.key == KEY_TAB) {
-            switch (tty_mode) {
-            case ttym_def:   tty_set_mode(ttym_debug); break;
-            case ttym_debug: tty_set_mode(ttym_def);   break;
-            case ttym_panic: break;
+        } else if (key_state_ctrl()) {
+            switch (ev.key) {
+                case KEY_TAB:
+                switch (tty_mode) {
+                    case ttym_def:   tty_set_mode(ttym_debug); break;
+                    case ttym_debug: tty_set_mode(ttym_def);   break;
+                    case ttym_panic: break;
+                }
+                break;
+                case KEY_C:
+                    if (~tty_owner && proc_alive(state.st_proc + tty_owner))
+                        send_sig_to_proc(tty_owner, SIGINT - 1);
+                break;
             }
         } else {
             char kchar = keycode_to_printable(ev.key);

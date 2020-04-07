@@ -19,6 +19,7 @@ typedef int32_t sigset_t;
 #define SIG_DFL ((sighandler_t)1)
 #define SIG_ERR ((sighandler_t)~(uint64_t)0)
 
+// signums
 #define SIGINT   2
 #define SIGKILL  9
 #define SIGSTOP 17

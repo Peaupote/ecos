@@ -10,10 +10,17 @@
     int    $SYSCALL_VEC
     retq
 .endm
-.macro mksc1 name sid
+.macro mksc1j name sid
     .global \name
 \name :
     movq   $\sid , %rax
+    int    $SYSCALL_R1_VEC
+    retq
+.endm
+.macro mksc1c name sid
+    .global \name
+\name :
+    movq   $(\sid + 0x100), %rax
     int    $SYSCALL_R1_VEC
     retq
 .endm
@@ -41,6 +48,8 @@ mksc sbrk         SYS_SBRK
 mksc _sigreturn   SYS_SIGRT
 mksc _sigsethnd   SYS_SIGHND
 mksc _signal      SYS_SIGNAL
+mksc kill         SYS_KILL
 mksc debug_block  SYS_DEBUG_BLOCK
 
-mksc1 r1_prires  SYS_R1_PRIRES
+mksc1j r1_prires  SYS_R1J_PRIRES
+mksc1c r1_ttyown  SYS_R1C_TTYOWN

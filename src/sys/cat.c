@@ -6,7 +6,8 @@
 
 int main(int argc, char *argv[]) {
     char buf[1024];
-    int fd = 0, i = 1, rc;
+    int fd = 0, i = 1;
+	ssize_t rc;
 
     if (argc == 1) goto start;
 

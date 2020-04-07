@@ -23,16 +23,20 @@ uint8_t sys_signal(int sigid, uint8_t hnd) {
 	return rt;
 }
 
-struct shnd_save { //sz = 18 * 8 = 0 [16]
+struct shnd_save { //sz = 2 * 4 + (2 + 9) * 8 = 12 * 8 = 0 [16]
 	sigset_t blocked;
-	struct base_reg b;
-};
+    uint32_t      :32;
+	reg_t    rip, rsp;
+	struct reg_rsv r;
+} __attribute__((packed));
 
 void sys_sigreturn() {
 	proc_t *p = cur_proc();
-	struct shnd_save* sv = (struct shnd_save*) p->p_reg.b.rsp;
+	struct shnd_save* sv = (struct shnd_save*) p->p_reg.rsp.p;
 	p->p_shnd.blk = sv->blocked | SIG_NOTCTB;
-	p->p_reg.b = sv->b;
+	p->p_reg.rip = sv->rip;
+	p->p_reg.rsp = sv->rsp;
+	p->p_reg.r   = sv->r;
 	iret_to_proc(p);
 }
 
@@ -52,35 +56,39 @@ void proc_hndl_sig_i(int sigid) {
 	// User handler
 	if (p->p_stat == BLOCR) {
 		// Si un appel système est en cours il est interrompu et renvoi -1
-		p->p_stat      = RUN;
-		p->p_reg.b.rax = ~(reg_t)0;
+		p->p_stat         = RUN;
+		p->p_reg.r.rax.rd = ~(reg_data_t)0;
 	}
 
-	uint_ptr sv_loc = p->p_reg.b.rsp & ~(uint_ptr)0xf; //align 16
+	uint_ptr sv_loc = (uint_ptr)p->p_reg.rsp.p;
+	sv_loc &= ~(uint_ptr)0xf; //align 16
 	sv_loc -= sizeof(struct shnd_save);
 	struct shnd_save* sv = (struct shnd_save*) sv_loc;
-	sv->b          = p->p_reg.b;
+	sv->rip        = p->p_reg.rip;
+	sv->rsp        = p->p_reg.rsp;
+	sv->r          = p->p_reg.r;
 	sv->blocked    = p->p_shnd.blk;
 	p->p_shnd.blk &= ~(((sigset_t) 1) << sigid);
 	
-	p->p_reg.b.rsp = sv_loc;// = 0 [16]
-	rei_cast(int, p->p_reg.b.rdi) = sigid;
-	p->p_reg.b.rip = (uint_ptr)p->p_shnd.usr;
+	p->p_reg.rsp.p   = (void*) sv_loc;// = 0 [16]
+	p->p_reg.r.rdi.i = sigid;
+	p->p_reg.rip.p   = p->p_shnd.usr;
 
 	iret_to_proc(p);
 }
 
-bool send_sig_to_proc(pid_t pid, int sigid) {
+int8_t send_sig_to_proc(pid_t pid, int sigid) {
 	klogf(Log_info, "send", "send i%d to %d", sigid, (int)pid);
 	proc_t* p  = state.st_proc + pid;
 	if (sigid + 1 == SIGKILL) {
 		if (state.st_curr_pid != pid) {
 			switch (p->p_stat) {
 				case BLOCK:
-					if (p->p_reg.b.rax == SYS_EXECVE) {
-						return true;//TODO
-					}
-					proc_extract_blk(p);
+					if (p->p_reg.r.rax.ll == SYS_EXECVE) {
+						pid_t aux_proc = p->p_reg.r.rdi.pid_t;
+						proc_execve_abort(aux_proc);
+					} else
+						proc_extract_blk(p);
 					break;
 				case RUN: case BLOCR:
 					proc_extract_pf(p);
@@ -91,10 +99,28 @@ bool send_sig_to_proc(pid_t pid, int sigid) {
 			switch_proc(pid);
 		}
 		kill_proc(SIGKILL * 0x100);
-		return true;
+		return 1;
 	}
 	p->p_spnd |= ((sigset_t)1) << sigid;
 	if (p->p_stat == BLOCK)
 		proc_unblock_1(pid, p);
-	return false;
+	return 0;
+}
+
+int sys_kill(pid_t pid, int signum) {
+	if (pid < 0 || pid >= NPROC || signum < 0 || signum > SIG_COUNT)
+		return -1;
+	proc_t* d = state.st_proc + pid;
+	if (!proc_alive(d))
+		return -1;
+	
+	if (!signum)       return 0;
+	if (d->p_ring < 3) return -1;
+
+	bool self = state.st_curr_pid == pid;
+	int8_t  r = send_sig_to_proc(pid, signum - 1);
+	if (r == -1)     return -1;
+	if (!r || !self) return  0;
+	
+	schedule_proc();
 }
