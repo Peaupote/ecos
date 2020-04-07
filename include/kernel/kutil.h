@@ -18,8 +18,10 @@ int  wprintf(stringl_writer, void*, const char* fmt, va_list params);
 int  kprintf(const char *format, ...);
 
 enum klog_level {
-    Log_error, Log_warn, Log_info, Log_verb
+    Log_none, Log_error, Log_warn, Log_info, Log_verb, Log_vverb
 };
+extern enum klog_level klog_level;
+extern char klog_filtr[256];
 
 void klog (enum klog_level lvl, const char *head, const char *msg);
 void klogf(enum klog_level lvl, const char *head, const char *msgf, ...);

@@ -190,6 +190,44 @@ uint_ptr read_ptr(const char str[]) {
     return int64_of_str_hexa(str);
 }
 
+/*
+ * log [-options] [hd]
+ * hd: filtre d'en-tête, '*' pour aucun filtre
+ * options:
+ *   -0 	aucun
+ *   -e 	erreurs
+ *   -w 	warnings
+ *   -i 	infos
+ *   -v		verbose
+ *   -vv	very verbose
+ * */
+void change_log(char** tokpt) {
+	char* arg;
+	while ((arg = strtok_rnull(NULL, " ", tokpt))) {
+		if (arg[0] == '-') {
+			switch(arg[1]) {
+				case 'e':
+					klog_level = Log_error;
+					break;
+				case 'w':
+					klog_level = Log_warn;
+					break;
+				case 'i':
+					klog_level = Log_info;
+					break;
+				case 'v':
+					klog_level = arg[2] == 'v' ? Log_vverb : Log_verb;
+					break;
+				default:
+					klog_level = Log_none;
+			}
+		} else if (!strcmp(arg, "*"))
+			*klog_filtr = '\0';
+		else if (strlen(arg) < 256)
+			strcpy(klog_filtr, arg);
+	}
+}
+
 size_t built_in_exec() {
     char* tokpt;
     char* cmd_name = strtok_rnull(ibuffer, " ", &tokpt);
@@ -254,6 +292,7 @@ size_t built_in_exec() {
     }
     else if (!strcmp(cmd_name, "vfiles")) inspect_vfiles();
     else if (!strcmp(cmd_name, "channs")) inspect_channs();
+	else if (!strcmp(cmd_name, "log"))    change_log(&tokpt);
 
     return 0;
 }
@@ -331,8 +370,10 @@ void tty_input(scancode_byte s, key_event ev) {
                 }
                 break;
                 case KEY_C:
-                    if (~tty_owner && proc_alive(state.st_proc + tty_owner))
+                    if (~tty_owner && proc_alive(state.st_proc + tty_owner)) {
+						kprintf("^C\n");
                         send_sig_to_proc(tty_owner, SIGINT - 1);
+					}
                 break;
             }
         } else {

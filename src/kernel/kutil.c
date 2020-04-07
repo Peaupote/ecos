@@ -27,15 +27,21 @@ int kprintf(const char *format, ...) {
     return count;
 }
 
-enum klog_level log_level = Log_error;
+enum klog_level klog_level = Log_error;
+char klog_filtr[256] = "";
+
+bool klog_pass_filtr(enum klog_level lvl, const char* hd) {
+	return lvl <= klog_level
+		&& (*klog_filtr == '\0' || !strcmp(hd, klog_filtr));
+}
 
 void klog(enum klog_level lvl, const char *hd, const char *msg) {
-    if (lvl <= log_level)
+    if (klog_pass_filtr(lvl, hd))
         kprintf("[%s] %s\n", hd, msg);
 }
 
 void klogf(enum klog_level lvl, const char *hd, const char *msgf, ...) {
-    if (lvl <= log_level){
+    if (klog_pass_filtr(lvl, hd)) {
         kprintf("[%s] ", hd);
         va_list params;
         va_start(params, msgf);

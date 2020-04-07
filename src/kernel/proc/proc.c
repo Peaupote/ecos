@@ -139,7 +139,7 @@ void sched_add_proc(pid_t pid) {
     struct scheduler_file* pf = state.st_sched.files + pr;
     pid_t     prl = pf->last;
 
-    klogf(Log_verb, "sched", "add %d @ %d", (int)pid, (int)pr);
+    klogf(Log_vverb, "sched", "add %d @ %d", (int)pid, (int)pr);
 
     ++state.st_sched.nb_proc;
     p->p_nxpf = PID_NONE;
@@ -160,7 +160,7 @@ pid_t sched_pop_proc() {
     priority_t pr = find_bit_64(s->pres, 1, 6);
     pid_t     pid = s->files[pr].first;
     pid_t      nx = state.st_proc[pid].p_nxpf;
-    klogf(Log_verb, "sched", "rem %d @ %d", (int)pid, (int)pr);
+    klogf(Log_vverb, "sched", "rem %d @ %d", (int)pid, (int)pr);
 
 #ifdef __is_debug
     state.st_proc[pid].p_prpf = NULL;
@@ -203,7 +203,7 @@ void schedule_proc() {
 pid_t schedule_proc_ev() {
     sched_add_proc(state.st_curr_pid);
     pid_t rt = sched_pop_proc();
-    klogf(Log_verb, "sched",
+    klogf(Log_vverb, "sched",
           "nb waiting %d choose proc %d",
           state.st_sched.nb_proc + 1,
           state.st_curr_pid);
