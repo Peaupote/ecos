@@ -26,7 +26,7 @@
 // permet de conserver des données lors du changement de paging
 struct execve_tr {
     uint8_t    stack[AUX_STACK_SIZE];
-	uint8_t    phase;
+    uint8_t    phase;
     Elf64_Ehdr ehdr;
     size_t     nb_sections;
     uint_ptr   args_bg;
@@ -107,7 +107,7 @@ void execve_switch_pml4() {
            | PAGING_FLAG_P | PAGING_FLAG_W;
     pml4_to_cr3(npml4);
     state.st_proc[state.st_curr_pid].p_pml4 = npml4;
-	trf()->phase = 1;
+    trf()->phase = 1;
 }
 
 // --Ring 1 -> 0 defined in int7Ecall.S
@@ -140,7 +140,7 @@ bool read_bytes(int fd, void* buf, size_t count) {
     return true;
 }
 static inline bool execve_lseek(int fd, off_t ofs) {
-    return ~lseek(fd, ofs);
+    return ~lseek(fd, ofs, SEEK_SET);
 }
 
 // Chargement des sections
@@ -336,10 +336,11 @@ int sys_execve(reg_t fname, reg_t argv, reg_t env) {
     for (; ini_addr < sizeof(struct execve_tr); ini_addr += PAGE_SIZE)
         execve_tr_do_alloc_pg(((uint_ptr)trf()) + ini_addr);
     for (uint16_t ini_ind = ini_addr >> PAGE_SHIFT;
-            ini_ind < PAGE_ENT; ++ini_ind)
+         ini_ind < PAGE_ENT; ++ini_ind) {
         *paging_acc_pdpt(PML4_PSKD, ini_ind) = 0;
+    }
 
-	trf()->phase = 0;
+    trf()->phase = 0;
 
     // Initialisation du processus auxiliaire
     ep->p_ppid = pid;
@@ -354,14 +355,15 @@ int sys_execve(reg_t fname, reg_t argv, reg_t env) {
     ep->p_reg.r.rdi = fname;
     ep->p_reg.r.rsi = argv;
     ep->p_reg.r.rdx = env;
+    ep->p_errno = 0;
     strncpy(ep->p_cmd, (char*)fname.p, 256);
 
     // On arrête processus appelant en le passant en BLOCK
     p->p_stat            = BLOCK;
-	++p->p_nchd;
+    ++p->p_nchd;
     trf()->sigblk_save   = p->p_shnd.blk;
     p->p_shnd.blk        = 0;
-	p->p_reg.r.rdi.pid_t = epid;
+    p->p_reg.r.rdi.pid_t = epid;
 
     // On bascule sur le processus auxiliaire
     state.st_curr_pid = epid;
@@ -435,11 +437,11 @@ void proc_execve_end() {
 }
 
 void proc_execve_abort(pid_t aux_pid) {
-	switch_proc(aux_pid);
-	uint8_t phase = trf()->phase;
+    switch_proc(aux_pid);
+    uint8_t phase = trf()->phase;
     for (int fd = 0; fd < NFD; fd++) sys_close(fd);
-	proc_t* mp = state.st_proc + aux_pid;
-	free_tr();
-	if (phase == 1)
-		kmem_free_paging(mp->p_pml4, kernel_pml4);
+    proc_t* mp = state.st_proc + aux_pid;
+    free_tr();
+    if (phase == 1)
+        kmem_free_paging(mp->p_pml4, kernel_pml4);
 }

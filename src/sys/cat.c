@@ -7,14 +7,15 @@
 int main(int argc, char *argv[]) {
     char buf[1024];
     int fd = 0, i = 1;
-	ssize_t rc;
+    ssize_t rc;
 
     if (argc == 1) goto start;
 
     for (; i < argc; i++) {
         fd = open(argv[i], O_RDONLY);
         if (fd < 0) {
-            printf("file %s not found\n", argv[i]);
+            sprintf(buf, "cat: %s", argv[i]);
+            perror(buf);
             continue;
         }
 
@@ -24,7 +25,8 @@ int main(int argc, char *argv[]) {
         }
 
         if (rc < 0) {
-            printf("error\n");
+            sprintf(buf, "cat: %s", argv[i]);
+            perror(buf);
             exit(1);
         }
 

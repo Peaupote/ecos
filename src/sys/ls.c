@@ -34,6 +34,12 @@ int list_files(const char *fname) {
     char buf[256], buf2[1024], bufmode[MODE_LEN + 1] = { 0 };
     int rc = 0;
 
+    if (!dirp) {
+        sprintf(buf2, "ls: %s", fname);
+        perror(buf2);
+        exit(1);
+    }
+
     while ((dir = readdir(dirp))) {
         memcpy(buf, dir->d_name, dir->d_name_len);
         buf[dir->d_name_len] = 0;
@@ -41,7 +47,8 @@ int list_files(const char *fname) {
         sprintf(buf2, "%s/%s", fname, buf);
         rc = stat(buf2, &st);
         if (rc < 0) {
-            printf("error on stat %s\n", buf2);
+            sprintf(buf2, "ls: %s/%s", fname, buf);
+            perror(buf2);
             break;
         }
 
@@ -94,7 +101,6 @@ int main (int argc, char *argv[]) {
     for (i = 0; i < count; i++) {
         rc = list_files(fnames[i]);
         if (rc < 0) {
-            printf("error on %s\n", fnames[i]);
             return rc;
         }
     }

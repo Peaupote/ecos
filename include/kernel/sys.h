@@ -10,6 +10,8 @@
 
 #include "proc.h"
 
+#define set_errno(p, e) if (p->p_errno) *p->p_errno = e;
+
 uint64_t sys_sleep(uint64_t);
 void     lookup_end_sleep(void);
 
@@ -29,7 +31,7 @@ int      sys_dup(int fd);
 int      sys_pipe(int fds[2]);
 ssize_t  sys_write(int fd, uint8_t *s, size_t len);
 ssize_t  sys_read(int fd, uint8_t *buf, size_t len);
-off_t    sys_lseek(int fd, off_t offset);
+off_t    sys_lseek(int fd, off_t offset, int whence);
 
 int      sys_execve(reg_t fname, reg_t argv, reg_t env);
 

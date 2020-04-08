@@ -49,6 +49,7 @@ mksc _sigreturn   SYS_SIGRT
 mksc _sigsethnd   SYS_SIGHND
 mksc _signal      SYS_SIGNAL
 mksc kill         SYS_KILL
+mksc _seterrno    SYS_SETERRNO
 mksc debug_block  SYS_DEBUG_BLOCK
 
 mksc1j r1_prires  SYS_R1J_PRIRES

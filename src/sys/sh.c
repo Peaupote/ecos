@@ -121,7 +121,9 @@ void mk_redirection(char *file, int flag, int redir) {
     if (!file) return;
     int fd = open(file, flag);
     if (fd < 0) {
-        perror("ls");
+        char buf[256];
+        sprintf(buf, "sh: %s", file);
+        perror(buf);
         exit(1);
     }
 

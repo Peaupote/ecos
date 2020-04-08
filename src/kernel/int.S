@@ -36,6 +36,7 @@ syscall_tab:
     .quad sys_sigreturn
     .quad sys_signal
     .quad sys_kill
+    .quad sys_errno
     .quad sys_debug_block
 syscall_ring1j_tab:
     .quad sys_prires

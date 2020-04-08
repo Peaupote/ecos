@@ -139,7 +139,16 @@ const char * const err_list[NERRNO] = {
     "Operation not supported"
 };
 
+int errno;
+
+extern void _seterrno(int*);
+
+void _errno_init() {
+    errno = 0;
+    _seterrno(&errno);
+}
+
 void perror(const char *s) {
     if (!s || !*s) return;
-    printf("%s: some error occured\n", s);
+    printf("%s: %s\n", s, err_list[errno]);
 }

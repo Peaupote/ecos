@@ -58,12 +58,20 @@ int main(int argc, char *argv[]) {
             }
         }
 
+        if (rc < 0) {
+            perror("wc: read");
+            close(fd);
+            exit(1);
+        }
+
         if (c > 1) ++l;
 
         if (flags&L) printf("%d\t", l);
         if (flags&W) printf("%d\t", w);
         if (flags&C) printf("%d\t", c);
         printf("%s\n", *ptr);
+
+        close(fd);
     }
 
     return 0;

@@ -4,11 +4,14 @@
 #include <libc/stdlib.h>
 #include <libc/unistd.h>
 #include <libc/stdio.h>
+#include <libc/errno.h>
 
 struct dirp *opendir(const char *fname) {
-    int fd = open(fname, READ);
+    int serr, fd = open(fname, READ);
     struct stat st;
     struct dirp *dirp = 0;
+
+    if (fd < 0) goto error;
 
     fstat(fd, &st);
     if (!(st.st_mode&TYPE_DIR)) goto error;
@@ -26,8 +29,10 @@ struct dirp *opendir(const char *fname) {
     return dirp;
 
 error:
+    serr = errno;
     close(fd);
     free(dirp);
+    errno = serr;
     return 0;
 }
 

@@ -6,6 +6,7 @@ const char * const err_list[NERRNO];
 int errno;
 
 enum error_kind {
+    SUCC,               // Success
     EPERM,              // Operation not permitted
     ENOENT,             // No such file or directory
     ESRCH,              // No such process

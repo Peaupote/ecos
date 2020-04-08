@@ -2,6 +2,7 @@
 
 #include <stdint.h>
 
+#include <libc/errno.h>
 #include <libc/string.h>
 #include <kernel/int.h>
 #include <kernel/proc.h>
@@ -77,6 +78,7 @@ pid_t sys_wait(int* rt_st) {
     } else {
         klogf(Log_verb, "syscall",
               "process %d has no child. dont wait", state.st_curr_pid);
+        set_errno(p, ECHILD);
         return -1;
     }
 }
@@ -114,6 +116,7 @@ pid_t sys_waitpid(pid_t cpid, int* rt_st) {
     } else {
         klogf(Log_info, "syscall", "process %d is not %d's child",
                 cpid, mpid);
+        set_errno(p, ECHILD);
         return -1;
     }
 }
@@ -123,7 +126,10 @@ pid_t sys_fork() {
 
     pid_t fpid = find_new_pid();
     // we didn't find place for a new processus
-    if (!~fpid) return -1;
+    if (!~fpid) {
+        set_errno(pp, EAGAIN);
+        return -1;
+    }
 
     fp          = state.st_proc + fpid;
     fp->p_ppid  = state.st_curr_pid;
@@ -156,6 +162,7 @@ pid_t sys_fork() {
     fp->p_brk   = pp->p_brk;
     fp->p_spnd  = 0;
     fp->p_shnd  = pp->p_shnd;
+    fp->p_errno = pp->p_errno;
 
     pp->p_nchd++; // one more child
     memcpy(&fp->p_reg, &pp->p_reg, sizeof(struct reg));

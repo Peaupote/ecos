@@ -19,7 +19,7 @@ struct dirent *readdir(struct dirp *dirp) {
     dirp->pos += dir->d_rec_len;
 
     if (dirp->off > DIRP_BUF_SIZE) {
-        lseek(dirp->fd, dirp->pos);
+        lseek(dirp->fd, dirp->pos, SEEK_SET);
         if (read(dirp->fd, dirp->buf, DIRP_BUF_SIZE) < 0) goto error;
         dirp->dir_entry = (struct dirent*)dirp->buf;
     } else {

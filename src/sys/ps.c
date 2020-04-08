@@ -27,8 +27,19 @@ int main () {
         pid = atoi(buf);
         sprintf(buf, "/proc/%d/stat", pid);
         int fd = open(buf, O_RDONLY);
+        if (fd < 0) {
+            perror("ps: open");
+            closedir(dirp);
+            exit(1);
+        }
 
-        read(fd, buf, 1024);
+        if (read(fd, buf, 1024) < 0) {
+            perror("ps: read");
+            close(fd);
+            closedir(dirp);
+            exit(1);
+        }
+
         int p; char cmd[256]; char st;
         sscanf(buf, "%d %s %c", &p, cmd, &st);
 

@@ -6,7 +6,9 @@
  * gives informations about the kernel to the user through simple files
  *
  * The filsystem is architectured as follow:
- * /proc
+ * /proc (ROOT_INO)
+ *   - /proc/tty
+ *   - /proc/pipes
  *   - /proc/pid
  *     - /proc/pid/stat process status
  *     - /proc/pid/cwd

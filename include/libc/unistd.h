@@ -20,7 +20,7 @@ int      close(int fd);
 int      dup(int fd);
 int      dup2(int fd1, int fd2);
 int      pipe(int fds[2]);
-off_t    lseek(int fd, off_t offset);
+off_t    lseek(int fd, off_t offset, int whence);
 
 pid_t    fork(void);
 pid_t    getpid(void);

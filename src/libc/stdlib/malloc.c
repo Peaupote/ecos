@@ -117,6 +117,8 @@ void* TEST_U(malloc)(size_t dsize) {
 }
 
 void TEST_U(free)(void* ptr) {
+    if (!ptr) return;
+
     free_bloc_t*      b = (free_bloc_t*) ptr;
     uint32_t        bsz = MBLOC_SIZE_MASK & *bloc_head(b);
     free_bloc_t* insert = &root;
