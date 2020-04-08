@@ -48,8 +48,8 @@ void vfs_init() {
     fst[EXT2_FS].fs_write          = (fs_rdwr_t*)&ext2_write;
     fst[EXT2_FS].fs_touch          = (fs_create_t*)ext2_touch;
     fst[EXT2_FS].fs_mkdir          = 0; // not implemented yet
-    fst[EXT2_FS].fs_opendir        = (fs_opendir_t*)&ext2_opendir;
-    fst[EXT2_FS].fs_readdir        = (fs_readdir_t*)&ext2_readdir;
+    fst[EXT2_FS].fs_opendir        = &ext2_opendir_it;
+    fst[EXT2_FS].fs_readdir        = &ext2_readdir_it;
     fst[EXT2_FS].fs_rm             = 0; // not implemted yet
     fst[EXT2_FS].fs_destroy_dirent = 0;
     fst[EXT2_FS].fs_readsymlink    = 0;
@@ -339,7 +339,8 @@ vfile_t *vfs_mkdir(const char *parent, const char *fname, mode_t perm) {
     return vfs_alloc(dev, parent, fname, perm, fs->fs_mkdir);
 }
 
-struct dirent *vfs_opendir(vfile_t *vfile, struct dirent **dir) {
+struct dirent_it *vfs_opendir(vfile_t *vfile, struct dirent_it *dbuf,
+		char* nbuf) {
     if (vfile) {
         if (!(vfile->vf_stat.st_mode&TYPE_DIR)) {
             klogf(Log_error, "vfs", "opendir: file %d is not a directory",
@@ -353,16 +354,17 @@ struct dirent *vfs_opendir(vfile_t *vfile, struct dirent **dir) {
 
         struct device *dev = devices + vfile->vf_stat.st_dev;
         struct fs *fs = fst + dev->dev_fs;
-        *dir = fs->fs_opendir(vfile->vf_stat.st_ino, &dev->dev_info);
+        return fs->fs_opendir(vfile->vf_stat.st_ino, dbuf, nbuf,
+								&dev->dev_info);
     }
-
-    return *dir;
+	return dbuf;
 }
 
-struct dirent *vfs_readdir(vfile_t *vfile, struct dirent *dir) {
+struct dirent_it *vfs_readdir(vfile_t *vfile, struct dirent_it *dir,
+		char* nbuf) {
     struct device *dev = devices + vfile->vf_stat.st_dev;
     struct fs *fs = fst + dev->dev_fs;
-    return fs->fs_readdir(dir);
+    return fs->fs_readdir(dir, nbuf);
 }
 
 ino_t vfs_rmdir(const char *fname, uint32_t rec) {
@@ -387,17 +389,19 @@ ino_t vfs_rmdir(const char *fname, uint32_t rec) {
     ino_t root = vf->vf_stat.st_ino, ino;
     struct stat st;
     uint32_t is_empty = 1, parent = 0;
-    struct dirent *dir;
+    struct dirent_it dbuf[1];
+    struct dirent_it *dir;
+	char nbuf[256];
     size_t size;
 
     // check if dir is empty and save parent inode
-    dir = fs->fs_opendir(root, &dev->dev_info);
+    dir = fs->fs_opendir(root, dbuf, nbuf, &dev->dev_info);
     for (size_t size = 0; size < vf->vf_stat.st_size;
-         size += dir->d_rec_len, dir = fs->fs_readdir(dir)) {
-        if (dir->d_name_len == 2 && !strncmp(dir->d_name, "..", 2))
-            parent = dir->d_ino;
-        else if (dir->d_ino &&
-                 !(dir->d_name_len == 1 && dir->d_name[0] == '.'))
+         size += dir->cnt.d_rec_len, dir = fs->fs_readdir(dir, nbuf)) {
+        if (dir->cnt.d_name_len == 2 && !strncmp(dir->cnt.d_name, "..", 2))
+            parent = dir->cnt.d_ino;
+        else if (dir->cnt.d_ino &&
+                 !(dir->cnt.d_name_len == 1 && dir->cnt.d_name[0] == '.'))
             is_empty = 0;
     }
 
@@ -421,14 +425,15 @@ ino_t vfs_rmdir(const char *fname, uint32_t rec) {
 
         fs->fs_stat(ino, &st, &dev->dev_info);
         if (st.st_mode&TYPE_DIR) {
-            dir = fs->fs_opendir(ino, &dev->dev_info);
+            dir = fs->fs_opendir(ino, dbuf, nbuf, &dev->dev_info);
             for (size = 0; size < st.st_size;
-                 size += dir->d_rec_len, dir = fs->fs_readdir(dir)) {
-                if (dir->d_ino != ino &&
-                    !(dir->d_name_len == 2 && !strncmp("..", dir->d_name, 2))) {
-                    PUSH(dir->d_ino);
+                 size += dir->cnt.d_rec_len, dir = fs->fs_readdir(dir, nbuf)) {
+                if (dir->cnt.d_ino != ino &&
+                    !(dir->cnt.d_name_len == 2 
+						&& !strncmp("..", dir->cnt.d_name, 2))) {
+                    PUSH(dir->cnt.d_ino);
                 }
-                fs->fs_rm(dir->d_ino, &dev->dev_info);
+                fs->fs_rm(dir->cnt.d_ino, &dev->dev_info);
             }
         }
     }
