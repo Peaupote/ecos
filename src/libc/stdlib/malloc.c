@@ -3,6 +3,7 @@
 #include <libc/unistd.h>
 #endif
 
+#include <libc/string.h>
 #include <util/test.h>
 #include <util/paging.h>
 #include <util/misc.h>
@@ -157,4 +158,13 @@ void TEST_U(free)(void* ptr) {
         else
             llist_insert_before(insert, b);
     }
+}
+
+void *calloc(size_t nmemb, size_t size) {
+    void *ret = malloc(nmemb * size);
+    if (ret) {
+        memset(ret, 0, nmemb * size);
+    }
+
+    return ret;
 }

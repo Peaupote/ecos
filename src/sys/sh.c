@@ -24,7 +24,6 @@ void int_handler(int signum) {
 
 const char *blank = " \t\n";
 char *ptr, line[258];
-const char *env[1] = { 0 };
 
 struct cmd {
     const char *args[NARGS];
@@ -182,7 +181,7 @@ void exec_cmd() {
             mk_redirection(c->infile, O_RDONLY, 0);
             mk_redirection(c->outfile, O_WRONLY, 1);
 
-            rc = execve(c->args[0], c->args, env);
+            rc = execvp(c->args[0], c->args);
             perror("sh");
             exit(1);
         }
@@ -194,7 +193,7 @@ void exec_cmd() {
         signal(SIGINT, prev_hnd);
         fg_proc_pid = PID_NONE;
 
-        printf("process %d exited with status %x\n", rc, rs);
+        /* printf("process %d exited with status %x\n", rc, rs); */
     }
 }
 
@@ -207,6 +206,7 @@ int main() {
     while(1) {
         memset(line, 0, 258);
         rc = read(0, line, 256);//TODO: attendre \n + ne pas aller plus loin
+        if (rc == 1) continue;
         if (rc < 0) {
             printf("an error occurred\n");
             exit(1);

@@ -20,7 +20,9 @@ LIBC_CFILES?=libc_main.c \
 	  stdio/perror.c \
 	  stdlib/atoi.c \
 	  stdlib/malloc.c \
+	  stdlib/env.c \
 	  unistd/brk.c \
+	  unistd/exec.c \
 	  stdio/scanf.c \
 	  ctype/ctype.c \
 	  sys/ressource.c \

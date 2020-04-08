@@ -17,6 +17,7 @@ home: sys
 	cp $(ROOT)/src/sys/ls.out    home/bin/ls
 	cp $(ROOT)/src/sys/ps.out    home/bin/ps
 	cp $(ROOT)/src/sys/wc.out    home/bin/wc
+	cp $(ROOT)/src/sys/env.out   home/bin/env
 
 	cp $(ROOT)/src/sys/test.c    home/test/test.c
 	cp $(ROOT)/src/sys/test.out  home/test/test

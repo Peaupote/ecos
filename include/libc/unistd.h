@@ -25,6 +25,10 @@ off_t    lseek(int fd, off_t offset, int whence);
 pid_t    fork(void);
 pid_t    getpid(void);
 pid_t    getppid(void);
+
+int      execv(const char *fname, const char **argv);
+int      execvp(const char *fname, const char **argv);
 int      execve(const char *fname, const char **argv, const char **env);
+int      execvpe(const char *fname, const char** argv, const char **env);
 
 #endif
