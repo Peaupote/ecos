@@ -42,18 +42,10 @@ int execv(const char *fname, const char **argv) {
 // dont lookup when start with ./
 int execvp(const char *name, const char **argv) {
     char fname[256] = { 0 };
-    if(!lookup_path(name, fname)) {
-        errno = ENOENT;
-        return -1;
-    }
-    return execv(fname, argv);
+    return execv(lookup_path(name, fname) ? fname : name, argv);
 }
 
 int execvpe(const char* name, const char** argv, const char **env) {
     char fname[256] = { 0 };
-    if(!lookup_path(name, fname)) {
-        errno = ENOENT;
-        return -1;
-    }
-    return execve(fname, argv, env);
+    return execve(lookup_path(name, fname) ? fname : name, argv, env);
 }
