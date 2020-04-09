@@ -10,6 +10,7 @@
 typedef void * block_t;
 
 #define FTYPE_MASK 0xf000
+#define FTYPE_OFS  12
 #define TYPE_FIFO  0x1000
 #define TYPE_CHAR  0x2000
 #define TYPE_DIR   0x4000

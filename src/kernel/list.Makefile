@@ -1,4 +1,5 @@
 include ../fs/proc/list.Makefile
+include ../fs/proc2/list.Makefile
 
 CFILES=main.c \
 		kutil.c \
@@ -19,7 +20,8 @@ CFILES=main.c \
 		memory/shared_pages.c \
 		memory/shared_ptr.c \
 		../fs/pipe.c \
-		$(addprefix ../fs/proc/, $(PROCFS_CFILES))
+		$(addprefix ../fs/proc/, $(PROCFS_CFILES)) \
+		$(addprefix ../fs/proc2/, $(PROC2FS_CFILES))
 
 ASFILES=entry.S \
 		int.S \

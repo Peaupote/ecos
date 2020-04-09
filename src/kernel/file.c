@@ -8,8 +8,11 @@
 #include <fs/pipe.h>
 #include <fs/ext2.h>
 #include <fs/proc.h>
+#include <fs/proc2.h>
 
 extern char home_partition[];
+extern char home_partition_end[];
+
 void vfs_init() {
     klogf(Log_info, "vfs", "Initialize");
 
@@ -25,7 +28,7 @@ void vfs_init() {
     }
 
     klogf(Log_info, "vfs", "setup proc file system");
-    memcpy(fst[PROC_FS].fs_name, "proc", 4);
+    memcpy(fst[PROC_FS].fs_name, "proc", 5);
     fst[PROC_FS].fs_mnt            = &proc_mount;
     fst[PROC_FS].fs_lookup         = &proc_lookup;
     fst[PROC_FS].fs_stat           = &proc_stat;
@@ -40,7 +43,7 @@ void vfs_init() {
     fst[PROC_FS].fs_readsymlink    = &proc_readsymlink;
 
     klogf(Log_info, "vfs", "setup ext2 file system");
-    memcpy(fst[EXT2_FS].fs_name, "ext2", 4);
+    memcpy(fst[EXT2_FS].fs_name, "ext2", 5);
     fst[EXT2_FS].fs_mnt            = (fs_mnt_t*)&ext2_mount;
     fst[EXT2_FS].fs_lookup         = (fs_lookup_t*)&ext2_lookup;
     fst[EXT2_FS].fs_stat           = (fs_stat_t*)&ext2_stat;
@@ -53,9 +56,27 @@ void vfs_init() {
     fst[EXT2_FS].fs_rm             = 0; // not implemted yet
     fst[EXT2_FS].fs_destroy_dirent = 0;
     fst[EXT2_FS].fs_readsymlink    = 0;
+    
+	klogf(Log_info, "vfs", "setup proc2 file system");
+    memcpy(fst[PROC2_FS].fs_name, "tprc", 5);
+    fst[PROC2_FS].fs_mnt            = &fs_proc_mount;
+    fst[PROC2_FS].fs_lookup         = &fs_proc_lookup;
+    fst[PROC2_FS].fs_stat           = &fs_proc_stat;
+    fst[PROC2_FS].fs_read           = &fs_proc_read;
+    fst[PROC2_FS].fs_write          = &fs_proc_write;
+    fst[PROC2_FS].fs_touch          = &fs_proc_touch;
+    fst[PROC2_FS].fs_mkdir          = &fs_proc_mkdir;
+    fst[PROC2_FS].fs_opendir        = &fs_proc_opendir;
+    fst[PROC2_FS].fs_readdir        = &fs_proc_readdir;
+    fst[PROC2_FS].fs_rm             = &fs_proc_rm;
+    fst[PROC2_FS].fs_destroy_dirent = &fs_proc_destroy_dirent;
+    fst[PROC2_FS].fs_readsymlink    = &fs_proc_readsymlink;
 
     vfs_mount("/proc", PROC_FS, 0);
+	klogf(Log_info, "ext2", "home_part: %p - %p",
+					home_partition, home_partition_end);
     vfs_mount("/home", EXT2_FS, home_partition);
+    vfs_mount("/tprc", PROC2_FS, 0);
 }
 
 int vfs_mount(const char *path, uint8_t fs, void *partition) {
@@ -138,6 +159,7 @@ struct device *find_device(const char *fname) {
 // TODO : follow symlink
 static ino_t vfs_lookup(struct mount_info *info, struct fs *fs,
                         const char *full_name, struct stat *st) {
+	klogf(Log_info, "vfs", "lookup for %s", full_name);
     char name[256] = { 0 };
     char *start, *end;
 

@@ -6,8 +6,10 @@
 
     .section .rodata
     .global home_partition
+    .global home_partition_end
 
 .align 0x20
 home_partition:
     .incbin "../../tests/run/home.img"
+home_partition_end:
 .align 0x20

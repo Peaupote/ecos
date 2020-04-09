@@ -14,10 +14,11 @@ typedef struct vfile {
 } vfile_t;
 
 // File system table
-#define NFST 3
+#define NFST 4
 #define DUMMY_FS 0
 #define PROC_FS  1
 #define EXT2_FS  2
+#define PROC2_FS 3
 
 /**
  * First parameter is a pointer to the beginning of the partition
