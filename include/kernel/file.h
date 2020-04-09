@@ -56,10 +56,13 @@ typedef int (fs_rdwr_t)(ino_t, void*, off_t, size_t, struct mount_info*);
 
 /**
  * Returns a pointer to the first element in the directory
+ * p2 is a location that may be used to store the entry
+ * p3 is a location that may be used to store the entry's name (max 255)
  */
-typedef struct dirent *(fs_opendir_t)(ino_t, struct mount_info*);
+typedef struct dirent_it *(fs_opendir_t)(ino_t, struct dirent_it*, char*,
+		struct mount_info*);
 
-typedef struct dirent *(fs_readdir_t)(struct dirent*);
+typedef struct dirent_it *(fs_readdir_t)(struct dirent_it*, char*);
 
 /**
  * Remove a dir entry with ino in list of dir entries of parent
@@ -99,8 +102,8 @@ int      vfs_write(vfile_t *vfile, void *buf, off_t pos, size_t len);
 vfile_t *vfs_touch(const char *parent, const char *fname, mode_t perm);
 vfile_t *vfs_mkdir(const char *parent, const char *fname, mode_t perm);
 
-struct dirent *vfs_opendir(vfile_t *vf, struct dirent **dir);
-struct dirent *vfs_readdir(vfile_t *vfile, struct dirent *dir);
+struct dirent_it *vfs_opendir(vfile_t *vf, struct dirent_it *it, char* nbf);
+struct dirent_it *vfs_readdir(vfile_t *vf, struct dirent_it *it, char* nbf);
 
 ino_t vfs_rmdir(const char *fname, uint32_t rec);
 

@@ -11,14 +11,15 @@
 #include "special.h"
 
 uint32_t proc_add_dirent(struct proc_inode *p, int32_t ino, const char *fname) {
-    struct dirent *dir = (struct dirent*)p->in_block[0];
-    while (dir->d_ino) dir = proc_readdir(dir);
+    struct ext2_dir_entry *dir = (struct ext2_dir_entry*)p->in_block[0];
+    while (dir->d_ino)
+		dir = (struct ext2_dir_entry*)(dir->d_rec_len + (char*)dir);
     proc_fill_dirent(dir, ino, fname);
     p->st.st_size += dir->d_rec_len;
 
     proc_inodes[ino].st.st_nlink++;
 
-    dir = proc_readdir(dir);
+	dir = (struct ext2_dir_entry*)(dir->d_rec_len + (char*)dir);
     proc_fill_dirent(dir, 0, "");
     return ino;
 }
@@ -34,16 +35,16 @@ uint32_t proc_init_dir(uint32_t ino, uint32_t parent, uint16_t type) {
     inode->in_block[0] = (uint64_t)(proc_blocks + b);
     inode->st.st_size  = 0;
 
-    struct dirent *dir = (struct dirent*)inode->in_block[0];
+    struct ext2_dir_entry *dir = (struct ext2_dir_entry*)inode->in_block[0];
     proc_fill_dirent(dir, ino, ".");
     inode->st.st_size += dir->d_rec_len;
 
-    dir = proc_readdir(dir);
+	dir = (struct ext2_dir_entry*)(dir->d_rec_len + (char*)dir);
     proc_fill_dirent(dir, parent, "..");
     proc_inodes[parent].st.st_nlink++;
     inode->st.st_size += dir->d_rec_len;
 
-    dir = proc_readdir(dir);
+	dir = (struct ext2_dir_entry*)(dir->d_rec_len + (char*)dir);
     proc_fill_dirent(dir, 0, "");
 
     inode->st.st_mode  = type;
@@ -63,15 +64,16 @@ uint32_t proc_lookup(const char *fname, ino_t parent,
     if (!(inode->st.st_mode&TYPE_DIR)) return 0;
 
     size_t nbblk = 0, len = 0, len_in_block = 0;
-    struct dirent *dir = (struct dirent*)inode->in_block[0];
+    struct ext2_dir_entry *dir = (struct ext2_dir_entry*)inode->in_block[0];
     goto start;
 
     do {
         if (len_in_block == info->block_size) {
             len_in_block = 0;
             if (++nbblk >= PROC_NBLOCK) return 0;
-            dir = (struct dirent*)inode->in_block[++nbblk];
-        } else dir = proc_readdir(dir);
+            dir = (struct ext2_dir_entry*)inode->in_block[++nbblk];
+        } else
+			dir = (struct ext2_dir_entry*)(dir->d_rec_len + (char*)dir);
 
     start:
         if (!dir->d_ino) break;
@@ -89,8 +91,23 @@ uint32_t proc_lookup(const char *fname, ino_t parent,
     return dir->d_ino;
 }
 
-struct dirent *proc_readdir(struct dirent *dir) {
-    return (struct dirent*)((char*)dir + dir->d_rec_len);
+static struct dirent_it* proc_dirent_from_ext2(struct dirent_it *d,
+		struct ext2_dir_entry* ed) {
+	struct dirent* c = &d->cnt;
+	c->d_ino       = ed->d_ino;
+	c->d_rec_len   = ed->d_rec_len;
+	c->d_name_len  = ed->d_name_len;
+	c->d_file_type = ed->d_file_type;
+	c->d_name      = ed->d_name;
+	struct ext2_dir_entry** nx = (struct ext2_dir_entry**) d->dt;
+	*nx = (struct ext2_dir_entry*)(ed->d_rec_len + (char*)ed);
+    return d;
+}
+
+struct dirent_it *proc_readdir(struct dirent_it *dir,
+		char* nbuf __attribute__((unused))) {
+	struct ext2_dir_entry** nx = (struct ext2_dir_entry**) dir->dt;
+    return proc_dirent_from_ext2(dir, *nx);
 }
 
 uint32_t proc_mkdir(ino_t parent, const char *fname, uint16_t type,
@@ -138,21 +155,25 @@ uint32_t proc_mkdir(ino_t parent, const char *fname, uint16_t type,
     return ino;
 }
 
-struct dirent *
-proc_opendir(ino_t ino, struct mount_info *info __attribute__((unused))) {
+struct dirent_it *
+proc_opendir(ino_t ino, struct dirent_it* it,
+		char* nbuf __attribute__((unused)), 
+		struct mount_info *info __attribute__((unused))) {
+
     struct proc_inode *inode = proc_inodes + ino;
-    return (struct dirent*)inode->in_block[0];
+    return proc_dirent_from_ext2(it, (struct ext2_dir_entry*)inode->in_block[0]);
 }
 
 ino_t proc_destroy_dirent(ino_t p, ino_t ino, struct mount_info *info) {
     struct proc_inode *parent = proc_inodes + p;
-    struct dirent *ndir, *dir;
+    struct ext2_dir_entry *ndir, *dir;
     size_t size, rec_len;
 
-    dir = (struct dirent*)parent->in_block[0];
+    dir = (struct ext2_dir_entry*)parent->in_block[0];
 
     for (size = 0; size < parent->st.st_size;
-         size += dir->d_rec_len, dir = proc_readdir(dir)) {
+         size += dir->d_rec_len,
+		 dir = (struct ext2_dir_entry*)(dir->d_rec_len + (char*)dir)) {
         if (dir->d_ino == ino) break;
     }
 
@@ -164,7 +185,7 @@ ino_t proc_destroy_dirent(ino_t p, ino_t ino, struct mount_info *info) {
 
     if (size + rec_len == parent->st.st_size) goto ret;
 
-    ndir = proc_readdir(dir);
+	ndir = (struct ext2_dir_entry*)(dir->d_rec_len + (char*)dir);
     memmove(dir, ndir, parent->st.st_size - size - rec_len);
 
 ret:

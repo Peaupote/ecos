@@ -248,21 +248,23 @@ uint32_t proc_create(pid_t pid) {
     }
 
     struct proc_inode *proc = proc_inodes + ino;
-    struct dirent *dir = proc_opendir(ino, &dev->dev_info);
+	struct ext2_dir_entry *dir = (struct ext2_dir_entry*)
+								proc_inodes[ino].in_block[0];
 
     // skip . and ..
     for (size_t l = 0; l < proc->st.st_size;
-         l += dir->d_rec_len, dir = proc_readdir(dir));
+         l += dir->d_rec_len, 
+		 dir = (struct ext2_dir_entry*)(dir->d_rec_len + (char*)dir));
 
     ino_t st_ino = alloc_special_file(pid, stat_read, stat_stat);
     proc_fill_dirent(dir, st_ino, "stat");
     proc->st.st_size += dir->d_rec_len;
-    dir = proc_readdir(dir);
+	dir = (struct ext2_dir_entry*)(dir->d_rec_len + (char*)dir);
 
     ino_t st_cmd = alloc_special_file(pid, cmd_read, cmd_stat);
     proc_fill_dirent(dir, st_cmd, "cmd");
     proc->st.st_size += dir->d_rec_len;
-    dir = proc_readdir(dir);
+	dir = (struct ext2_dir_entry*)(dir->d_rec_len + (char*)dir);
 
     proc_fill_dirent(dir, 0, "");
 
@@ -273,12 +275,13 @@ uint32_t proc_create(pid_t pid) {
     }
 
     proc_t *p = state.st_proc + pid;
-    dir = proc_opendir(rc, &dev->dev_info);
+	dir = (struct ext2_dir_entry*) proc_inodes[rc].in_block[0];
     struct proc_inode *fd = proc_inodes + rc;
 
     // skip . and ..
     for (size_t l = 0; l < fd->st.st_size;
-         l += dir->d_rec_len, dir = proc_readdir(dir));
+         l += dir->d_rec_len,
+		 dir = (struct ext2_dir_entry*)(dir->d_rec_len + (char*)dir));
 
     for (int i = 0; i < NFD; i++) {
         if (p->p_fds[i] == -1) continue;
@@ -292,7 +295,7 @@ uint32_t proc_create(pid_t pid) {
         fd->st.st_size += dir->d_rec_len;
 
         proc_inodes[c->chann_vfile->vf_stat.st_ino].st.st_nlink++;
-        dir = proc_readdir(dir);
+		dir = (struct ext2_dir_entry*)(dir->d_rec_len + (char*)dir);
 
         // TODO problem if not same fs
         // TODO change type

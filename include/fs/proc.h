@@ -69,8 +69,9 @@ int      proc_write(ino_t ino, void*, off_t, size_t, struct mount_info*);
 uint32_t proc_touch(ino_t, const char*, uint16_t, struct mount_info*);
 uint32_t proc_mkdir(ino_t, const char*, uint16_t, struct mount_info*);
 
-struct dirent *proc_opendir(ino_t, struct mount_info *);
-struct dirent *proc_readdir(struct dirent*);
+struct dirent_it *proc_opendir(ino_t, struct dirent_it* buf, char nbuf[],
+		struct mount_info *);
+struct dirent_it *proc_readdir(struct dirent_it*, char nbuf[]);
 
 ino_t proc_readsymlink(ino_t, char*, struct mount_info *);
 
@@ -85,7 +86,7 @@ uint32_t proc_alloc_std_streams(pid_t pid);
 uint32_t proc_exit(pid_t pid);
 
 static inline void
-proc_fill_dirent(struct dirent *dir, uint32_t ino, const char *fname) {
+proc_fill_dirent(struct ext2_dir_entry *dir, uint32_t ino, const char *fname) {
     dir->d_ino       = ino;
     dir->d_file_type = proc_inodes[ino].st.st_mode;
     dir->d_name_len  = strlen(fname);

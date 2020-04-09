@@ -256,14 +256,6 @@ ext2_inode_blocks(uint32_t block_count, struct ext2_superblock *sp) {
 
 #define EXT2_DIR_BASE_SIZE 8
 
-struct ext2_dir_entry {
-    uint32_t d_ino;
-    uint16_t d_rec_len;
-    uint8_t  d_name_len;
-    uint8_t  d_file_type;
-    char     d_name[]; // at most 255 bytes len
-};
-
 /**
  * Functions
  */
@@ -331,5 +323,9 @@ uint32_t ext2_mkdir(uint32_t parent, const char *dirname, uint16_t type,
                     struct ext2_mount_info *info);
 
 struct ext2_dir_entry *ext2_opendir(uint32_t ino, struct ext2_mount_info *);
+
+struct dirent_it* ext2_opendir_it(ino_t, struct dirent_it* dbuf,
+		char* nbuf, struct mount_info*);
+struct dirent_it* ext2_readdir_it(struct dirent_it* it, char* nbuf);
 
 #endif

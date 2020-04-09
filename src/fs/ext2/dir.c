@@ -173,3 +173,34 @@ ext2_opendir(uint32_t ino, struct ext2_mount_info *info) {
 
     return dir;
 }
+
+static struct dirent_it* dirent_from_ext2(struct dirent_it *d,
+				struct ext2_dir_entry* ed) {
+	struct dirent* c = &d->cnt;
+	c->d_ino       = ed->d_ino;
+	c->d_rec_len   = ed->d_rec_len;
+	c->d_name_len  = ed->d_name_len;
+	c->d_file_type = ed->d_file_type;
+	c->d_name      = ed->d_name;
+	struct ext2_dir_entry** nx = (struct ext2_dir_entry**) d->dt;
+	*nx = (struct ext2_dir_entry*)(ed->d_rec_len + (char*)ed);
+    return d;
+}
+
+struct dirent_it* ext2_opendir_it(ino_t ino, struct dirent_it* dbuf,
+		char* nbuf __attribute__((unused)), struct mount_info* p_info) {
+	struct ext2_mount_info* info = (struct ext2_mount_info*) p_info;
+    struct ext2_inode *inode = ext2_get_inode(ino, info);
+    if (inode->in_type&EXT2_TYPE_DIR)
+        return dirent_from_ext2(dbuf,
+				(struct ext2_dir_entry*)
+					ext2_get_inode_block(0, inode, info));
+
+    return NULL;
+}
+
+struct dirent_it* ext2_readdir_it(struct dirent_it* it,
+		char* nbuf __attribute__((unused))) {
+	struct ext2_dir_entry** nx = (struct ext2_dir_entry**) it->dt;
+    return dirent_from_ext2(it, *nx);
+}

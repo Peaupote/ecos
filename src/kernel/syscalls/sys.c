@@ -122,7 +122,7 @@ pid_t sys_waitpid(pid_t cpid, int* rt_st) {
 }
 
 pid_t sys_fork() {
-    proc_t *fp, *pp = state.st_proc + state.st_curr_pid;
+    proc_t *fp, *pp = cur_proc();
 
     pid_t fpid = find_new_pid();
     // we didn't find place for a new processus
@@ -134,6 +134,7 @@ pid_t sys_fork() {
     fp          = state.st_proc + fpid;
     fp->p_ppid  = state.st_curr_pid;
 
+	// Ajout dans la liste des enfants
     if (~pp->p_fchd) {
         proc_t *fc = state.st_proc + pp->p_fchd;
         if (fc->p_stat == ZOMB) {

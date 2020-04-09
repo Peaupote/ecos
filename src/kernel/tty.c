@@ -127,14 +127,16 @@ void ls (char** tokpt) {
     char* arg1 = strtok_rnull(NULL, " ", tokpt);
     if (!arg1) return;
 
-    struct dirent *dir;
+    struct dirent_it dbuf[1];
+    struct dirent_it *dir;
+	char nbuf[256];
     vfile_t *vf = vfs_load(arg1, 0);
     if (!vf) {
         kprintf("%s don't exist\n", arg1);
         return;
     }
 
-    if (!vfs_opendir(vf, &dir)) {
+    if (!(dir = vfs_opendir(vf, dbuf, nbuf))) {
         vfs_close(vf);
         return;
     }
@@ -147,12 +149,12 @@ void ls (char** tokpt) {
     kprintf("INO    TYPE    SIZE    NLINK        NAME\n");
 
     for (size_t size = 0; size < vf->vf_stat.st_size;
-         size += dir->d_rec_len, dir = fs->fs_readdir(dir)) {
-        fs->fs_stat(dir->d_ino, &st, &dev->dev_info);
+         size += dir->cnt.d_rec_len, dir = fs->fs_readdir(dir, nbuf)) {
+        fs->fs_stat(dir->cnt.d_ino, &st, &dev->dev_info);
         kprintf("%d    %x    %d    %d        ",
-                dir->d_ino, st.st_mode, st.st_size, st.st_nlink);
-        for (size_t i = 0; i < dir->d_name_len; i++)
-            kprintf("%c", dir->d_name[i]);
+                dir->cnt.d_ino, st.st_mode, st.st_size, st.st_nlink);
+        for (size_t i = 0; i < dir->cnt.d_name_len; i++)
+            kprintf("%c", dir->cnt.d_name[i]);
         kprintf("\n");
 
     }
