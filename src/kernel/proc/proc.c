@@ -20,7 +20,7 @@
 
 #include <fs/proc.h>
 
-char proc_state_char[6] = {'f', 's', 'b', 'L', 'R', 'Z'};
+char proc_state_char[6] = {'f', 'S', 'B', 'L', 'R', 'Z'};
 
 extern void proc_idle_entry(void);
 extern void proc_init_entry(void);
@@ -125,9 +125,7 @@ void proc_start() {
     state.st_curr_pid = PID_INIT;
     st_curr_reg       = &p_init->p_reg;
 
-    proc_create(PID_INIT);
-    proc_create(PID_STOP);
-    proc_alloc_std_streams(PID_INIT);
+	kAssert(fs_proc_std_to_tty(state.st_proc + PID_INIT));
 
     klogf(Log_info, "init", "Start process init @ %p", p_init->p_reg.rip.p);
     iret_to_proc(p_init);
@@ -289,18 +287,6 @@ void proc_ps() {
     }
 }
 
-void proc_write_stdin(char *buf, size_t len) {
-    // TODO : handle differently to dont block other processes
-    vfile_t *vf = vfs_load("/proc/tty/tty0", 0);
-    if (!vf) return;
-
-    if (vfs_write(vf, buf, 0, len) < 0) {
-        klogf(Log_error, "proc", "problem when writing on stdin");
-    }
-
-    vfs_close(vf);
-}
-
 void wait_file(pid_t pid, cid_t cid) {
     klogf(Log_info, "proc", "pid %d waiting for channel %d", pid, cid);
     proc_t *p   = state.st_proc + pid;
@@ -330,7 +316,8 @@ static inline bool is_waiting_me(proc_t* pp, pid_t mpid) {
             );
 }
 
-static void kill_proc_remove(pid_t pid, proc_t* p, proc_t* pp) {
+static void kill_proc_remove(pid_t pid __attribute__((unused)),
+		proc_t* p, proc_t* pp) {
     if (~p->p_fchd) {
         // Les enfants du processus reçoivent INIT comme nouveau parent
         proc_t* fcp = state.st_proc + p->p_fchd;
@@ -409,7 +396,6 @@ static void kill_proc_remove(pid_t pid, proc_t* p, proc_t* pp) {
     else pp->p_fchd = p->p_nxsb;
 
     for (int fd = 0; fd < NFD; fd++) sys_close(fd);
-    proc_exit(pid);
 }
 
 static void kill_proc_2zb(proc_t* p, proc_t* pp, int status) {

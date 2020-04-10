@@ -10,7 +10,6 @@
 #include <kernel/memory/shared_pages.h>
 #include <util/elf64.h>
 #include <util/misc.h>
-#include <fs/proc.h>
 
 void sys_errno(int *errno) {
     state.st_proc[state.st_curr_pid].p_errno = errno;
@@ -43,6 +42,8 @@ int sys_open(const char *fname, int oflags) {
             c->chann_acc  = 1;
             c->chann_mode = oflags&3;
             c->chann_pos  = 0;
+			c->chann_nxw  = cid;
+			c->chann_waiting = PID_NONE;
             p->p_fds[fd] = cid;
             set_errno(p, SUCC);
             klogf(Log_info, "syscall", "process %d open %s on %d (cid %d)",
@@ -143,7 +144,7 @@ int sys_pipe(int fd[2]) {
 
     fd[0] = fdin;
     fd[1] = fdout;
-    p->p_fds[fdin] = in;
+    p->p_fds[fdin ] = in;
     p->p_fds[fdout] = out;
 
     cin->chann_acc   = 1;
@@ -151,9 +152,13 @@ int sys_pipe(int fd[2]) {
     cout->chann_acc  = 1;
     cout->chann_mode = WRITE;
 
-    vfile_t *pipe = vfs_pipe();
-    cin->chann_vfile  = pipe;
-    cout->chann_vfile = pipe;
+	vfile_t* fvf[2];
+    if (!~vfs_pipe(fvf))
+		return -1; //TODO errno
+    cin->chann_vfile  = fvf[0];
+    cout->chann_vfile = fvf[1];
+	kAssert(fvf[0] != NULL);
+	kAssert(fvf[1] != NULL);
 
     set_errno(p, SUCC);
     klogf(Log_error, "syscall", "alloc pipe, in %d, out %d", fdin, fdout);
@@ -236,6 +241,7 @@ ssize_t sys_write(int fd, uint8_t *s, size_t len) {
     vfile_t *vfile = chann->chann_vfile;
     klogf(Log_verb, "syscall", "process %d write on %d",
             state.st_curr_pid, fd);
+	klogf(Log_verb, "syscall", "vfile=%p", vfile);
 
     int rc = 0;
 

@@ -14,11 +14,10 @@ typedef struct vfile {
 } vfile_t;
 
 // File system table
-#define NFST 4
+#define NFST 3
 #define DUMMY_FS 0
-#define PROC_FS  1
+#define PROC2_FS 1
 #define EXT2_FS  2
-#define PROC2_FS 3
 
 /**
  * First parameter is a pointer to the beginning of the partition
@@ -92,9 +91,11 @@ struct fs {
 void vfs_init();
 int  vfs_mount(const char *path, uint8_t fs, void *partition);
 
-vfile_t *vfs_pipe();
+uint32_t vfs_pipe(vfile_t* rt[2]);
 
 vfile_t *vfs_load(const char *path, int flags);
+
+void vfs_unblock(vfile_t* vfile);
 
 int      vfs_close(vfile_t *vfile);
 int      vfs_read(vfile_t *vfile, void *buf, off_t pos, size_t len);

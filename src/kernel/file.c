@@ -8,7 +8,6 @@
 #include <fs/pipe.h>
 #include <fs/ext2.h>
 #include <fs/proc.h>
-#include <fs/proc2.h>
 
 extern char home_partition[];
 extern char home_partition_end[];
@@ -26,21 +25,22 @@ void vfs_init() {
         state.st_files[i].vf_cnt = 0;
         state.st_files[i].vf_waiting = PID_NONE;
     }
+	
+	klogf(Log_info, "vfs", "setup proc file system");
+    memcpy(fst[PROC2_FS].fs_name, "tprc", 5);
+    fst[PROC2_FS].fs_mnt            = &fs_proc_mount;
+    fst[PROC2_FS].fs_lookup         = &fs_proc_lookup;
+    fst[PROC2_FS].fs_stat           = &fs_proc_stat;
+    fst[PROC2_FS].fs_read           = &fs_proc_read;
+    fst[PROC2_FS].fs_write          = &fs_proc_write;
+    fst[PROC2_FS].fs_touch          = &fs_proc_touch;
+    fst[PROC2_FS].fs_mkdir          = &fs_proc_mkdir;
+    fst[PROC2_FS].fs_opendir        = &fs_proc_opendir;
+    fst[PROC2_FS].fs_readdir        = &fs_proc_readdir;
+    fst[PROC2_FS].fs_rm             = &fs_proc_rm;
+    fst[PROC2_FS].fs_destroy_dirent = &fs_proc_destroy_dirent;
+    fst[PROC2_FS].fs_readsymlink    = &fs_proc_readsymlink;
 
-    klogf(Log_info, "vfs", "setup proc file system");
-    memcpy(fst[PROC_FS].fs_name, "proc", 5);
-    fst[PROC_FS].fs_mnt            = &proc_mount;
-    fst[PROC_FS].fs_lookup         = &proc_lookup;
-    fst[PROC_FS].fs_stat           = &proc_stat;
-    fst[PROC_FS].fs_read           = &proc_read;
-    fst[PROC_FS].fs_write          = &proc_write;
-    fst[PROC_FS].fs_touch          = &proc_touch;
-    fst[PROC_FS].fs_mkdir          = &proc_mkdir;
-    fst[PROC_FS].fs_opendir        = &proc_opendir;
-    fst[PROC_FS].fs_readdir        = &proc_readdir;
-    fst[PROC_FS].fs_rm             = &proc_rm;
-    fst[PROC_FS].fs_destroy_dirent = &proc_destroy_dirent;
-    fst[PROC_FS].fs_readsymlink    = &proc_readsymlink;
 
     klogf(Log_info, "vfs", "setup ext2 file system");
     memcpy(fst[EXT2_FS].fs_name, "ext2", 5);
@@ -57,26 +57,10 @@ void vfs_init() {
     fst[EXT2_FS].fs_destroy_dirent = 0;
     fst[EXT2_FS].fs_readsymlink    = 0;
     
-	klogf(Log_info, "vfs", "setup proc2 file system");
-    memcpy(fst[PROC2_FS].fs_name, "tprc", 5);
-    fst[PROC2_FS].fs_mnt            = &fs_proc_mount;
-    fst[PROC2_FS].fs_lookup         = &fs_proc_lookup;
-    fst[PROC2_FS].fs_stat           = &fs_proc_stat;
-    fst[PROC2_FS].fs_read           = &fs_proc_read;
-    fst[PROC2_FS].fs_write          = &fs_proc_write;
-    fst[PROC2_FS].fs_touch          = &fs_proc_touch;
-    fst[PROC2_FS].fs_mkdir          = &fs_proc_mkdir;
-    fst[PROC2_FS].fs_opendir        = &fs_proc_opendir;
-    fst[PROC2_FS].fs_readdir        = &fs_proc_readdir;
-    fst[PROC2_FS].fs_rm             = &fs_proc_rm;
-    fst[PROC2_FS].fs_destroy_dirent = &fs_proc_destroy_dirent;
-    fst[PROC2_FS].fs_readsymlink    = &fs_proc_readsymlink;
-
-    vfs_mount("/proc", PROC_FS, 0);
+    vfs_mount(PROC_MOUNT, PROC2_FS, 0);
 	klogf(Log_info, "ext2", "home_part: %p - %p",
 					home_partition, home_partition_end);
     vfs_mount("/home", EXT2_FS, home_partition);
-    vfs_mount("/tprc", PROC2_FS, 0);
 }
 
 int vfs_mount(const char *path, uint8_t fs, void *partition) {
@@ -102,40 +86,16 @@ int vfs_mount(const char *path, uint8_t fs, void *partition) {
     return i;
 }
 
-vfile_t *vfs_pipe() {
-    int free = 0;
-    for (free = 0; free < NFILE; ++free) {
-        if (!state.st_files[free].vf_cnt) break;
-    }
-
-    if (free == NFILE) {
-        klogf(Log_info, "vfs", "can't find a free virtual file slot");
-        return 0;
-    }
-
-    vfile_t *vf = state.st_files + free;
-    char buf[256];
-    sprintf(buf, "%d", free);
-
-    vfile_t *pipedir = vfs_load("/proc/pipes", 0);
-    if (!pipedir) {
-        return 0;
-    }
-
-    struct device *dev = devices + vf->vf_stat.st_dev;
-    ino_t ino = proc_touch(pipedir->vf_stat.st_ino, buf,
-                           TYPE_FIFO|0600, &dev->dev_info);
-    vfs_close(pipedir);
-
-    if (!ino) {
-        klogf(Log_error, "vfs", "Failed to create /proc/pipes/%d\n", free);
-    }
-
-    struct proc_inode *inode = proc_inodes + ino;
-    inode->in_block[0] = (uint64_t)pipe_alloc();
-
-    ++vf->vf_cnt;
-    return vf;
+uint32_t vfs_pipe(vfile_t* rt[2]) {
+	uint32_t pipeid = fs_proc_alloc_pipe(TYPE_FIFO|0400, TYPE_FIFO|0200);
+	if (!~pipeid) return ~(uint32_t)0;
+	char path[256];
+	fs_proc_pipe_path(path, pipeid, false);
+	rt[0] = vfs_load(path, 0);
+	fs_proc_pipe_path(path, pipeid, true);
+	rt[1] = vfs_load(path, 0);
+	kAssert(rt[0] && rt[1]);
+	return pipeid;
 }
 
 struct device *find_device(const char *fname) {
@@ -262,6 +222,22 @@ int vfs_read(vfile_t *vfile, void *buf, off_t pos, size_t len) {
     return rc;
 }
 
+void vfs_unblock(vfile_t* vfile) {
+	chann_t *c;
+	cid_t cid;
+
+	for (cid = vfile->vf_waiting; ~cid; ) {
+		c = state.st_chann + cid;
+		klogf(Log_info, "vfs", "write unblock cid %d", cid);
+		proc_unblock_list(&c->chann_waiting);
+		cid_t ncid   = c->chann_nxw;
+		c->chann_nxw = cid;
+		cid = ncid;
+	}
+
+	vfile->vf_waiting = ~0;
+}
+
 int vfs_write(vfile_t *vfile, void *buf, off_t pos, size_t len) {
     dev_t dev_id = vfile->vf_stat.st_dev;
     struct device *dev = devices + dev_id;
@@ -272,21 +248,8 @@ int vfs_write(vfile_t *vfile, void *buf, off_t pos, size_t len) {
     vfile->vf_stat.st_dev = dev_id;
 
     // TODO : what happend for waiting ps if error ?
-    if (rc > 0) {
-        chann_t *c;
-        cid_t cid;
-
-        for (cid = vfile->vf_waiting; ~cid; ) {
-            c = state.st_chann + cid;
-            klogf(Log_info, "vfs", "write unblock cid %d", cid);
-            proc_unblock_list(&c->chann_waiting);
-            cid_t ncid   = c->chann_nxw;
-            c->chann_nxw = cid;
-            cid = ncid;
-        }
-
-        vfile->vf_waiting = ~0;
-    }
+    if (rc > 0)
+		vfs_unblock(vfile);
 
     return rc;
 }

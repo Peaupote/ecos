@@ -205,14 +205,14 @@ int main() {
 
     while(1) {
         memset(line, 0, 258);
-        rc = read(0, line, 256);//TODO: attendre \n + ne pas aller plus loin
+        rc = read(0, line, 256);
+		line[rc] = '\0';//TODO: attendre \n + ne pas aller plus loin
+
         if (rc == 1) continue;
         if (rc < 0) {
             printf("an error occurred\n");
             exit(1);
         }
-
-        line[rc] = '\n';
 
         setup_parse();
         parse_cmd();

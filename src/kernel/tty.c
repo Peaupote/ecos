@@ -12,6 +12,8 @@
 #include <kernel/proc.h>
 #include <kernel/int.h>
 
+#include <fs/proc.h>
+
 #include <kernel/tests.h>
 #include <fs/ext2.h>
 
@@ -122,7 +124,6 @@ void tty_set_owner(pid_t p) {
 
 uint8_t do_kprint = 0;
 
-#include <fs/proc.h>
 void ls (char** tokpt) {
     char* arg1 = strtok_rnull(NULL, " ", tokpt);
     if (!arg1) return;
@@ -322,7 +323,8 @@ void tty_input(scancode_byte s, key_event ev) {
             switch(tty_mode) {
             case ttym_def:
                 ibuffer[ib_size] = '\n';
-                proc_write_stdin(ibuffer, ib_size + 1);
+				if(fs_proc_write_tty(ibuffer, ib_size + 1) != ib_size + 1)
+					klogf(Log_error, "tty", "in_buffer saturated");
                 break;
             default:
                 ibuffer[ib_size] = '\0';

@@ -1,5 +1,5 @@
-#ifndef _H_PROC_FS
-#define _H_PROC_FS
+#ifndef _H_PROC2_FS
+#define _H_PROC2_FS
 
 /**
  * Not communicating with physical memory of any kind
@@ -18,82 +18,72 @@
 
 #include <kernel/proc.h>
 #include <kernel/file.h>
-#include <libc/string.h>
+#include <headers/file.h>
 
-#define PROC_NBLOCKS    256
-#define PROC_BLOCK_SIZE 1024
-#define PROC_BITMAP_SIZE (PROC_NBLOCKS >> 3)
+#include <stdbool.h>
 
-uint8_t proc_block_bitmap[PROC_BITMAP_SIZE];
-
-struct proc_block {
-    char    content[PROC_BLOCK_SIZE];
-} proc_blocks[PROC_NBLOCKS];
-
-static inline uint32_t proc_free_block() {
-    size_t b;
-    for (b = 0; b < PROC_NBLOCKS; b++) {
-        if (!(proc_block_bitmap[b >> 3] & (1 << (b&7)))) break;
-    }
-
-    return b;
-}
-
-// ino 0 means end of dirent list
-#define PROC_NULL_INO 0
 #define PROC_ROOT_INO 1
+#define FP_PIPE_IN    1
+#define FP_PIPE_OUT   2
 
-#define PROC_NBLOCK 15
-#define PROC_NINODES (NPROC * 2)
-struct proc_inode {
-    struct stat st;
+#define PROC_MOUNT "/proc"
 
-    // pointers to auxiliary memory if necessary
-    uint64_t in_block[PROC_NBLOCK];
-} proc_inodes[PROC_NINODES];
+struct fp_pipe_cnt {
+	char*   buf;
+	size_t  sz;
+	size_t  ofs;
+};
 
-static inline uint32_t proc_free_inode() {
-    uint32_t ino;
-    for (ino = 2; ino < PROC_NINODES; ino++) {
-        if (!proc_inodes[ino].st.st_nlink) break;
-    }
+struct fp_pipe {
+	uint8_t open;
+	mode_t  mode_in;
+	mode_t  mode_out;
+	struct fp_pipe_cnt cnt;
+};
 
-    return ino == PROC_NINODES ? 0 : ino;
+struct fp_pipe fp_pipes[NPIPE];
+struct fp_pipe_cnt   ttyin_buf;
+extern vfile_t* ttyin_vfile;
+
+
+int      fs_proc_mount(void*, struct mount_info *info);
+uint32_t fs_proc_lookup(const char *fname, ino_t parent, struct mount_info*);
+int      fs_proc_stat(ino_t ino, struct stat *st, struct mount_info*);
+int      fs_proc_read(ino_t ino, void*, off_t, size_t, struct mount_info*);
+int      fs_proc_write(ino_t ino, void*, off_t, size_t, struct mount_info*);
+struct dirent_it* fs_proc_opendir(ino_t, struct dirent_it*,
+			char name_buf[], struct mount_info *);
+struct dirent_it* fs_proc_readdir(struct dirent_it*, char name_buf[]);
+ino_t    fs_proc_readsymlink(ino_t, char*, struct mount_info *);
+
+
+uint32_t fs_proc_mkdir(ino_t, const char*, uint16_t, struct mount_info*);
+ino_t    fs_proc_rm(ino_t ino, struct mount_info *);
+ino_t    fs_proc_rmdir(ino_t ino, struct mount_info *);
+ino_t    fs_proc_destroy_dirent(ino_t p, ino_t ino, struct mount_info*);
+uint32_t fs_proc_touch(ino_t, const char*, uint16_t, struct mount_info*);
+
+
+void     fs_proc_init_pipes();
+uint32_t fs_proc_alloc_pipe(mode_t m_in, mode_t m_out);
+static inline int fs_proc_pipe_path(char* dst,
+			uint32_t pipeid, bool out) {
+	return sprintf(dst, PROC_MOUNT "/pipes/%d%c", pipeid, out ? 'o' : 'i');
+}
+void     fs_proc_close_pipe(struct fp_pipe* p, uint8_t io);
+size_t   fs_proc_write_pipe(struct fp_pipe_cnt* p,
+							const void* src, size_t count);
+size_t   fs_proc_read_pipe(struct fp_pipe_cnt* p, void* dst, size_t count);
+
+void     fs_proc_init_tty_buf();
+bool     fs_proc_std_to_tty(proc_t *);
+static inline size_t fs_proc_write_tty(const char* src, size_t len) {
+	size_t rt = fs_proc_write_pipe(&ttyin_buf, src, len);
+	if (rt && ttyin_vfile) {
+		ttyin_vfile->vf_stat.st_size = ttyin_buf.sz;
+		vfs_unblock(ttyin_vfile);
+	}
+	return rt;
 }
 
-int proc_mount(void*, struct mount_info *info);
-uint32_t proc_lookup(const char *fname, ino_t parent, struct mount_info*);
-int      proc_stat(ino_t ino, struct stat *st, struct mount_info*);
-int      proc_read(ino_t ino, void*, off_t, size_t, struct mount_info*);
-int      proc_write(ino_t ino, void*, off_t, size_t, struct mount_info*);
-uint32_t proc_touch(ino_t, const char*, uint16_t, struct mount_info*);
-uint32_t proc_mkdir(ino_t, const char*, uint16_t, struct mount_info*);
-
-struct dirent_it *proc_opendir(ino_t, struct dirent_it* buf, char nbuf[],
-		struct mount_info *);
-struct dirent_it *proc_readdir(struct dirent_it*, char nbuf[]);
-
-ino_t proc_readsymlink(ino_t, char*, struct mount_info *);
-
-ino_t proc_rm(ino_t ino, struct mount_info *);
-ino_t proc_rmdir(ino_t ino, struct mount_info *);
-ino_t proc_destroy_dirent(ino_t p, ino_t ino, struct mount_info*);
-
-uint32_t proc_alloc_pipe(ino_t parent, const char *fname, uint16_t type);
-
-uint32_t proc_create(pid_t pid);
-uint32_t proc_alloc_std_streams(pid_t pid);
-uint32_t proc_exit(pid_t pid);
-
-static inline void
-proc_fill_dirent(struct ext2_dir_entry *dir, uint32_t ino, const char *fname) {
-    dir->d_ino       = ino;
-    dir->d_file_type = proc_inodes[ino].st.st_mode;
-    dir->d_name_len  = strlen(fname);
-    dir->d_rec_len   = DIRENT_OFF + dir->d_name_len;
-    memcpy(dir->d_name, fname, dir->d_name_len);
-}
-
-uint32_t proc_add_dirent(struct proc_inode *, int32_t, const char*);
-uint32_t proc_init_dir(uint32_t ino, uint32_t parent, uint16_t type);
 #endif

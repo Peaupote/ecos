@@ -10,7 +10,6 @@
 #include <kernel/memory/shared_pages.h>
 #include <util/elf64.h>
 #include <util/misc.h>
-#include <fs/proc.h>
 
 /**
  * Syscalls
@@ -183,9 +182,6 @@ pid_t sys_fork() {
         }
     }
 
-    if (!proc_create(fpid)) {
-        klogf(Log_error, "syscall", "fail proc create");
-    }
     fp->p_reg.r.rax.pid_t = 0;
 
     sched_add_proc(fpid);

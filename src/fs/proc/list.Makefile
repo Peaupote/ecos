@@ -1,1 +1,1 @@
-PROCFS_CFILES=proc.c dir.c special.c
+PROCFS_CFILES=proc.c pipe.c
