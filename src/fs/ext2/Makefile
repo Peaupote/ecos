@@ -13,7 +13,7 @@ NAME=ext2$(TSFX).a
 
 ##
 
-.PHONY: all re clean
+.PHONY: all re clean clean-depends
 
 all: $(NAME)
 
@@ -25,11 +25,12 @@ $(NAME): $(OBJ)
 
 $(TSFX).depends:
 	$(ROOT)/tools/mkdep.sh "$(CC) $(FLAGS_K) $(INCLUDES)" $(SRCDEP) > .depends
+clean-depends:
+	rm -f *.depends .depends
 
 include $(TSFX).depends
 
 clean:
-	@echo "Clean trash files"
-	rm -rf $(NAME) $(OBJ) *.o **/*.o *.a *.s
+	rm -f $(NAME) $(OBJ) *.o **/*.o *.a *.s *.depends .depends
 
 re: clean all

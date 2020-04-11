@@ -18,7 +18,6 @@ CFILES=main.c \
 		memory/page_alloc.c \
 		memory/shared_pages.c \
 		memory/shared_ptr.c \
-		../fs/pipe.c \
 		$(addprefix ../fs/proc/, $(PROCFS_CFILES))
 
 ASFILES=entry.S \

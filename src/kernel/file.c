@@ -5,7 +5,6 @@
 #include <kernel/file.h>
 #include <kernel/proc.h>
 
-#include <fs/pipe.h>
 #include <fs/ext2.h>
 #include <fs/proc.h>
 
@@ -27,19 +26,19 @@ void vfs_init() {
     }
 	
 	klogf(Log_info, "vfs", "setup proc file system");
-    memcpy(fst[PROC2_FS].fs_name, "tprc", 5);
-    fst[PROC2_FS].fs_mnt            = &fs_proc_mount;
-    fst[PROC2_FS].fs_lookup         = &fs_proc_lookup;
-    fst[PROC2_FS].fs_stat           = &fs_proc_stat;
-    fst[PROC2_FS].fs_read           = &fs_proc_read;
-    fst[PROC2_FS].fs_write          = &fs_proc_write;
-    fst[PROC2_FS].fs_touch          = &fs_proc_touch;
-    fst[PROC2_FS].fs_mkdir          = &fs_proc_mkdir;
-    fst[PROC2_FS].fs_opendir        = &fs_proc_opendir;
-    fst[PROC2_FS].fs_readdir        = &fs_proc_readdir;
-    fst[PROC2_FS].fs_rm             = &fs_proc_rm;
-    fst[PROC2_FS].fs_destroy_dirent = &fs_proc_destroy_dirent;
-    fst[PROC2_FS].fs_readsymlink    = &fs_proc_readsymlink;
+    memcpy(fst[PROC_FS].fs_name, "tprc", 5);
+    fst[PROC_FS].fs_mnt            = &fs_proc_mount;
+    fst[PROC_FS].fs_lookup         = &fs_proc_lookup;
+    fst[PROC_FS].fs_stat           = &fs_proc_stat;
+    fst[PROC_FS].fs_read           = &fs_proc_read;
+    fst[PROC_FS].fs_write          = &fs_proc_write;
+    fst[PROC_FS].fs_touch          = &fs_proc_touch;
+    fst[PROC_FS].fs_mkdir          = &fs_proc_mkdir;
+	fst[PROC_FS].fs_getdents       = &fs_proc_getdents;
+	fst[PROC_FS].fs_opench         = &fs_proc_opench;
+    fst[PROC_FS].fs_rm             = &fs_proc_rm;
+    fst[PROC_FS].fs_destroy_dirent = &fs_proc_destroy_dirent;
+    fst[PROC_FS].fs_readsymlink    = &fs_proc_readsymlink;
 
 
     klogf(Log_info, "vfs", "setup ext2 file system");
@@ -51,13 +50,13 @@ void vfs_init() {
     fst[EXT2_FS].fs_write          = (fs_rdwr_t*)&ext2_write;
     fst[EXT2_FS].fs_touch          = (fs_create_t*)ext2_touch;
     fst[EXT2_FS].fs_mkdir          = 0; // not implemented yet
-    fst[EXT2_FS].fs_opendir        = &ext2_opendir_it;
-    fst[EXT2_FS].fs_readdir        = &ext2_readdir_it;
+	fst[EXT2_FS].fs_getdents       = &ext2_getdents;
+	fst[EXT2_FS].fs_opench         = &ext2_opench;
     fst[EXT2_FS].fs_rm             = 0; // not implemted yet
     fst[EXT2_FS].fs_destroy_dirent = 0;
     fst[EXT2_FS].fs_readsymlink    = 0;
     
-    vfs_mount(PROC_MOUNT, PROC2_FS, 0);
+    vfs_mount(PROC_MOUNT, PROC_FS, 0);
 	klogf(Log_info, "ext2", "home_part: %p - %p",
 					home_partition, home_partition_end);
     vfs_mount("/home", EXT2_FS, home_partition);
@@ -208,6 +207,12 @@ vfile_t *vfs_load(const char *filename, int flags) {
     return state.st_files + free;
 }
 
+void vfs_opench(vfile_t *vf, chann_adt_t* cdt) {
+	struct device *dev = devices + vf->vf_stat.st_dev;
+	struct fs *fs = fst + dev->dev_fs;
+	return fs->fs_opench(vf->vf_stat.st_ino, cdt, &dev->dev_info);
+}
+
 int vfs_read(vfile_t *vfile, void *buf, off_t pos, size_t len) {
     dev_t dev_id = vfile->vf_stat.st_dev;
     struct device *dev = devices + dev_id;
@@ -324,32 +329,22 @@ vfile_t *vfs_mkdir(const char *parent, const char *fname, mode_t perm) {
     return vfs_alloc(dev, parent, fname, perm, fs->fs_mkdir);
 }
 
-struct dirent_it *vfs_opendir(vfile_t *vfile, struct dirent_it *dbuf,
-		char* nbuf) {
-    if (vfile) {
-        if (!(vfile->vf_stat.st_mode&TYPE_DIR)) {
-            klogf(Log_error, "vfs", "opendir: file %d is not a directory",
-                  vfile->vf_stat.st_ino);
-            vfs_close(vfile);
-            return 0;
-        }
+int vfs_getdents(vfile_t *vf, struct dirent* dst, size_t sz,
+					chann_adt_t* cdt) {
 
-        klogf(Log_info, "vfs", "opendir %d (device %d)",
-              vfile->vf_stat.st_ino, vfile->vf_stat.st_dev);
+	if (!(vf->vf_stat.st_mode & TYPE_DIR)) {
+		klogf(Log_error, "vfs", "getdents: file %d is not a directory",
+			  vf->vf_stat.st_ino);
+		vfs_close(vf);
+		return -1;
+	}
 
-        struct device *dev = devices + vfile->vf_stat.st_dev;
-        struct fs *fs = fst + dev->dev_fs;
-        return fs->fs_opendir(vfile->vf_stat.st_ino, dbuf, nbuf,
-								&dev->dev_info);
-    }
-	return dbuf;
-}
+	klogf(Log_verb, "vfs", "getdents %d (device %d)",
+		  vf->vf_stat.st_ino, vf->vf_stat.st_dev);
 
-struct dirent_it *vfs_readdir(vfile_t *vfile, struct dirent_it *dir,
-		char* nbuf) {
-    struct device *dev = devices + vfile->vf_stat.st_dev;
-    struct fs *fs = fst + dev->dev_fs;
-    return fs->fs_readdir(dir, nbuf);
+	struct device *dev = devices + vf->vf_stat.st_dev;
+	struct fs *fs = fst + dev->dev_fs;
+	return fs->fs_getdents(vf->vf_stat.st_ino, dst, sz, cdt, &dev->dev_info);
 }
 
 ino_t vfs_rmdir(const char *fname, uint32_t rec) {
@@ -374,21 +369,31 @@ ino_t vfs_rmdir(const char *fname, uint32_t rec) {
     ino_t root = vf->vf_stat.st_ino, ino;
     struct stat st;
     uint32_t is_empty = 1, parent = 0;
-    struct dirent_it dbuf[1];
-    struct dirent_it *dir;
-	char nbuf[256];
-    size_t size;
 
     // check if dir is empty and save parent inode
-    dir = fs->fs_opendir(root, dbuf, nbuf, &dev->dev_info);
-    for (size_t size = 0; size < vf->vf_stat.st_size;
-         size += dir->cnt.d_rec_len, dir = fs->fs_readdir(dir, nbuf)) {
-        if (dir->cnt.d_name_len == 2 && !strncmp(dir->cnt.d_name, "..", 2))
-            parent = dir->cnt.d_ino;
-        else if (dir->cnt.d_ino &&
-                 !(dir->cnt.d_name_len == 1 && dir->cnt.d_name[0] == '.'))
-            is_empty = 0;
-    }
+	chann_adt_t cdt;
+    char dbuf[512];
+	int rc;
+	fs->fs_opench(root, &cdt, &dev->dev_info);
+	while((rc = fs->fs_getdents(root, (struct dirent*)dbuf, 
+					512, &cdt, &dev->dev_info)) > 0) {
+		struct dirent* de = (struct dirent*)dbuf;
+		if (rc < de->d_rec_len) {
+			klogf(Log_error, "rm", 
+					"pas assez de place pour stocker le nom (1)");
+            vfs_close(vf);
+			return 0;
+		}
+		for (int i = 0; i < rc;
+				i += de->d_rec_len, de = (struct dirent*)(dbuf + i)) {
+			if (de->d_name_len == 2 
+					&& !strncmp(de->d_name, "..", 2))
+				parent = de->d_ino;
+			else if (de->d_ino &&
+				!(de->d_name_len == 1 && de->d_name[0] == '.'))
+				is_empty = 0;
+		}
+	}
 
     kAssert(parent > 0);
 
@@ -410,16 +415,28 @@ ino_t vfs_rmdir(const char *fname, uint32_t rec) {
 
         fs->fs_stat(ino, &st, &dev->dev_info);
         if (st.st_mode&TYPE_DIR) {
-            dir = fs->fs_opendir(ino, dbuf, nbuf, &dev->dev_info);
-            for (size = 0; size < st.st_size;
-                 size += dir->cnt.d_rec_len, dir = fs->fs_readdir(dir, nbuf)) {
-                if (dir->cnt.d_ino != ino &&
-                    !(dir->cnt.d_name_len == 2 
-						&& !strncmp("..", dir->cnt.d_name, 2))) {
-                    PUSH(dir->cnt.d_ino);
-                }
-                fs->fs_rm(dir->cnt.d_ino, &dev->dev_info);
-            }
+
+			fs->fs_opench(ino, &cdt, &dev->dev_info);
+			while((rc = fs->fs_getdents(ino, (struct dirent*)dbuf, 
+							512, &cdt, &dev->dev_info)) > 0) {
+				struct dirent* de = (struct dirent*)dbuf;
+				if (rc < de->d_rec_len) {
+					klogf(Log_error, "rm", 
+							"pas assez de place pour stocker le nom (2)");
+					vfs_close(vf);
+					return 0;
+				}
+				for (int i = 0; i < rc; i += de->d_rec_len,
+						de = (struct dirent*)(dbuf + i)) {
+					if (de->d_ino != ino &&
+						!(de->d_name_len == 2 
+							&& !strncmp("..", de->d_name, 2))) {
+						PUSH(de->d_ino);
+					}
+					fs->fs_rm(de->d_ino, &dev->dev_info);
+				}
+			}
+
         }
     }
 

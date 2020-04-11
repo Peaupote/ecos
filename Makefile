@@ -42,9 +42,10 @@ depends:
 	$(MAKE) -B -C src/kernel/aux_prg .depends
 	$(MAKE) -B -C src/boot           .depends
 	$(MAKE) -B -C src/util      clean-depends
-	$(MAKE) -B -C src/libc           .depends
+	$(MAKE)    -C src/libc      clean-depends
 	$(MAKE)    -C tests/host          depends
 	$(MAKE) -B -C tools              .depends
+	$(MAKE)    -C src/fs        clean-depends
 
 clean:
 	$(MAKE) -C src/kernel clean

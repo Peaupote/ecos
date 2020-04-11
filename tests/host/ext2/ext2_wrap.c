@@ -43,7 +43,7 @@ void print_inode(struct ext2_inode *inode) {
     printf("total %d\n", block_count);
 }
 
-int print_dir(struct ext2_dir_entry *dir) {
+int print_dir(struct dirent *dir) {
     if (!dir) {
         printf("dir null\n");
         return 0;

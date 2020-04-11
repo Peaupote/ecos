@@ -44,6 +44,7 @@ int sys_open(const char *fname, int oflags) {
             c->chann_pos  = 0;
 			c->chann_nxw  = cid;
 			c->chann_waiting = PID_NONE;
+			vfs_opench(c->chann_vfile, &c->chann_adt);
             p->p_fds[fd] = cid;
             set_errno(p, SUCC);
             klogf(Log_info, "syscall", "process %d open %s on %d (cid %d)",
@@ -115,7 +116,7 @@ int sys_dup2(int fd1, int fd2) {
 
     p->p_fds[fd2] = p->p_fds[fd1];
     ++state.st_chann[p->p_fds[fd1]].chann_acc;
-    klogf(Log_error, "syscall", "dup %d on %d", fd1, fd2); // <<=
+    klogf(Log_info, "syscall", "dup %d on %d", fd1, fd2); // <<=
     return fd2;
 }
 
@@ -161,7 +162,7 @@ int sys_pipe(int fd[2]) {
 	kAssert(fvf[1] != NULL);
 
     set_errno(p, SUCC);
-    klogf(Log_error, "syscall", "alloc pipe, in %d, out %d", fdin, fdout);
+    klogf(Log_info, "syscall", "alloc pipe, in %d, out %d", fdin, fdout);
     return 0;
 
 err_emfile:
@@ -192,6 +193,10 @@ ssize_t sys_read(int fd, uint8_t *d, size_t len) {
 
     switch (vfile->vf_stat.st_mode&0xf000) {
     case TYPE_DIR:
+		rc = vfs_getdents(vfile, (struct dirent*)d, len,
+				&chann->chann_adt);
+		if (rc < 0) goto err_overflow; //TODO
+		goto succ;
     case TYPE_REG:
         if (chann->chann_pos == vfile->vf_stat.st_size)
             goto succ;

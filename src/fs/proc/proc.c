@@ -7,7 +7,6 @@
 #include <kernel/proc.h>
 
 #include <fs/proc.h>
-#include <fs/pipe.h>
 
 #include <libc/string.h>
 #include <libc/stdio_strfuns.h>
@@ -23,7 +22,7 @@
 #define PROC_TTY_INO   2
 #define PROC_PIPES_INO 3
 #define PROC_TTYI_INO(I) (0x10|(I))
-#define PROC_PIPEI_INO(I) ((1<<31)|(I));
+#define PROC_PIPEI_INO(I) ((1<<31)|(I))
 #define PROC_PID_STAT_INO(P) (PROC_INO_PID_PART(P)|1)
 #define PROC_PID_CMD_INO(P)  (PROC_INO_PID_PART(P)|2)
 #define PROC_PID_FD_INO(P)   (PROC_INO_PID_PART(P)|3)
@@ -63,23 +62,25 @@ int spart_printf(void* dst, size_t ofs, size_t count,
 
 //
 
-typedef struct {
-	ino_t   ino;
+typedef struct {//sz <= CADT_SIZE
+	uint8_t num0;
 	union {
 		pid_t pid;
 		unsigned num;
 		uint32_t pipei;
 	};
-} dirent_dt_t;
+} cdt_t;
 
 typedef struct {
 	pid_t pid;
 } fpd_dt_t;
 
-typedef bool (*dir_next)(fpd_dt_t*, bool, dirent_dt_t*, struct dirent*, char*);
+typedef int (*dir_getents)(fpd_dt_t*, int, 
+						bool, cdt_t*, struct dirent*, size_t);
 
 struct fs_proc_dir {
-	dir_next next;
+	ino_t parent;
+	dir_getents ents;
 	fpd_dt_t dt;
 };
 
@@ -93,65 +94,94 @@ typedef union {
 	uint32_t pipei;
 } file_ins;
 
-static inline void dirent_stc(struct dirent* c, ino_t i, mode_t ty,
-		char* name_buf, const char* name, size_t name_len) {
-	c->d_ino       = i;
-	c->d_rec_len   = 1;
-	c->d_name_len  = name_len;
-	c->d_file_type = ty >> FTYPE_OFS;
-	c->d_name      = name_buf;
-	memcpy(name_buf, name, name_len);
+static inline struct dirent* dirent_aux(int* rc, struct dirent* d,
+		size_t* lsz, ino_t i, mode_t ty, size_t rlen) {
+	if (*lsz < rlen) {
+		if (!*rc && *lsz < offsetof(struct dirent, d_name)) {
+			d->d_ino       = i;
+			d->d_rec_len   = rlen;
+			d->d_file_type = ty >> FTYPE_OFS;
+			*rc = offsetof(struct dirent, d_name);
+		}
+		return NULL;
+	}
+	d->d_ino       = i;
+	d->d_rec_len   = rlen;
+	d->d_file_type = ty >> FTYPE_OFS;
+	*rc  += rlen;
+	*lsz -= rlen;
+	return (struct dirent*)(rlen + (char*)d);
 }
 
-// -- root --
-
-static bool root_next(fpd_dt_t* n __attribute__((unused)),
-		bool begin, dirent_dt_t* dt,
-		struct dirent* rt, char name_buf[]) {
-	if (begin) {
-		dt->pid = 0;
-		dirent_stc(rt, PROC_TTY_INO, TYPE_DIR, name_buf, "tty", 3);
+static inline bool dirent_stc(int* rc, struct dirent** d,
+		size_t* lsz, ino_t i, mode_t ty,
+		const char* name, size_t name_len) {
+	size_t rlen = align_to_size(
+						offsetof(struct dirent, d_name) + name_len, 4);
+	struct dirent* nx = dirent_aux(rc, *d, lsz, i, ty, rlen);
+	if (nx)	{
+		(*d)->d_name_len  = name_len;
+		memcpy((*d)->d_name, name, name_len);
+		*d = nx;
 		return true;
-	}
-	pid_t i = dt->pid;
-	if (i == 0) {
-		dirent_stc(rt, PROC_PIPES_INO, TYPE_DIR, name_buf, "pipes", 5);
-		dt->pid = 1;
-		return true;
-	}
-	for (; i < NPROC; ++i) {
-		if (proc_alive(state.st_proc + i)) {
-			rt->d_ino       = i << PROC_INO_PID_SHIFT;
-			rt->d_rec_len   = 1;
-			rt->d_name_len  = sprintf(name_buf, "%d", i);
-			rt->d_file_type = TYPE_DIR >> FTYPE_OFS;
-			rt->d_name      = name_buf;
-			dt->pid = i + 1;
-			return true;
-		}
 	}
 	return false;
 }
 
+// -- root --
+
+static int root_getents(fpd_dt_t* n __attribute__((unused)),
+		int rc, bool begin, cdt_t* dt, struct dirent* d, size_t sz) {
+	pid_t i = begin ? -1 : dt->pid;
+	switch (i) {
+		case -1:
+			if(!dirent_stc(&rc, &d, &sz, 
+						PROC_TTY_INO, TYPE_DIR, "tty", 3)) {
+				dt->pid = -1;
+				return rc;
+			}
+			// FALLTHRU
+		case 0:
+			if (!dirent_stc(&rc, &d, &sz,
+						PROC_PIPES_INO, TYPE_DIR, "pipes", 5)) {
+				dt->pid = 0;
+				return rc;
+			}
+			i = 1;
+	}
+	for (; i < NPROC; ++i) {
+		if (proc_alive(state.st_proc + i)) {
+			struct dirent* nx = dirent_aux(&rc, d, &sz,
+					i << PROC_INO_PID_SHIFT, TYPE_DIR, 20);
+			if (!nx) {
+				dt->pid = i;
+				return rc;
+			}
+			d->d_name_len = sprintf(d->d_name, "%d", i);
+			d = nx;
+		}
+	}
+	return rc;
+}
+
 // -- /tty --
 
-static bool tty_next(fpd_dt_t* n __attribute__((unused)),
-		bool begin, dirent_dt_t* dt,
-		struct dirent* rt, char name_buf[]) {
+static int tty_getents(fpd_dt_t* n __attribute__((unused)),
+		int rc, bool begin, cdt_t* dt, struct dirent* d, size_t sz) {
 	if (begin) dt->num = 0;
-	if (dt->num > 2) return false;
-	rt->d_ino       = PROC_TTYI_INO(dt->num);
-	rt->d_rec_len   = 1;
-	rt->d_name_len  = sprintf(name_buf, "tty%d", dt->num);
-	rt->d_file_type = TYPE_CHAR >> FTYPE_OFS;
-	rt->d_name      = name_buf;
-	++dt->num;
-	return true;
+	for (; dt->num <= 2; ++dt->num){
+		struct dirent* nx = dirent_aux(&rc, d, &sz,
+				PROC_TTYI_INO(dt->num), TYPE_CHAR, 16);
+		if (!nx) return rc;
+		d->d_name_len = sprintf(d->d_name, "tty%d", dt->num);
+		d = nx;
+	}
+	return rc;
 }
 
 // -- /tty/<ttyi>
 			
-int ttyi_stat(file_ins* ins, struct stat* st) {
+static int ttyi_stat(file_ins* ins, struct stat* st) {
     st->st_mode = TYPE_CHAR | (ins->ttyi ? 0200 : 0400);
     st->st_nlink   = 1;
     st->st_size    = ins->ttyi ? 0 : ttyin_buf.sz;
@@ -159,12 +189,12 @@ int ttyi_stat(file_ins* ins, struct stat* st) {
     st->st_blocks  = 0;
     return st->st_ino;
 }
-int ttyi_read(file_ins* ins, void* dst,
+static int ttyi_read(file_ins* ins, void* dst,
 		off_t ofs __attribute__((unused)), size_t sz) {
 	if (ins->ttyi) return -1;
 	return fs_proc_read_pipe(&ttyin_buf, dst, sz);
 }
-int ttyi_write(file_ins* ins, void* src,
+static int ttyi_write(file_ins* ins, void* src,
 		off_t ofs __attribute__((unused)), size_t sz) {
 	if (!ins->ttyi) return -1;
 	tty_seq_t sq;
@@ -176,23 +206,23 @@ int ttyi_write(file_ins* ins, void* src,
 
 // -- /pipes --
 
-static bool pipes_next(fpd_dt_t* n __attribute__((unused)),
-		bool begin, dirent_dt_t* dt,
-		struct dirent* rt, char name_buf[]) {
+static int pipes_getents(fpd_dt_t* n __attribute__((unused)),
+		int rc, bool begin, cdt_t* dt, struct dirent* d, size_t sz) {
 
 	for (uint32_t pi = begin ? 0 : dt->pipei; pi < 2 * NPIPE; ++pi) {
 		if ((fp_pipes[pi >> 1].open >> (pi & 1)) & 1) {
-			rt->d_ino       = PROC_PIPEI_INO(pi);
-			rt->d_rec_len   = 1;
-			rt->d_name_len  = sprintf(name_buf, "%d%c",
-								pi>>1, (pi&1) ? 'o' : 'i');
-			rt->d_file_type = TYPE_FIFO >> FTYPE_OFS;
-			rt->d_name      = name_buf;
-			dt->pipei = pi + 1;
-			return true;
+			struct dirent* nx = dirent_aux(&rc, d, &sz,
+					PROC_PIPEI_INO(pi), TYPE_FIFO, 20);
+			if (!nx) {
+				dt->pipei = pi;
+				return rc;
+			}
+			d->d_name_len  = sprintf(d->d_name, "%d%c",
+									pi>>1, (pi&1) ? 'o' : 'i');
+			d = nx;
 		}
 	}
-	return false;
+	return rc;
 }
 
 // -- /pipes/<pipei>
@@ -218,50 +248,57 @@ static int pipei_write(file_ins* ins, void* src,
 
 // -- /<pid> --
 
-static bool pid_next(fpd_dt_t* ddt,
-		bool begin, dirent_dt_t* dt,
-		struct dirent* rt, char name_buf[]) {
-	if (begin){
-		dirent_stc(rt, PROC_PID_FD_INO(ddt->pid), TYPE_DIR,
-				name_buf, "fd", 2);
-		dt->num = 0;
-		return true;
-	}
-	switch (dt->num) {
+static int pid_getents(fpd_dt_t* ddt,
+		int rc, bool begin, cdt_t* dt, struct dirent* d, size_t sz) {
+
+	switch (begin ? 0 : dt->num) {
 		case 0:
-			dirent_stc(rt, PROC_PID_STAT_INO(ddt->pid), TYPE_REG,
-					name_buf, "stat", 4);
-			dt->num = 1;
-			return true;
+			if(!dirent_stc(&rc, &d, &sz, 
+					PROC_PID_FD_INO(ddt->pid), TYPE_DIR, "fd", 2)) {
+				dt->num = 0;
+				return rc;
+			}
+			//FALLTHRU
 		case 1:
-			dirent_stc(rt, PROC_PID_CMD_INO(ddt->pid), TYPE_REG,
-					name_buf, "cmd", 3);
-			dt->num = 2;
-			return true;
+			if(!dirent_stc(&rc, &d, &sz, 
+					PROC_PID_STAT_INO(ddt->pid), TYPE_REG, "stat", 4)) {
+				dt->num = 1;
+				return rc;
+			}
+			//FALLTHRU
+		case 2:
+			if(!dirent_stc(&rc, &d, &sz, 
+					PROC_PID_CMD_INO(ddt->pid), TYPE_REG, "cmd", 3)) {
+				dt->num = 2;
+				return rc;
+			}
+			//FALLTHRU
 		default:
-			return false;
+			return rc;
 	}
 }
 
-// -- /<pid>/fd --
+// -- /<pid>/fd/ --
 
-static bool pid_fd_next(fpd_dt_t* ddt,
-		bool begin, dirent_dt_t* dt,
-		struct dirent* rt, char name_buf[]) {
-	if (begin) dt->num = 0;
+static int pid_fd_getents(fpd_dt_t* ddt,
+		int rc, bool begin, cdt_t* dt, struct dirent* d, size_t sz) {
+
+	
 	proc_t* p = state.st_proc + ddt->pid;
-	for(int fd = dt->num; fd < NFD; ++fd) {
+
+	for(unsigned fd = begin ? 0 : dt->num; fd < NFD; ++fd) {
 		if (~p->p_fds[fd]) {
-			rt->d_ino       = PROC_PID_FDI_INO(ddt->pid, fd);
-			rt->d_rec_len   = 1;
-			rt->d_name_len  = sprintf(name_buf, "%d", fd);
-			rt->d_file_type = TYPE_SYM >> FTYPE_OFS;
-			rt->d_name      = name_buf;
-			dt->num = fd + 1;
-			return true;
+			struct dirent* nx = dirent_aux(&rc, d, &sz,
+					PROC_PID_FDI_INO(ddt->pid, fd), TYPE_SYM, 20);
+			if (!nx) {
+				dt->num = fd;
+				return rc;
+			}
+			d->d_name_len  = sprintf(d->d_name, "%d", fd);
+			d = nx;
 		}
 	}
-	return false;
+	return rc;
 }
 
 // -- /<pid>/fd/<fd> --
@@ -316,128 +353,145 @@ static int reg_stat(file_ins* n __attribute__((unused)), struct stat* st) {
 
 // -- dossiers --
 
-static int dir_stat(file_ins* ins, struct stat* st) {
+static int dir_stat(file_ins* ins __attribute__((unused)),
+		struct stat* st) {
     st->st_mode    = TYPE_DIR|0400;
     st->st_nlink   = 1;
-
-	int count = 0;
-	{
-		char nbuf[256];
-		struct dirent it_cnt;
-		dirent_dt_t   it_dt;
-		it_dt.ino = st->st_ino;
-		if (ins->d.next(&ins->d.dt, true, &it_dt, &it_cnt, nbuf)) {
-			count = 1;
-			while (ins->d.next(&ins->d.dt, false, &it_dt, &it_cnt, nbuf))
-				++count;
-		}
-	}
-
-    st->st_size    = count;
+    st->st_size    = 0;
     st->st_blksize = PROC_BLOCK_SIZE;
     st->st_blocks  = 0;
     return st->st_ino;
 }
 
 static uint32_t dir_lookup(ino_t ino, file_ins* ins, const char* fname) {
-	char nbuf[256];
-	struct dirent it_cnt;
-	dirent_dt_t   it_dt;
-	it_dt.ino = ino;
-	if (ins->d.next(&ins->d.dt, true, &it_dt, &it_cnt, nbuf)) {
+	if (!strcmp(fname, "."))
+		return ino;
+	if (!strcmp(fname, ".."))
+		return ins->d.parent;
+	char dbuf[512];
+	cdt_t cdt;
+	int rc = ins->d.ents(&ins->d.dt, 0, true, &cdt, (struct dirent*)dbuf, 512);
+	if (rc > 0) {
 		do {
-			if (!strncmp(fname, it_cnt.d_name, it_cnt.d_name_len)
-					&& fname[it_cnt.d_name_len] == '\0') {
-				return it_cnt.d_ino;
+			struct dirent *d = (struct dirent*)dbuf;
+			kAssert(rc >= d->d_rec_len);
+
+			for (int i = 0; i < rc;
+					i += d->d_rec_len, d = (struct dirent*)(dbuf+i)) {
+				if (!strncmp(fname, d->d_name, d->d_name_len)
+						&& fname[d->d_name_len] == '\0') {
+					return d->d_ino;
+				}
 			}
-		} while (ins->d.next(&ins->d.dt, false, &it_dt, &it_cnt, nbuf));
+
+		} while ((rc = ins->d.ents(&ins->d.dt, 0, false, &cdt, 
+					(struct dirent*)dbuf, 512)) > 0);
 	}
 	return 0;
 }
-struct dirent_it* dir_opendir(file_ins* ins, struct dirent_it* dbuf,
-		char* nbuf){
-	dirent_dt_t* dt = (dirent_dt_t*)&dbuf->dt;
-	return ins->d.next(&ins->d.dt, true, dt, &dbuf->cnt, nbuf)
-			? dbuf : NULL;
-				
+
+static int dir_getdents(ino_t ino, file_ins* ins, struct dirent* d,
+		size_t sz, chann_adt_t* p_cdt) {
+	cdt_t* cdt = (cdt_t*)p_cdt;
+	int rc = 0;
+	switch (cdt->num0) {
+		case 0:
+			if(!dirent_stc(&rc, &d, &sz, ino, TYPE_DIR, ".", 1))
+				return rc;
+			//FALLTHRU
+		case 1:
+			if(!dirent_stc(&rc, &d, &sz, ins->d.parent, TYPE_DIR, "..", 2)) {
+				cdt->num0 = 1;
+				return rc;
+			}
+			//FALLTHRU
+		case 2:
+			cdt->num0 = 3;
+			return ins->d.ents(&ins->d.dt, rc, true, cdt, d, sz);
+		case 3:
+			return ins->d.ents(&ins->d.dt, rc, false, cdt, d, sz);
+		default:
+			return -1;
+	}
 }
-struct dirent_it* dir_readdir(file_ins* ins, struct dirent_it* it,
-		char* nbuf){
-	dirent_dt_t* dt = (dirent_dt_t*)&it->dt;
-	return ins->d.next(&ins->d.dt, false, dt, &it->cnt, nbuf)
-			? it : NULL;
+
+static void dir_opench(file_ins* ins __attribute__((unused)),
+						chann_adt_t* p_cdt) {
+	((cdt_t*)p_cdt)->num0 = 0;
 }
 
 // -- redirection --
 
 struct fs_proc_file {
+	void     (*opench)(file_ins*, chann_adt_t*);
 	int      (*stat  )(file_ins*, struct stat*);
 	int      (*read  )(file_ins*, void*, off_t, size_t);
 	int      (*write )(file_ins*, void*, off_t, size_t);
 	uint32_t (*lookup)(ino_t ino, file_ins*, const char* fname);
-	struct dirent_it* (*open_dir)(file_ins*, struct dirent_it*, char*);
-	struct dirent_it* (*read_dir)(file_ins*, struct dirent_it*, char*);
+	int      (*getdents)(ino_t ino, file_ins*, struct dirent*, size_t,
+							chann_adt_t*);
 	ino_t    (*read_sym)(file_ins*, char*);
 };
 
 static struct fs_proc_file
 	fun_dir = {
+			.opench   = dir_opench,
 			.stat     = dir_stat,
 			.read     = NULL,
 			.write    = NULL,
 			.lookup   = dir_lookup,
-			.open_dir = dir_opendir,
-			.read_dir = dir_readdir,
+			.getdents = dir_getdents,
 			.read_sym = NULL
 		},
 	fun_fdi = {
+			.opench   = NULL,
 			.stat     = fdi_stat,
 			.read     = fdi_read,
 			.write    = NULL,
 			.lookup   = NULL,
-			.open_dir = NULL,
-			.read_dir = NULL,
+			.getdents = NULL,
 			.read_sym = fdi_read_sym
 	},
 	fun_cmd = {
+			.opench   = NULL,
 			.stat     = reg_stat,
 			.read     = cmd_read,
 			.write    = NULL,
 			.lookup   = NULL,
-			.open_dir = NULL,
-			.read_dir = NULL,
+			.getdents = NULL,
 			.read_sym = NULL
 	},
 	fun_stat = {
+			.opench   = NULL,
 			.stat     = reg_stat,
 			.read     = stat_read,
 			.write    = NULL,
 			.lookup   = NULL,
-			.open_dir = NULL,
-			.read_dir = NULL,
+			.getdents = NULL,
 			.read_sym = NULL
 	},
 	fun_ttyi = {
+			.opench   = NULL,
 			.stat     = ttyi_stat,
 			.read     = ttyi_read,
 			.write    = ttyi_write,
 			.lookup   = NULL,
-			.open_dir = NULL,
-			.read_dir = NULL,
+			.getdents = NULL,
 			.read_sym = NULL
 	},
 	fun_pipei = {
+			.opench   = NULL,
 			.stat     = pipei_stat,
 			.read     = pipei_read,
 			.write    = pipei_write,
 			.lookup   = NULL,
-			.open_dir = NULL,
-			.read_dir = NULL,
+			.getdents = NULL,
 			.read_sym = NULL
 	};
 
-static inline fpd_dt_t* set_dir_dt(file_ins* ins, dir_next dn) {
-	ins->d.next = dn;
+static inline fpd_dt_t* set_dir_dt(file_ins* ins, ino_t p, dir_getents e) {
+	ins->d.parent = p;
+	ins->d.ents   = e;
 	return &ins->d.dt;
 }
 
@@ -446,15 +500,15 @@ static bool fs_proc_from_ino(ino_t ino, file_ins* ins, struct fs_proc_file** rt)
 	switch (ino) {
 		case PROC_ROOT_INO:// /
 			*rt = &fun_dir;
-			set_dir_dt(ins, root_next);
+			set_dir_dt(ins, PROC_ROOT_INO, root_getents);
 			return true;
 		case PROC_TTY_INO:// /tty/
 			*rt = &fun_dir;
-			set_dir_dt(ins, tty_next);
+			set_dir_dt(ins, PROC_ROOT_INO, tty_getents);
 			return true;
 		case PROC_PIPES_INO:// /pipes/
 			*rt = &fun_dir;
-			set_dir_dt(ins, pipes_next);
+			set_dir_dt(ins, PROC_ROOT_INO, pipes_getents);
 			return true;
 		default:
 			if (ino & (1<<31)) {
@@ -478,7 +532,8 @@ static bool fs_proc_from_ino(ino_t ino, file_ins* ins, struct fs_proc_file** rt)
 					switch (ino & 0x7fff) {
 						case 0: // /<pid>/
 							*rt = &fun_dir;
-							set_dir_dt(ins, pid_next)->pid = pid;
+							set_dir_dt(ins, PROC_ROOT_INO, pid_getents)
+								->pid = pid;
 							return true;
 						case 1: // /<pid>/stat
 							*rt = &fun_stat;
@@ -490,7 +545,8 @@ static bool fs_proc_from_ino(ino_t ino, file_ins* ins, struct fs_proc_file** rt)
 							return true;
 						case 3: // /<pid>/fd/
 							*rt = &fun_dir;
-							set_dir_dt(ins, pid_fd_next)->pid = pid;
+							set_dir_dt(ins, PROC_INO_PID_PART(pid), 
+										pid_fd_getents)->pid = pid;
 							return true;
 						default:
 							return false;
@@ -557,6 +613,13 @@ uint32_t fs_proc_touch(ino_t n1 __attribute__((unused)),
 	}
 #define VAH(...) __VA_ARGS__
 
+void fs_proc_opench(ino_t ino, chann_adt_t* cdt,
+		struct mount_info* info __attribute__((unused))) {
+	file_ins ins;
+	struct fs_proc_file* f;
+	if (fs_proc_from_ino(ino, &ins, &f) && f->opench)
+		f->opench(&ins, cdt);
+}
 uint32_t fs_proc_lookup(const char *fname, ino_t ino,
 		struct mount_info* info __attribute__((unused))) {
 	file_ins ins;
@@ -579,25 +642,14 @@ GEN_RRT(int, fs_proc_read,  read,  -1, VAH(void* d, off_t o, size_t s), VAH(d,o,
 GEN_RRT(int, fs_proc_write, write, -1, VAH(void* d, off_t o, size_t s), VAH(d,o,s))
 GEN_RRT(ino_t, fs_proc_readsymlink, read_sym, 0, char* d, d)
 
-struct dirent_it* fs_proc_opendir(ino_t ino, struct dirent_it* dbuf,
-		char* nbuf, struct mount_info* info __attribute__((unused))) {
+int fs_proc_getdents(ino_t ino, struct dirent* d, size_t sz,
+				chann_adt_t* cdt,
+				struct mount_info* info __attribute__((unused))) {
 	file_ins ins;
 	struct fs_proc_file* f;
-	dirent_dt_t* dt = (dirent_dt_t*)&dbuf->dt;
-	dt->ino = ino;
-	
-	if (fs_proc_from_ino(ino, &ins, &f) && f->open_dir)
-		return f->open_dir(&ins, dbuf, nbuf);
-	return NULL;
-}
-struct dirent_it* fs_proc_readdir(struct dirent_it* it, char* nbuf) {
-	file_ins ins;
-	struct fs_proc_file* f;
-	dirent_dt_t* dt = (dirent_dt_t*)&it->dt;
-	
-	if (fs_proc_from_ino(dt->ino, &ins, &f) && f->read_dir)
-		return f->read_dir(&ins, it, nbuf);
-	return NULL;
+	if (fs_proc_from_ino(ino, &ins, &f) && f->getdents)
+		return f->getdents(ino, &ins, d, sz, cdt);
+	return -1;
 }
 
 #undef VAH

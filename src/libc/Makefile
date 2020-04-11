@@ -9,7 +9,7 @@ INCLUDES=-I $(ROOT)/include
 
 ##
 
-.PHONY: all re clean
+.PHONY: all re clean clean-depends
 
 all: libc.a libk.a
 
@@ -54,7 +54,10 @@ include $(NAME_LK).depends
 
 ##
 
+clean-depends:
+	rm -f *.depends .depends
+
 clean:
-	rm -rf $(NAME) $(OBJ) *.o **/*.o *.a *.s sys.h *.depends
+	rm -f $(NAME) $(OBJ) *.o **/*.o *.a *.s sys.h *.depends .depends
 
 re: clean $(NAME)

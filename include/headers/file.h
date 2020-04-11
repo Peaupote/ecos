@@ -42,28 +42,16 @@ struct stat {
     uint32_t st_mtime;
 };
 
-#define DIRENT_OFF 8
-struct ext2_dir_entry {
+// Attention on uitlise dans fs/ext2 le fait que cette structure aie le même
+// format que celui du système ext2
+struct dirent {
     uint32_t d_ino;
     uint16_t d_rec_len;
     uint8_t  d_name_len;
     uint8_t  d_file_type;
-    char     d_name[]; // at most 255 bytes len
-};
-
-struct dirent {
-	ino_t    d_ino;
-    uint16_t d_rec_len;
-	uint8_t  d_name_len;
-	uint8_t  d_file_type;
-	char*    d_name; // at most 255 bytes len
-};
-struct dirent_it {
-	struct dirent cnt;
-	// espace permettant de stocker des données spécifique
-	// au système de fichier
-	char dt[16] __attribute__ ((aligned (16)));    
-};
+    char     d_name[]; // NOT null terminated
+} __attribute__((packed));
+#define DIRENT_OFF 8 //offsetof(struct dirent, d_name)
 
 #define SEEK_SET 0
 #define SEEK_CUR 1

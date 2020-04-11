@@ -14,20 +14,22 @@ struct dirent *readdir(struct dirp *dirp) {
 
     struct dirent *dir;
 
-    dir       = dirp->dir_entry;
+    dir        = dirp->dir_entry;
     dirp->off += dir->d_rec_len; // TODO problem here
     dirp->pos += dir->d_rec_len;
 
-    if (dirp->off > DIRP_BUF_SIZE) {
-        lseek(dirp->fd, dirp->pos, SEEK_SET);
-        if (read(dirp->fd, dirp->buf, DIRP_BUF_SIZE) < 0) goto error;
-        dirp->dir_entry = (struct dirent*)dirp->buf;
-    } else {
-        dirp->dir_entry = (struct dirent*)((char*)dir + dirp->dir_entry->d_rec_len);
-    }
+    if (dirp->off > dirp->bsz) {
+		int rc = read(dirp->fd, dirp->buf, DIRP_BUF_SIZE);
+		if (rc < 0) goto error;
+		if (rc == 0) return 0;
+		dirp->off = 0;
+        dir = dirp->dir_entry = (struct dirent*)dirp->buf;
+		if (rc < dir->d_rec_len) goto error; //nom trop long
+    } else
+        dir = dirp->dir_entry = (struct dirent*)(dirp->buf + dirp->off);
 
     return dir;
 
 error:
-    return 0;
+    return NULL;
 }

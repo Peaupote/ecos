@@ -118,6 +118,9 @@ typedef struct channel {
     // and current writing/reading position in the buffer
     vfile_t        *chann_vfile;
     size_t          chann_pos;
+	// emplacement pour stocker des données spécifiques 
+	// au système de fichier
+	chann_adt_t     chann_adt;
 
     cid_t           chann_nxw;     // next chann waiting same file
                                    //  ~0 = last, self_cid = not waiting

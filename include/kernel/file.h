@@ -1,6 +1,8 @@
 #ifndef _H_FILE
 #define _H_FILE
 
+#include <stdbool.h>
+
 #include <headers/proc.h>
 #include <headers/file.h>
 
@@ -16,8 +18,14 @@ typedef struct vfile {
 // File system table
 #define NFST 3
 #define DUMMY_FS 0
-#define PROC2_FS 1
+#define PROC_FS 1
 #define EXT2_FS  2
+
+#define CADT_SIZE 16
+
+typedef struct {
+	char d[CADT_SIZE] __attribute__((aligned(8))); 
+} chann_adt_t;
 
 /**
  * First parameter is a pointer to the beginning of the partition
@@ -54,15 +62,19 @@ typedef uint32_t (fs_create_t)(ino_t parent, const char *fname, uint16_t type,
  */
 typedef int (fs_rdwr_t)(ino_t, void*, off_t, size_t, struct mount_info*);
 
-/**
- * Returns a pointer to the first element in the directory
- * p2 is a location that may be used to store the entry
- * p3 is a location that may be used to store the entry's name (max 255)
- */
-typedef struct dirent_it *(fs_opendir_t)(ino_t, struct dirent_it*, char*,
-		struct mount_info*);
 
-typedef struct dirent_it *(fs_readdir_t)(struct dirent_it*, char*);
+/**
+ * Lit un nombre entier de dirents
+ * Si il n'y a pas assez de place pour stocker le premier dirent,
+ * stocker les champs excepté d_name et d_name_len,
+ * le prochain appel relit la même entrée.
+ * Dans tous les cas si rc > 0, rc >= offsetof(struct dirent, d_name)
+ *
+ * p3: nombre maximal d'octet à lire
+ */
+typedef int (fs_getdents_t)(ino_t, struct dirent*, size_t,
+							chann_adt_t*,  struct mount_info*);
+typedef void (fs_opench_t)(ino_t, chann_adt_t*,  struct mount_info*);
 
 /**
  * Remove a dir entry with ino in list of dir entries of parent
@@ -81,8 +93,8 @@ struct fs {
     fs_rdwr_t           *fs_write;
     fs_create_t         *fs_touch;
     fs_create_t         *fs_mkdir;
-    fs_opendir_t        *fs_opendir;
-    fs_readdir_t        *fs_readdir;
+	fs_getdents_t       *fs_getdents;
+	fs_opench_t         *fs_opench;
     fs_rm_t             *fs_rm;
     fs_destroy_dirent_t *fs_destroy_dirent;
     fs_readsymlink_t    *fs_readsymlink;
@@ -94,6 +106,7 @@ int  vfs_mount(const char *path, uint8_t fs, void *partition);
 uint32_t vfs_pipe(vfile_t* rt[2]);
 
 vfile_t *vfs_load(const char *path, int flags);
+void     vfs_opench(vfile_t *vf, chann_adt_t* cdt);
 
 void vfs_unblock(vfile_t* vfile);
 
@@ -104,8 +117,8 @@ int      vfs_write(vfile_t *vfile, void *buf, off_t pos, size_t len);
 vfile_t *vfs_touch(const char *parent, const char *fname, mode_t perm);
 vfile_t *vfs_mkdir(const char *parent, const char *fname, mode_t perm);
 
-struct dirent_it *vfs_opendir(vfile_t *vf, struct dirent_it *it, char* nbf);
-struct dirent_it *vfs_readdir(vfile_t *vf, struct dirent_it *it, char* nbf);
+int      vfs_getdents(vfile_t *vf, struct dirent* dst, size_t sz, 
+						chann_adt_t* cdt);
 
 ino_t vfs_rmdir(const char *fname, uint32_t rec);
 

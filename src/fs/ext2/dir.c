@@ -7,14 +7,16 @@
 #include <kernel/kutil.h>
 #endif
 
+#include <util/misc.h>
+
 #include <util/test.h>
 
-struct ext2_dir_entry *
+struct dirent *
 ext2_iter_dir(struct ext2_inode *inode,
-              int (*iterator)(struct ext2_dir_entry*),
+              int (*iterator)(struct dirent*),
               struct ext2_mount_info *info) {
     size_t nbblk = 0, len = 0, len_in_block = 0;
-    struct ext2_dir_entry *dir;
+    struct dirent *dir;
 
     dir = ext2_get_inode_block(0, inode, info);
     goto start;
@@ -38,7 +40,7 @@ ext2_iter_dir(struct ext2_inode *inode,
 }
 
 static const char *lookup_name;
-static int cmp_dir_name(struct ext2_dir_entry* dir) {
+static int cmp_dir_name(struct dirent* dir) {
     if (!strncmp(lookup_name, dir->d_name, dir->d_name_len) &&
         !lookup_name[dir->d_name_len]) return -1;
     return 0;
@@ -47,18 +49,18 @@ static int cmp_dir_name(struct ext2_dir_entry* dir) {
 uint32_t ext2_lookup_dir(struct ext2_inode *inode, const char *fname,
                          struct ext2_mount_info *info) {
     lookup_name = fname;
-    struct ext2_dir_entry *entry = ext2_iter_dir(inode, cmp_dir_name, info);
+    struct dirent *entry = ext2_iter_dir(inode, cmp_dir_name, info);
     // TODO : binary search
     return entry ? entry->d_ino : 0;
 }
 
-struct ext2_dir_entry *ext2_readdir(struct ext2_dir_entry *dir) {
-    return (struct ext2_dir_entry*)((char*)dir + dir->d_rec_len);
+struct dirent *ext2_readdir(struct dirent *dir) {
+    return (struct dirent*)((char*)dir + dir->d_rec_len);
 }
 
-static struct ext2_dir_entry *
+static struct dirent *
 ext2_reach_end(struct ext2_inode *parent, struct ext2_mount_info *info) {
-    struct ext2_dir_entry *dir;
+    struct dirent *dir;
     uint32_t b;
     uint32_t blk = parent->in_size / info->block_size;
     uint32_t off = parent->in_size % info->block_size;
@@ -83,7 +85,7 @@ ext2_reach_end(struct ext2_inode *parent, struct ext2_mount_info *info) {
 
 uint32_t ext2_add_dirent(struct ext2_inode *parent, uint32_t file,
                          const char *fname, struct ext2_mount_info *info) {
-    struct ext2_dir_entry *dir;
+    struct dirent *dir;
     uint32_t name_len, rec_len;
 
     name_len = strlen(fname) + 1;
@@ -112,7 +114,7 @@ uint32_t ext2_add_dirent(struct ext2_inode *parent, uint32_t file,
 uint32_t ext2_mkdir(uint32_t parent, const char *dirname, uint16_t type,
                     struct ext2_mount_info *info) {
     struct ext2_inode *p = ext2_get_inode(parent, info);
-    struct ext2_dir_entry *dir;
+    struct dirent *dir;
     uint32_t name_len, rec_len, ino, block;
 
     if (!(type&EXT2_TYPE_DIR) || !(p->in_type&EXT2_TYPE_DIR)) return 0;
@@ -163,44 +165,47 @@ uint32_t ext2_mkdir(uint32_t parent, const char *dirname, uint16_t type,
     return dir->d_ino;
 }
 
-struct ext2_dir_entry *
-ext2_opendir(uint32_t ino, struct ext2_mount_info *info) {
-    struct ext2_inode *inode = ext2_get_inode(ino, info);
-    struct ext2_dir_entry *dir = 0;
-    if (inode->in_type&EXT2_TYPE_DIR) {
-        dir = (struct ext2_dir_entry*)ext2_get_inode_block(0, inode, info);
-    }
+struct ext2_cdt_dir { //sz <= CADT_SIZE
+	char* it;
+	char* ed;
+};
 
-    return dir;
-}
-
-static struct dirent_it* dirent_from_ext2(struct dirent_it *d,
-				struct ext2_dir_entry* ed) {
-	struct dirent* c = &d->cnt;
-	c->d_ino       = ed->d_ino;
-	c->d_rec_len   = ed->d_rec_len;
-	c->d_name_len  = ed->d_name_len;
-	c->d_file_type = ed->d_file_type;
-	c->d_name      = ed->d_name;
-	struct ext2_dir_entry** nx = (struct ext2_dir_entry**) d->dt;
-	*nx = (struct ext2_dir_entry*)(ed->d_rec_len + (char*)ed);
-    return d;
-}
-
-struct dirent_it* ext2_opendir_it(ino_t ino, struct dirent_it* dbuf,
-		char* nbuf __attribute__((unused)), struct mount_info* p_info) {
+void ext2_opench(ino_t ino, chann_adt_t* p_cdt,
+					struct mount_info* p_info) {
 	struct ext2_mount_info* info = (struct ext2_mount_info*) p_info;
-    struct ext2_inode *inode = ext2_get_inode(ino, info);
-    if (inode->in_type&EXT2_TYPE_DIR)
-        return dirent_from_ext2(dbuf,
-				(struct ext2_dir_entry*)
-					ext2_get_inode_block(0, inode, info));
+	struct ext2_inode     *inode = ext2_get_inode(ino, info);
 
-    return NULL;
+	if (inode->in_type & EXT2_TYPE_DIR) {
+		struct ext2_cdt_dir* cdt = (struct ext2_cdt_dir*) p_cdt;
+		cdt->it = (char*) ext2_get_inode_block(0, inode, info);
+		cdt->ed = cdt->it + inode->in_size;
+	}
 }
 
-struct dirent_it* ext2_readdir_it(struct dirent_it* it,
-		char* nbuf __attribute__((unused))) {
-	struct ext2_dir_entry** nx = (struct ext2_dir_entry**) it->dt;
-    return dirent_from_ext2(it, *nx);
+int ext2_getdents(ino_t ino __attribute__((unused)),
+			struct dirent* dst, size_t sz, chann_adt_t* p_cdt,
+			struct mount_info* none __attribute__((unused))) {
+	struct ext2_cdt_dir*     cdt = (struct ext2_cdt_dir*   ) p_cdt;
+
+	int rc = 0;
+	while (cdt->it < cdt->ed && sz >= offsetof(struct dirent, d_name)) {
+		const struct dirent* src = (const struct dirent*)cdt->it;
+	
+		size_t rlen = align_to_size(
+				offsetof(struct dirent, d_name) + src->d_name_len, 4);
+
+		if (sz < rlen) {
+			if (rc) return rc;
+			memcpy(dst, src, offsetof(struct dirent, d_name));
+			return offsetof(struct dirent, d_name);
+		}
+
+		memcpy(dst, src, rlen);
+		dst->d_rec_len = rlen;
+		cdt->it += src->d_rec_len;
+		rc      += rlen;
+		sz      -= rlen;
+		dst = (struct dirent*)(rlen + (char*)dst);
+	}
+	return rc;
 }

@@ -51,9 +51,11 @@ uint32_t fs_proc_lookup(const char *fname, ino_t parent, struct mount_info*);
 int      fs_proc_stat(ino_t ino, struct stat *st, struct mount_info*);
 int      fs_proc_read(ino_t ino, void*, off_t, size_t, struct mount_info*);
 int      fs_proc_write(ino_t ino, void*, off_t, size_t, struct mount_info*);
-struct dirent_it* fs_proc_opendir(ino_t, struct dirent_it*,
-			char name_buf[], struct mount_info *);
-struct dirent_it* fs_proc_readdir(struct dirent_it*, char name_buf[]);
+
+int      fs_proc_getdents(ino_t, struct dirent*, size_t,
+							chann_adt_t*, struct mount_info*);
+void     fs_proc_opench(ino_t, chann_adt_t*, struct mount_info*);
+
 ino_t    fs_proc_readsymlink(ino_t, char*, struct mount_info *);
 
 

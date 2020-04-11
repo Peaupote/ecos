@@ -128,37 +128,42 @@ void ls (char** tokpt) {
     char* arg1 = strtok_rnull(NULL, " ", tokpt);
     if (!arg1) return;
 
-    struct dirent_it dbuf[1];
-    struct dirent_it *dir;
-	char nbuf[256];
-    vfile_t *vf = vfs_load(arg1, 0);
+	vfile_t *vf = vfs_load(arg1, 0);
     if (!vf) {
         kprintf("%s don't exist\n", arg1);
         return;
     }
 
-    if (!(dir = vfs_opendir(vf, dbuf, nbuf))) {
-        vfs_close(vf);
-        return;
-    }
+	chann_adt_t cdt;
+	vfs_opench(vf, &cdt);
 
-    struct device *dev = devices + vf->vf_stat.st_dev;
-    struct fs *fs = fst + dev->dev_fs;
-    struct stat st;
+    char dbuf[512];
 
-    kprintf("size %d\n", vf->vf_stat.st_size);
-    kprintf("INO    TYPE    SIZE    NLINK        NAME\n");
+	struct device *dev = devices + vf->vf_stat.st_dev;
+	struct fs *fs = fst + dev->dev_fs;
+	struct stat st;
 
-    for (size_t size = 0; size < vf->vf_stat.st_size;
-         size += dir->cnt.d_rec_len, dir = fs->fs_readdir(dir, nbuf)) {
-        fs->fs_stat(dir->cnt.d_ino, &st, &dev->dev_info);
-        kprintf("%d    %x    %d    %d        ",
-                dir->cnt.d_ino, st.st_mode, st.st_size, st.st_nlink);
-        for (size_t i = 0; i < dir->cnt.d_name_len; i++)
-            kprintf("%c", dir->cnt.d_name[i]);
-        kprintf("\n");
+	kprintf("size %d\n", vf->vf_stat.st_size);
+	kprintf("INO    TYPE    SIZE    NLINK        NAME\n");
 
-    }
+	int rc;
+	while((rc = vfs_getdents(vf, (struct dirent*)dbuf, 512, &cdt)) > 0) {
+		struct dirent* de = (struct dirent*)dbuf;
+		if (rc < de->d_rec_len) {
+			klogf(Log_error, "ls", 
+					"pas assez de place pour stocker le nom");
+			break;
+		}
+		for (int i = 0; i < rc;
+				i += de->d_rec_len, de = (struct dirent*)(dbuf + i)) {
+			fs->fs_stat(de->d_ino, &st, &dev->dev_info);
+			kprintf("%d    %x    %d    %d        ",
+					de->d_ino, st.st_mode, st.st_size, st.st_nlink);
+			for (size_t i = 0; i < de->d_name_len; i++)
+				kprintf("%c", de->d_name[i]);
+			kprintf("\n");
+		}
+	}
 
     vfs_close(vf);
 }

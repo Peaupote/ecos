@@ -5,14 +5,15 @@
 
 #include <stdint.h>
 #include <kernel/param.h>
-#include <fs/pipe.h>
+
+#define MIADT_SIZE 18
 
 struct mount_info {
     void    *sp;
     uint32_t block_size;
     uint32_t root_ino;
 
-	uint64_t space[3];//TODO: ajuster
+	char space[MIADT_SIZE] __attribute__((aligned(8)));
 };
 
 struct device {
