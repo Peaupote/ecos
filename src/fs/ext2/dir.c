@@ -190,9 +190,10 @@ int ext2_getdents(ino_t ino __attribute__((unused)),
 	int rc = 0;
 	while (cdt->it < cdt->ed && sz >= offsetof(struct dirent, d_name)) {
 		const struct dirent* src = (const struct dirent*)cdt->it;
-	
-		size_t rlen = align_to_size(
-				offsetof(struct dirent, d_name) + src->d_name_len, 4);
+
+		size_t mlen = offsetof(struct dirent, d_name)
+						+ src->d_name_len + 1;
+		size_t rlen = align_to_size(mlen, 4);
 
 		if (sz < rlen) {
 			if (rc) return rc;
@@ -200,8 +201,9 @@ int ext2_getdents(ino_t ino __attribute__((unused)),
 			return offsetof(struct dirent, d_name);
 		}
 
-		memcpy(dst, src, rlen);
+		memcpy(dst, src, mlen);
 		dst->d_rec_len = rlen;
+		dst->d_name[src->d_name_len] = '\0';
 		cdt->it += src->d_rec_len;
 		rc      += rlen;
 		sz      -= rlen;

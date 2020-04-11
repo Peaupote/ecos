@@ -167,10 +167,10 @@ void exec_cmd() {
 
                 if (rc == 0) {
                     // child read on pipe
-                    dup2(fds[0], 0);
+                    dup2(fds[0], STDIN_FILENO);
                     c = c->pipe;
                 } else {
-                    dup2(fds[1], 1);
+                    dup2(fds[1], STDOUT_FILENO);
                 }
 
                 close(fds[0]);

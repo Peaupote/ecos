@@ -103,6 +103,8 @@ struct fs {
 void vfs_init();
 int  vfs_mount(const char *path, uint8_t fs, void *partition);
 
+// rt[0]: read end ie output
+// rt[1]: write end ie input
 uint32_t vfs_pipe(vfile_t* rt[2]);
 
 vfile_t *vfs_load(const char *path, int flags);

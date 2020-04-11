@@ -125,44 +125,46 @@ int sys_pipe(int fd[2]) {
 
     if (!fd) return -1;
 
-    int fdin, fdout;
+    int fdrd, fdwt;
 
-    for (fdin = 0; fdin < NFD && p->p_fds[fdin] != -1; fdin++);
-    if (fdin == NFD) goto err_emfile;
+    for (fdrd = 0; fdrd < NFD && ~p->p_fds[fdrd]; fdrd++);
+    if (fdrd == NFD) goto err_emfile;
 
-    for (fdout = fdin+1; fdout < NFD && p->p_fds[fdout] != -1; fdout++);
-    if (fdout == NFD) goto err_emfile;
+    for (fdwt = fdrd+1; fdwt < NFD && ~p->p_fds[fdwt]; fdwt++);
+    if (fdwt == NFD) goto err_emfile;
 
-    cid_t in, out;
-    for (in = 0; in < NCHAN && state.st_chann[in].chann_mode != UNUSED; in++);
-    if (in == NCHAN) goto err_enfile;
+    cid_t rd, wt;
+    for (rd = 0; rd < NCHAN && state.st_chann[rd].chann_mode != UNUSED; rd++);
+    if (rd == NCHAN) goto err_enfile;
 
-    for (out = in; out < NCHAN && state.st_chann[out].chann_mode != UNUSED; out++);
-    if (out == NCHAN) goto err_enfile;
+    for (wt = rd + 1; 
+			wt < NCHAN && state.st_chann[wt].chann_mode != UNUSED; wt++);
+    if (wt == NCHAN) goto err_enfile;
 
-    chann_t *cin = &state.st_chann[in],
-        *cout = &state.st_chann[out];
+    chann_t *crd = &state.st_chann[rd],
+            *cwt = &state.st_chann[wt];
 
-    fd[0] = fdin;
-    fd[1] = fdout;
-    p->p_fds[fdin ] = in;
-    p->p_fds[fdout] = out;
+    fd[0] = fdrd;
+    fd[1] = fdwt;
+    p->p_fds[fdrd] = rd;
+    p->p_fds[fdwt] = wt;
 
-    cin->chann_acc   = 1;
-    cin->chann_mode  = READ;
-    cout->chann_acc  = 1;
-    cout->chann_mode = WRITE;
+    crd->chann_acc  = 1;
+    crd->chann_mode = READ;
+    cwt->chann_acc  = 1;
+    cwt->chann_mode = WRITE;
 
 	vfile_t* fvf[2];
     if (!~vfs_pipe(fvf))
 		return -1; //TODO errno
-    cin->chann_vfile  = fvf[0];
-    cout->chann_vfile = fvf[1];
+    crd->chann_vfile = fvf[0];
+    cwt->chann_vfile = fvf[1];
 	kAssert(fvf[0] != NULL);
 	kAssert(fvf[1] != NULL);
 
     set_errno(p, SUCC);
-    klogf(Log_info, "syscall", "alloc pipe, in %d, out %d", fdin, fdout);
+    klogf(Log_info, "syscall", "alloc pipe, read %d(%d), write %d(%d)",
+			fdrd, rd, fdwt, wt);
     return 0;
 
 err_emfile:
@@ -244,9 +246,9 @@ ssize_t sys_write(int fd, uint8_t *s, size_t len) {
 
     chann_t *chann = &state.st_chann[p->p_fds[fd]];
     vfile_t *vfile = chann->chann_vfile;
-    klogf(Log_verb, "syscall", "process %d write on %d",
-            state.st_curr_pid, fd);
-	klogf(Log_verb, "syscall", "vfile=%p", vfile);
+    klogf(Log_verb, "syscall", "process %d write on %d(%d -> %d@%d)",
+            state.st_curr_pid, fd, p->p_fds[fd],
+			vfile->vf_stat.st_ino, vfile->vf_stat.st_dev);
 
     int rc = 0;
 
@@ -261,13 +263,8 @@ ssize_t sys_write(int fd, uint8_t *s, size_t len) {
         goto succ;
 
     case TYPE_FIFO:
-        rc = vfs_write(vfile, s, 0, len);
-        goto succ;
-
     case TYPE_CHAR:
-        // TODO : more efficient
-        for (rc = 0; rc < (int)len; ++rc)
-            kprintf("%c", *s++);
+        rc = vfs_write(vfile, s, 0, len);
         goto succ;
 
     default:

@@ -23,6 +23,7 @@
 #define PROC_PIPES_INO 3
 #define PROC_TTYI_INO(I) (0x10|(I))
 #define PROC_PIPEI_INO(I) ((1<<31)|(I))
+#define PROC_PID_INO(P)      PROC_INO_PID_PART(P)
 #define PROC_PID_STAT_INO(P) (PROC_INO_PID_PART(P)|1)
 #define PROC_PID_CMD_INO(P)  (PROC_INO_PID_PART(P)|2)
 #define PROC_PID_FD_INO(P)   (PROC_INO_PID_PART(P)|3)
@@ -117,11 +118,11 @@ static inline bool dirent_stc(int* rc, struct dirent** d,
 		size_t* lsz, ino_t i, mode_t ty,
 		const char* name, size_t name_len) {
 	size_t rlen = align_to_size(
-						offsetof(struct dirent, d_name) + name_len, 4);
+					offsetof(struct dirent, d_name) + name_len + 1, 4);
 	struct dirent* nx = dirent_aux(rc, *d, lsz, i, ty, rlen);
 	if (nx)	{
-		(*d)->d_name_len  = name_len;
-		memcpy((*d)->d_name, name, name_len);
+		(*d)->d_name_len = name_len;
+		memcpy((*d)->d_name, name, name_len + 1);
 		*d = nx;
 		return true;
 	}
@@ -152,7 +153,7 @@ static int root_getents(fpd_dt_t* n __attribute__((unused)),
 	for (; i < NPROC; ++i) {
 		if (proc_alive(state.st_proc + i)) {
 			struct dirent* nx = dirent_aux(&rc, d, &sz,
-					i << PROC_INO_PID_SHIFT, TYPE_DIR, 20);
+					PROC_PID_INO(i), TYPE_DIR, 20);
 			if (!nx) {
 				dt->pid = i;
 				return rc;
@@ -161,6 +162,7 @@ static int root_getents(fpd_dt_t* n __attribute__((unused)),
 			d = nx;
 		}
 	}
+	dt->pid = NPROC;
 	return rc;
 }
 
@@ -182,7 +184,7 @@ static int tty_getents(fpd_dt_t* n __attribute__((unused)),
 // -- /tty/<ttyi>
 			
 static int ttyi_stat(file_ins* ins, struct stat* st) {
-    st->st_mode = TYPE_CHAR | (ins->ttyi ? 0200 : 0400);
+    st->st_mode    = TYPE_CHAR | (ins->ttyi ? 0200 : 0400);
     st->st_nlink   = 1;
     st->st_size    = ins->ttyi ? 0 : ttyin_buf.sz;
     st->st_blksize = PROC_BLOCK_SIZE;
@@ -222,13 +224,14 @@ static int pipes_getents(fpd_dt_t* n __attribute__((unused)),
 			d = nx;
 		}
 	}
+	dt->pipei = 2 * NPIPE;
 	return rc;
 }
 
 // -- /pipes/<pipei>
 
 static int pipei_stat(file_ins* ins, struct stat* st) {
-    st->st_mode = TYPE_CHAR | ((ins->pipei&1) ? 0200 : 0400);
+    st->st_mode    = TYPE_FIFO | ((ins->pipei&1) ? 0200 : 0400);
     st->st_nlink   = 1;
     st->st_size    = fp_pipes[ins->pipei >> 1].cnt.sz;
     st->st_blksize = PROC_BLOCK_SIZE;
@@ -237,13 +240,31 @@ static int pipei_stat(file_ins* ins, struct stat* st) {
 }
 static int pipei_read(file_ins* ins, void* dst,
 		off_t ofs __attribute__((unused)), size_t sz) {
-	if (ins->pipei & 1) return -1;
-	return fs_proc_read_pipe(&fp_pipes[ins->pipei >> 1].cnt, dst, sz);
+	if (!(ins->pipei & 1)) return -1;
+	struct fp_pipe* pi = fp_pipes + (ins->pipei >> 1);
+	int rc =fs_proc_read_pipe(&pi->cnt, dst, sz);
+	if (rc) {
+		if (pi->vf_out)
+			pi->vf_out->vf_stat.st_size = pi->cnt.sz;
+		if (pi->vf_in)
+			pi->vf_in->vf_stat.st_size  = pi->cnt.sz;
+	}
+	return rc;
 }
 static int pipei_write(file_ins* ins, void* src,
 		off_t ofs __attribute__((unused)), size_t sz) {
-	if (!(ins->ttyi & 1)) return -1;
-	return fs_proc_write_pipe(&fp_pipes[ins->pipei >> 1].cnt, src, sz);
+	if (ins->pipei & 1) return -1;
+	struct fp_pipe* pi = fp_pipes + (ins->pipei >> 1);
+	int wc = fs_proc_write_pipe(&pi->cnt, src, sz);
+	if (wc > 0) {
+		if (pi->vf_out) {
+			pi->vf_out->vf_stat.st_size = pi->cnt.sz;
+			vfs_unblock(pi->vf_out);
+		}
+		if (pi->vf_in)
+			pi->vf_in->vf_stat.st_size  = pi->cnt.sz;
+	}
+	return wc;
 }
 
 // -- /<pid> --
@@ -274,6 +295,7 @@ static int pid_getents(fpd_dt_t* ddt,
 			}
 			//FALLTHRU
 		default:
+			dt->num = 3;
 			return rc;
 	}
 }
@@ -298,6 +320,7 @@ static int pid_fd_getents(fpd_dt_t* ddt,
 			d = nx;
 		}
 	}
+	dt->num = NFD;
 	return rc;
 }
 
@@ -496,7 +519,7 @@ static inline fpd_dt_t* set_dir_dt(file_ins* ins, ino_t p, dir_getents e) {
 }
 
 static bool fs_proc_from_ino(ino_t ino, file_ins* ins, struct fs_proc_file** rt) {
-	klogf(Log_info, "fsproc", "access %d", ino);
+	klogf(Log_verb, "fsproc", "access %d = %x", (int)ino, (int)ino);
 	switch (ino) {
 		case PROC_ROOT_INO:// /
 			*rt = &fun_dir;
@@ -515,6 +538,7 @@ static bool fs_proc_from_ino(ino_t ino, file_ins* ins, struct fs_proc_file** rt)
 				// /pipes/<pipei>
 				*rt = &fun_pipei;
 				ins->pipei = ino & 0x7fffffff;
+				klogf(Log_verb, "fsproc", "access pipe %d", (int)ins->pipei);
 				return true;
 			} else if (ino & (0x7fff << 16)) {
 				pid_t pid = ino >> 16;
@@ -545,8 +569,8 @@ static bool fs_proc_from_ino(ino_t ino, file_ins* ins, struct fs_proc_file** rt)
 							return true;
 						case 3: // /<pid>/fd/
 							*rt = &fun_dir;
-							set_dir_dt(ins, PROC_INO_PID_PART(pid), 
-										pid_fd_getents)->pid = pid;
+							set_dir_dt(ins, PROC_PID_INO(pid), pid_fd_getents)
+								->pid = pid;
 							return true;
 						default:
 							return false;

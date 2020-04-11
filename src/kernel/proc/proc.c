@@ -280,10 +280,11 @@ void proc_ps() {
     for (pid_t pid = 0; pid < NPROC; pid++) {
         proc_t* p = state.st_proc + pid;
         if (p->p_stat != FREE)
-            kprintf("%cpid=%d st=%c ppid=%d pr=%d\n",
+            kprintf("%cpid=%d st=%c ppid=%d pr=%d pml4=%p '%s'\n",
                     pid==state.st_curr_pid ? '*' : ' ',
                     (int)pid, (int)proc_state_char[p->p_stat],
-                    (int)p->p_ppid, 19 - (int)p->p_prio);
+                    (int)p->p_ppid, 19 - (int)p->p_prio,
+					p->p_pml4, p->p_cmd);
     }
 }
 

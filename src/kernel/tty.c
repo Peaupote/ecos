@@ -77,14 +77,16 @@ void tty_init(enum tty_mode m) {
     input_color = vga_entry_color (
                 VGA_COLOR_LIGHT_GREY, VGA_COLOR_BLACK);
 
-    ib_printed = ib_size = 0;
+    ib_printed   = ib_size = 0;
     input_height = 0;
     input_bottom_line = input_top_line = ~0;
 
-    sb_ashift   = 0;
+    sb_ashift   = 1;// evite que cur_idx renvoit -1
     sb_display_shift = 0;
     sb_nb_lines = 0;
     sb_dtcd     = false;
+
+	tty_force_new_line();
 
     tty_set_mode(m);
 }
@@ -157,11 +159,9 @@ void ls (char** tokpt) {
 		for (int i = 0; i < rc;
 				i += de->d_rec_len, de = (struct dirent*)(dbuf + i)) {
 			fs->fs_stat(de->d_ino, &st, &dev->dev_info);
-			kprintf("%d    %x    %d    %d        ",
-					de->d_ino, st.st_mode, st.st_size, st.st_nlink);
-			for (size_t i = 0; i < de->d_name_len; i++)
-				kprintf("%c", de->d_name[i]);
-			kprintf("\n");
+			kprintf("%d    %x    %d    %d        %s\n",
+					de->d_ino, st.st_mode, st.st_size, st.st_nlink,
+					de->d_name);
 		}
 	}
 
@@ -397,7 +397,9 @@ void tty_input(scancode_byte s, key_event ev) {
 }
 
 void tty_afficher_buffer_range(size_t idx_begin, size_t idx_end) {
-    size_t r_b = (idx_begin - sb_ashift) & SB_MASK;
+    size_t r_b = idx_begin > sb_ashift 
+			? ((idx_begin - sb_ashift) & SB_MASK)
+			: 0;
     size_t r_e = (idx_end   - sb_ashift) & SB_MASK;
     maxa_size_t(&r_b, sb_rel_im_bg());
     mina_size_t(&r_e, sb_rel_im_ed());
@@ -556,8 +558,12 @@ size_t tty_prompt_to_buffer(size_t in_len) {
     return rt;
 }
 
+size_t cur_ln_x = 80;
+
 size_t tty_buffer_cur_idx(){
-    return sb_ashift + sb_nb_lines - 1;
+    return cur_ln_x < VGA_WIDTH
+			? sb_ashift + sb_nb_lines - 1
+			: sb_ashift + sb_nb_lines;
 }
 
 size_t tty_buffer_next_idx(){
@@ -581,8 +587,6 @@ size_t tty_new_buffer_line(size_t* index) {
     }
     return 0;
 }
-
-size_t cur_ln_x = 80;
 
 void tty_force_new_line() {
     cur_ln_x = VGA_WIDTH;

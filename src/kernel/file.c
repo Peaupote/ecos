@@ -89,11 +89,13 @@ uint32_t vfs_pipe(vfile_t* rt[2]) {
 	uint32_t pipeid = fs_proc_alloc_pipe(TYPE_FIFO|0400, TYPE_FIFO|0200);
 	if (!~pipeid) return ~(uint32_t)0;
 	char path[256];
-	fs_proc_pipe_path(path, pipeid, false);
+	fs_proc_pipe_path(path, pipeid, true); // out
 	rt[0] = vfs_load(path, 0);
-	fs_proc_pipe_path(path, pipeid, true);
+	fs_proc_pipe_path(path, pipeid, false);// in
 	rt[1] = vfs_load(path, 0);
 	kAssert(rt[0] && rt[1]);
+	fp_pipes[pipeid].vf_out = rt[0];
+	fp_pipes[pipeid].vf_in = rt[0];
 	return pipeid;
 }
 

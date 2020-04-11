@@ -49,7 +49,7 @@ struct dirent {
     uint16_t d_rec_len;
     uint8_t  d_name_len;
     uint8_t  d_file_type;
-    char     d_name[]; // NOT null terminated
+    char     d_name[]; // null terminated
 } __attribute__((packed));
 #define DIRENT_OFF 8 //offsetof(struct dirent, d_name)
 

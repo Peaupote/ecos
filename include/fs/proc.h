@@ -23,8 +23,8 @@
 #include <stdbool.h>
 
 #define PROC_ROOT_INO 1
-#define FP_PIPE_IN    1
-#define FP_PIPE_OUT   2
+#define FP_PIPE_IN    1 // Write end
+#define FP_PIPE_OUT   2 // Read end
 
 #define PROC_MOUNT "/proc"
 
@@ -35,9 +35,9 @@ struct fp_pipe_cnt {
 };
 
 struct fp_pipe {
-	uint8_t open;
-	mode_t  mode_in;
-	mode_t  mode_out;
+	uint8_t  open;
+	mode_t   mode_in, mode_out;
+	vfile_t  *vf_in,  *vf_out;
 	struct fp_pipe_cnt cnt;
 };
 

@@ -8,7 +8,6 @@ struct dirp {
     off_t off;   // position in buffer
 	int   bsz;   // buffer content size
 
-    struct dirent *dir_entry;
     char buf[DIRP_BUF_SIZE];
 };
 

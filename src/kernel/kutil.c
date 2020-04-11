@@ -67,12 +67,12 @@ void kpanic_stop() {
 }
 
 void kpanic(const char *msg) {
-    kprintf("PANIC!\n");
+    kprintf("PANIC! cpid=%d\n", (int)state.st_curr_pid);
     kprintf("%s", msg);
     kpanic_stop();
 }
 void kpanicf(const char *msg, const char *fmt, ...) {
-    kprintf("PANIC!\n");
+    kprintf("PANIC! cpid=%d\n", (int)state.st_curr_pid);
     kprintf("%s\n", msg);
     va_list params;
     va_start(params, fmt);
