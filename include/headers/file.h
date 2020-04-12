@@ -42,7 +42,7 @@ struct stat {
     uint32_t st_mtime;
 };
 
-// Attention on uitlise dans fs/ext2 le fait que cette structure aie le même
+// Attention on utilise dans fs/ext2 le fait que cette structure aie le même
 // format que celui du système ext2
 struct dirent {
     uint32_t d_ino;

@@ -62,8 +62,9 @@ void ext2_block_free(uint32_t block, struct ext2_mount_info *info) {
     bitmap[block >> 8] &= ~(1 << (block&7));
 }
 
-uint32_t ext2_lookup(const char *fname, ino_t ino,
-                     struct ext2_mount_info *info) {
+uint32_t ext2_lookup(ino_t ino, const char *fname,
+                     struct mount_info *p_info) {
+	struct ext2_mount_info* info = (struct ext2_mount_info*) p_info;
     struct ext2_inode *inode = ext2_get_inode(ino, info);
     if (!(inode->in_type&EXT2_TYPE_DIR)) return 0;
 
@@ -111,3 +112,9 @@ int ext2_write(ino_t ino __attribute__((unused)),
                struct ext2_mount_info *info __attribute__((unused))) {
     return 0;
 }
+
+void ext2_close(ino_t ino       __attribute__((unused)),
+		struct mount_info* info __attribute__((unused))) {}
+void ext2_open(ino_t ino        __attribute__((unused)),
+		vfile_t* vf             __attribute__((unused)),
+		struct mount_info* info __attribute__((unused))) {}

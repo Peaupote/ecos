@@ -214,11 +214,15 @@ ssize_t sys_read(int fd, uint8_t *d, size_t len) {
 
     case TYPE_CHAR:
     case TYPE_FIFO:
-        if (vfile->vf_stat.st_size == 0) {
+        if (vfile->vf_stat.st_size == 0)
             wait_file(state.st_curr_pid, cid);
-        }
 
         rc = vfs_read(vfile, d, 0, len);
+		if (rc == -2)
+            wait_file(state.st_curr_pid, cid);
+		else if (rc < 0)
+			goto err_overflow; //TODO
+
         goto succ;
 
     default:
@@ -244,7 +248,8 @@ ssize_t sys_write(int fd, uint8_t *s, size_t len) {
     if (!s || fd < 0 || fd > NFD || p->p_fds[fd] == -1)
         goto err_badf;
 
-    chann_t *chann = &state.st_chann[p->p_fds[fd]];
+    cid_t cid = p->p_fds[fd];
+    chann_t *chann = &state.st_chann[cid];
     vfile_t *vfile = chann->chann_vfile;
     klogf(Log_verb, "syscall", "process %d write on %d(%d -> %d@%d)",
             state.st_curr_pid, fd, p->p_fds[fd],
@@ -265,6 +270,10 @@ ssize_t sys_write(int fd, uint8_t *s, size_t len) {
     case TYPE_FIFO:
     case TYPE_CHAR:
         rc = vfs_write(vfile, s, 0, len);
+		if (rc == -2)
+            wait_file(state.st_curr_pid, cid);
+		else if (rc < 0)
+			goto err_overflow; //TODO
         goto succ;
 
     default:

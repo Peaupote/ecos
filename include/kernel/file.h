@@ -38,7 +38,7 @@ typedef int (fs_mnt_t)(void*, struct mount_info*);
  * Look for file named fname in directory with specified inode
  * return the file's inode if exists 0 otherwise
  */
-typedef uint32_t (fs_lookup_t)(const char *fname, ino_t parent,
+typedef uint32_t (fs_lookup_t)(ino_t parent, const char *fname,
                                struct mount_info *info);
 
 /**
@@ -58,7 +58,7 @@ typedef uint32_t (fs_create_t)(ino_t parent, const char *fname, uint16_t type,
 
 /**
  * Read/Write in file specified by given ino
- * return the number of char read or < 0 if error
+ * return the number of char read, -1 if error, -2 if wait
  */
 typedef int (fs_rdwr_t)(ino_t, void*, off_t, size_t, struct mount_info*);
 
@@ -74,7 +74,14 @@ typedef int (fs_rdwr_t)(ino_t, void*, off_t, size_t, struct mount_info*);
  */
 typedef int (fs_getdents_t)(ino_t, struct dirent*, size_t,
 							chann_adt_t*,  struct mount_info*);
+
+/**
+ * Indique la création d'un nouveau canal vers le fichier
+ */
 typedef void (fs_opench_t)(ino_t, chann_adt_t*,  struct mount_info*);
+
+typedef void (fs_open_t)(ino_t, vfile_t*, struct mount_info*);
+typedef void (fs_close_t)(ino_t, struct mount_info*);
 
 /**
  * Remove a dir entry with ino in list of dir entries of parent
@@ -95,6 +102,8 @@ struct fs {
     fs_create_t         *fs_mkdir;
 	fs_getdents_t       *fs_getdents;
 	fs_opench_t         *fs_opench;
+	fs_open_t           *fs_open;
+	fs_close_t          *fs_close;
     fs_rm_t             *fs_rm;
     fs_destroy_dirent_t *fs_destroy_dirent;
     fs_readsymlink_t    *fs_readsymlink;

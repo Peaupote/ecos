@@ -182,11 +182,18 @@ static int tty_getents(fpd_dt_t* n __attribute__((unused)),
 }
 
 // -- /tty/<ttyi>
-			
+static void ttyi_open(file_ins* ins, vfile_t* vf) {
+	if (ins->ttyi == 0)
+		ttyin_vfile = vf;
+}
+static void ttyi_close(file_ins* ins) {
+	if (ins->ttyi == 0)
+		ttyin_vfile = NULL;
+}
 static int ttyi_stat(file_ins* ins, struct stat* st) {
     st->st_mode    = TYPE_CHAR | (ins->ttyi ? 0200 : 0400);
     st->st_nlink   = 1;
-    st->st_size    = ins->ttyi ? 0 : ttyin_buf.sz;
+    st->st_size    = ins->ttyi ? 0 : (ttyin_force0 ? 1 : ttyin_buf.sz);
     st->st_blksize = PROC_BLOCK_SIZE;
     st->st_blocks  = 0;
     return st->st_ino;
@@ -194,16 +201,16 @@ static int ttyi_stat(file_ins* ins, struct stat* st) {
 static int ttyi_read(file_ins* ins, void* dst,
 		off_t ofs __attribute__((unused)), size_t sz) {
 	if (ins->ttyi) return -1;
+	if (ttyin_force0) {
+		ttyin_force0 = false;
+		return 0;
+	}
 	return fs_proc_read_pipe(&ttyin_buf, dst, sz);
 }
 static int ttyi_write(file_ins* ins, void* src,
 		off_t ofs __attribute__((unused)), size_t sz) {
 	if (!ins->ttyi) return -1;
-	tty_seq_t sq;
-	tty_seq_init  (&sq);
-	tty_seq_write (&sq, (const char*)src, sz);
-	tty_seq_commit(&sq);
-	return sz;
+	return tty_writei(ins->ttyi, (const char*)src, sz);
 }
 
 // -- /pipes --
@@ -230,10 +237,23 @@ static int pipes_getents(fpd_dt_t* n __attribute__((unused)),
 
 // -- /pipes/<pipei>
 
+static void pipei_open(file_ins* ins, vfile_t* vf) {
+	fp_pipes[ins->pipei >> 1].vfs[ins->pipei & 1] = vf;
+}
+static void pipei_close(file_ins* ins) {
+	struct fp_pipe* pi = fp_pipes + (ins->pipei >> 1);
+	fs_proc_close_pipe(pi, 1 << (ins->pipei & 1));
+	pi->vfs[ins->pipei & 1] = NULL;
+	if (pi->vfs[(ins->pipei & 1)^1])
+		pi->vfs[(ins->pipei & 1)^1]->vf_stat.st_size = 1; // force call
+	if (pi->vfs[fp_pipe_out])
+		vfs_unblock(pi->vfs[fp_pipe_out]);
+}
 static int pipei_stat(file_ins* ins, struct stat* st) {
-    st->st_mode    = TYPE_FIFO | ((ins->pipei&1) ? 0200 : 0400);
+	struct fp_pipe* pi = fp_pipes + (ins->pipei >> 1);
+    st->st_mode    = pi->mode[ins->pipei & 1];
     st->st_nlink   = 1;
-    st->st_size    = fp_pipes[ins->pipei >> 1].cnt.sz;
+	st->st_size    = pi->open == 3 ? pi->cnt.sz : 1;
     st->st_blksize = PROC_BLOCK_SIZE;
     st->st_blocks  = 0;
     return st->st_ino;
@@ -242,12 +262,13 @@ static int pipei_read(file_ins* ins, void* dst,
 		off_t ofs __attribute__((unused)), size_t sz) {
 	if (!(ins->pipei & 1)) return -1;
 	struct fp_pipe* pi = fp_pipes + (ins->pipei >> 1);
-	int rc =fs_proc_read_pipe(&pi->cnt, dst, sz);
+
+	int rc = fs_proc_read_pipe(&pi->cnt, dst, sz);
 	if (rc) {
-		if (pi->vf_out)
-			pi->vf_out->vf_stat.st_size = pi->cnt.sz;
-		if (pi->vf_in)
-			pi->vf_in->vf_stat.st_size  = pi->cnt.sz;
+		size_t vsz = pi->open == 0b11 ? pi->cnt.sz : 1;
+		for (uint8_t i = 0; i < 2; ++i)
+			if (pi->vfs[i])
+				pi->vfs[i]->vf_stat.st_size = vsz;
 	}
 	return rc;
 }
@@ -255,14 +276,16 @@ static int pipei_write(file_ins* ins, void* src,
 		off_t ofs __attribute__((unused)), size_t sz) {
 	if (ins->pipei & 1) return -1;
 	struct fp_pipe* pi = fp_pipes + (ins->pipei >> 1);
+	if (pi->open != 0b11) return -1;
+
 	int wc = fs_proc_write_pipe(&pi->cnt, src, sz);
 	if (wc > 0) {
-		if (pi->vf_out) {
-			pi->vf_out->vf_stat.st_size = pi->cnt.sz;
-			vfs_unblock(pi->vf_out);
+		if (pi->vfs[fp_pipe_out]) {
+			pi->vfs[fp_pipe_out]->vf_stat.st_size = pi->cnt.sz;
+			vfs_unblock(pi->vfs[fp_pipe_out]);
 		}
-		if (pi->vf_in)
-			pi->vf_in->vf_stat.st_size  = pi->cnt.sz;
+		if (pi->vfs[fp_pipe_in])
+			pi->vfs[fp_pipe_in]->vf_stat.st_size  = pi->cnt.sz;
 	}
 	return wc;
 }
@@ -386,7 +409,7 @@ static int dir_stat(file_ins* ins __attribute__((unused)),
     return st->st_ino;
 }
 
-static uint32_t dir_lookup(ino_t ino, file_ins* ins, const char* fname) {
+static uint32_t dir_lookup(file_ins* ins, ino_t ino, const char* fname) {
 	if (!strcmp(fname, "."))
 		return ino;
 	if (!strcmp(fname, ".."))
@@ -413,7 +436,7 @@ static uint32_t dir_lookup(ino_t ino, file_ins* ins, const char* fname) {
 	return 0;
 }
 
-static int dir_getdents(ino_t ino, file_ins* ins, struct dirent* d,
+static int dir_getdents(file_ins* ins, ino_t ino, struct dirent* d,
 		size_t sz, chann_adt_t* p_cdt) {
 	cdt_t* cdt = (cdt_t*)p_cdt;
 	int rc = 0;
@@ -447,69 +470,83 @@ static void dir_opench(file_ins* ins __attribute__((unused)),
 
 struct fs_proc_file {
 	void     (*opench)(file_ins*, chann_adt_t*);
+	void     (*open)(file_ins*, vfile_t*);
+	void     (*close)(file_ins*);
 	int      (*stat  )(file_ins*, struct stat*);
 	int      (*read  )(file_ins*, void*, off_t, size_t);
 	int      (*write )(file_ins*, void*, off_t, size_t);
-	uint32_t (*lookup)(ino_t ino, file_ins*, const char* fname);
-	int      (*getdents)(ino_t ino, file_ins*, struct dirent*, size_t,
+	uint32_t (*lookup)(file_ins*, ino_t, const char* fname);
+	int      (*getdents)(file_ins*, ino_t, struct dirent*, size_t,
 							chann_adt_t*);
-	ino_t    (*read_sym)(file_ins*, char*);
+	ino_t    (*readsymlink)(file_ins*, char*);
 };
 
 static struct fs_proc_file
 	fun_dir = {
 			.opench   = dir_opench,
+			.open     = NULL,
+			.close    = NULL,
 			.stat     = dir_stat,
 			.read     = NULL,
 			.write    = NULL,
 			.lookup   = dir_lookup,
 			.getdents = dir_getdents,
-			.read_sym = NULL
+			.readsymlink = NULL
 		},
 	fun_fdi = {
 			.opench   = NULL,
+			.open     = NULL,
+			.close    = NULL,
 			.stat     = fdi_stat,
 			.read     = fdi_read,
 			.write    = NULL,
 			.lookup   = NULL,
 			.getdents = NULL,
-			.read_sym = fdi_read_sym
+			.readsymlink = fdi_read_sym
 	},
 	fun_cmd = {
 			.opench   = NULL,
+			.open     = NULL,
+			.close    = NULL,
 			.stat     = reg_stat,
 			.read     = cmd_read,
 			.write    = NULL,
 			.lookup   = NULL,
 			.getdents = NULL,
-			.read_sym = NULL
+			.readsymlink = NULL
 	},
 	fun_stat = {
 			.opench   = NULL,
+			.open     = NULL,
+			.close    = NULL,
 			.stat     = reg_stat,
 			.read     = stat_read,
 			.write    = NULL,
 			.lookup   = NULL,
 			.getdents = NULL,
-			.read_sym = NULL
+			.readsymlink = NULL
 	},
 	fun_ttyi = {
 			.opench   = NULL,
+			.open     = ttyi_open,
+			.close    = ttyi_close,
 			.stat     = ttyi_stat,
 			.read     = ttyi_read,
 			.write    = ttyi_write,
 			.lookup   = NULL,
 			.getdents = NULL,
-			.read_sym = NULL
+			.readsymlink = NULL
 	},
 	fun_pipei = {
 			.opench   = NULL,
+			.open     = pipei_open,
+			.close    = pipei_close,
 			.stat     = pipei_stat,
 			.read     = pipei_read,
 			.write    = pipei_write,
 			.lookup   = NULL,
 			.getdents = NULL,
-			.read_sym = NULL
+			.readsymlink = NULL
 	};
 
 static inline fpd_dt_t* set_dir_dt(file_ins* ins, ino_t p, dir_getents e) {
@@ -626,32 +663,25 @@ uint32_t fs_proc_touch(ino_t n1 __attribute__((unused)),
 	return 0;
 }
 
-#define GEN_RRT(R, N, M, E, AT, AN) \
-	R N(ino_t ino, AT,\
+#define GEN_RRT(R, M, E, AT, AN) \
+	R fs_proc_##M(ino_t ino AT,\
 			struct mount_info* none __attribute__((unused))) {\
 		file_ins ins; \
 		struct fs_proc_file* f; \
 		if (fs_proc_from_ino(ino, &ins, &f) && f->M) \
-			return f->M(&ins, AN); \
+			return f->M(&ins AN); \
 		return E; \
 	}
-#define VAH(...) __VA_ARGS__
+#define GEN_RRTV(M, AT, AN) \
+	void fs_proc_##M(ino_t ino AT,\
+			struct mount_info* none __attribute__((unused))) {\
+		file_ins ins; \
+		struct fs_proc_file* f; \
+		if (fs_proc_from_ino(ino, &ins, &f) && f->M) \
+			f->M(&ins AN); \
+	}
+#define VAH(...) ,## __VA_ARGS__
 
-void fs_proc_opench(ino_t ino, chann_adt_t* cdt,
-		struct mount_info* info __attribute__((unused))) {
-	file_ins ins;
-	struct fs_proc_file* f;
-	if (fs_proc_from_ino(ino, &ins, &f) && f->opench)
-		f->opench(&ins, cdt);
-}
-uint32_t fs_proc_lookup(const char *fname, ino_t ino,
-		struct mount_info* info __attribute__((unused))) {
-	file_ins ins;
-	struct fs_proc_file* f;
-	if (fs_proc_from_ino(ino, &ins, &f) && f->lookup)
-		return f->lookup(ino, &ins, fname);
-	return 0;
-}
 int fs_proc_stat(ino_t ino, struct stat* st,
 		struct mount_info* none __attribute__((unused))) {
 	file_ins ins;
@@ -662,19 +692,18 @@ int fs_proc_stat(ino_t ino, struct stat* st,
 	}
 	return -1;
 }
-GEN_RRT(int, fs_proc_read,  read,  -1, VAH(void* d, off_t o, size_t s), VAH(d,o,s))
-GEN_RRT(int, fs_proc_write, write, -1, VAH(void* d, off_t o, size_t s), VAH(d,o,s))
-GEN_RRT(ino_t, fs_proc_readsymlink, read_sym, 0, char* d, d)
 
-int fs_proc_getdents(ino_t ino, struct dirent* d, size_t sz,
-				chann_adt_t* cdt,
-				struct mount_info* info __attribute__((unused))) {
-	file_ins ins;
-	struct fs_proc_file* f;
-	if (fs_proc_from_ino(ino, &ins, &f) && f->getdents)
-		return f->getdents(ino, &ins, d, sz, cdt);
-	return -1;
-}
+GEN_RRTV(opench, VAH(chann_adt_t* cdt), VAH(cdt))
+GEN_RRTV(open,   VAH(vfile_t* vf), VAH(vf))
+GEN_RRTV(close,  VAH(), VAH())
+GEN_RRT(uint32_t, lookup, 0, VAH(const char *fname), VAH(ino, fname))
+GEN_RRT(int, read,  -1, VAH(void* d, off_t o, size_t s), VAH(d,o,s))
+GEN_RRT(int, write, -1, VAH(void* d, off_t o, size_t s), VAH(d,o,s))
+GEN_RRT(ino_t, readsymlink, 0, VAH(char* d), VAH(d))
+GEN_RRT(int, getdents, -1,
+		VAH(struct dirent* d, size_t sz, chann_adt_t* cdt),
+		VAH(ino, d, sz, cdt))
 
 #undef VAH
 #undef GEN_RRT
+#undef GEN_RRTV

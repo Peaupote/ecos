@@ -20,13 +20,13 @@ uint32_t fs_proc_alloc_pipe(mode_t m_in, mode_t m_out) {
 	for (size_t i = 0; i < NPIPE; ++i) {
 		struct fp_pipe* p = fp_pipes + i;
 		if (!p->open) {
-			p->cnt.buf  = (char*)kalloc_page();
-			p->cnt.sz   = 0;
-			p->cnt.ofs  = 0;
-			p->open     = FP_PIPE_IN | FP_PIPE_OUT;
-			p->mode_out = m_out;
-			p->mode_in  = m_in;
-			p->vf_out   = p->vf_in = NULL;
+			p->cnt.buf = (char*)kalloc_page();
+			p->cnt.sz  = 0;
+			p->cnt.ofs = 0;
+			p->open    = 0b11;
+			p->mode[fp_pipe_out] = m_out;
+			p->mode[fp_pipe_in ] = m_in;
+			p->vfs[fp_pipe_in] = p->vfs[fp_pipe_out] = NULL;
 			return i;
 		}
 	}
@@ -86,16 +86,14 @@ static int open_channel(const char* path, int mflags) {
 }
 
 vfile_t* ttyin_vfile = NULL;
+bool ttyin_force0 = false;
 
 bool fs_proc_std_to_tty(proc_t* p) {
-	cid_t cid_in = p->p_fds[STDIN_FILENO] 
-		         = open_channel(PROC_MOUNT "/tty/tty0", READ);
+	p->p_fds[STDIN_FILENO ] = open_channel(PROC_MOUNT "/tty/tty0", READ);
 	p->p_fds[STDOUT_FILENO] = open_channel(PROC_MOUNT "/tty/tty1", WRITE);
 	p->p_fds[STDERR_FILENO] = open_channel(PROC_MOUNT "/tty/tty2", WRITE);
 	
-	if (!~cid_in) return false;
-
-	ttyin_vfile = state.st_chann[cid_in].chann_vfile;
-	
-	return ~p->p_fds[STDOUT_FILENO] && ~p->p_fds[STDERR_FILENO];
+	return ~p->p_fds[STDIN_FILENO ] 
+		&& ~p->p_fds[STDOUT_FILENO] 
+		&& ~p->p_fds[STDERR_FILENO];
 }

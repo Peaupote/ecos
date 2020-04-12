@@ -117,7 +117,7 @@ uint32_t ext2_touch(uint32_t parent, const char *fname, uint16_t type,
                     struct ext2_mount_info *info) {
     uint32_t ino;
 
-    if ((ino = ext2_lookup(fname, parent, info)) &&
+    if ((ino = ext2_lookup(parent, fname, (struct mount_info*)info)) &&
         !(ext2_get_inode(ino, info)->in_type&TYPE_DIR))
         return 0;
 

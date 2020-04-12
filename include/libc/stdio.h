@@ -9,6 +9,8 @@ int  putchar(int c);
 
 int  puts(const char *s);
 
+int  fdprintf(int fd, const char *fmt, ...);
+
 int  printf(const char *fmt, ...);
 
 int  scanf(const char *format, ...);

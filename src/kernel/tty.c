@@ -17,7 +17,7 @@
 #include <kernel/tests.h>
 #include <fs/ext2.h>
 
-#define SB_MASK  0x7f
+#define SB_MASK  0x1ff
 
 #define IB_LENGTH 256
 
@@ -26,26 +26,24 @@
 // ashift          |---->|
 // display_shift         |-->|
 // nb_lines              |------>|
-uint16_t sbuffer[SB_HEIGHT][80];
-size_t   sb_ashift; //shift array
-size_t   sb_display_shift; // <= sb_nb_lines
+static uint16_t sbuffer[SB_HEIGHT][80];
+static size_t   sb_ashift; //shift array
+static size_t   sb_display_shift; // <= sb_nb_lines
 // < SB_HEIGHT pour éviter 0 = SB_HEIGHT lors du passage au modulo
-size_t   sb_nb_lines;
-bool     sb_dtcd; // scroll détaché
+static size_t   sb_nb_lines;
+static bool     sb_dtcd; // scroll détaché
 
 //Input Buffer
-char     ibuffer[IB_LENGTH];
-size_t   ib_size;
-size_t   ib_printed;
-const size_t input_width = 80 - 2;
-size_t   input_height;
-size_t   input_bottom_line;
-size_t   input_top_line;
+static char     ibuffer[IB_LENGTH];
+static size_t   ib_size;
+static size_t   ib_printed;
+static const size_t input_width = 80 - 2;
+static size_t   input_height;
+static size_t   input_bottom_line;
+static size_t   input_top_line;
 
-uint8_t  input_color;
-uint8_t  prompt_color;
-uint8_t  vprompt_color;
-uint8_t  back_color;
+static uint8_t  input_color, prompt_color, vprompt_color,
+                back_color,  buf_color,    err_color;
 
 static pid_t tty_owner = PID_NONE;
 
@@ -70,35 +68,46 @@ static inline size_t sb_sc_ed() {
 }
 
 static enum tty_mode tty_mode;
+static enum tty_mode tty_bmode;
 
 void tty_init(enum tty_mode m) {
-    back_color = vga_entry_color (
-                VGA_COLOR_LIGHT_GREY, VGA_COLOR_BLACK);
+    back_color  = vga_entry_color (
+                	VGA_COLOR_LIGHT_GREY, VGA_COLOR_BLACK);
+    buf_color   = back_color;
+    err_color   = vga_entry_color (
+                	VGA_COLOR_LIGHT_RED, VGA_COLOR_BLACK);
     input_color = vga_entry_color (
-                VGA_COLOR_LIGHT_GREY, VGA_COLOR_BLACK);
+                	VGA_COLOR_LIGHT_GREY, VGA_COLOR_BLACK);
 
     ib_printed   = ib_size = 0;
     input_height = 0;
     input_bottom_line = input_top_line = ~0;
 
-    sb_ashift   = 1;// evite que cur_idx renvoit -1
+    sb_ashift   = 0;
     sb_display_shift = 0;
     sb_nb_lines = 0;
     sb_dtcd     = false;
 
 	tty_force_new_line();
 
+	tty_bmode = m;
     tty_set_mode(m);
 }
 
 void tty_set_mode(enum tty_mode m) {
     switch (m) {
-    case ttym_def:
+	case ttym_prompt:
         prompt_color = vga_entry_color (
                     VGA_COLOR_LIGHT_BLUE, VGA_COLOR_BLACK);
         vprompt_color = vga_entry_color (
                     VGA_COLOR_BLUE, VGA_COLOR_BLACK);
         break;
+    case ttym_def:
+        prompt_color = vga_entry_color (
+                    VGA_COLOR_WHITE, VGA_COLOR_BLACK);
+        vprompt_color = vga_entry_color (
+                    VGA_COLOR_LIGHT_GREY, VGA_COLOR_BLACK);
+		break;
     case ttym_panic:
         prompt_color = vga_entry_color (
                     VGA_COLOR_LIGHT_RED, VGA_COLOR_BLACK);
@@ -117,6 +126,12 @@ void tty_set_mode(enum tty_mode m) {
     tty_mode = m;
     if (~input_top_line)
         vga_putentryat('>', prompt_color, 0, input_top_line);
+}
+
+void tty_set_bmode(enum tty_mode m) {
+	tty_bmode = m;
+	if (tty_mode < ttym_debug)	
+		tty_set_mode(m);
 }
 
 void tty_set_owner(pid_t p) {
@@ -305,10 +320,16 @@ size_t built_in_exec() {
     return 0;
 }
 
+static inline size_t tty_input_to_buffer() {
+	if (tty_mode == ttym_def)
+		return tty_writestringl(ibuffer, ib_size, back_color);
+	else
+		return tty_prompt_to_buffer(ib_size);
+}
+
 void tty_input(scancode_byte s, key_event ev) {
     tty_seq_t sq;
     tty_seq_init(&sq);
-    uint8_t p_updt = 0;
 
     if (do_kprint) {
         char str[] = "s=__ c=__ f=__ p=__\n";
@@ -316,17 +337,17 @@ void tty_input(scancode_byte s, key_event ev) {
         int8_to_str_hexa(str + 7,  ev.key);
         int8_to_str_hexa(str + 12, ev.flags);
         int8_to_str_hexa(str + 17, keycode_to_printable(ev.key));
-        p_updt = 1;
         sq.shift += tty_writestring(str);
         sq.shift += tty_update_prompt_pos();
     }
     if (ev.key && !(ev.flags & 0x1)) {//évènement appui
         if ((ev.key&KEYS_MASK) == KEYS_ENTER) {
-            p_updt = 1;
-            sq.shift += tty_prompt_to_buffer(ib_size);
+			sq.shift += tty_input_to_buffer();
+			tty_force_new_line();
 
             switch(tty_mode) {
             case ttym_def:
+            case ttym_prompt:
                 ibuffer[ib_size] = '\n';
 				if(fs_proc_write_tty(ibuffer, ib_size + 1) != ib_size + 1)
 					klogf(Log_error, "tty", "in_buffer saturated");
@@ -373,17 +394,30 @@ void tty_input(scancode_byte s, key_event ev) {
             switch (ev.key) {
                 case KEY_TAB:
                 switch (tty_mode) {
-                    case ttym_def:   tty_set_mode(ttym_debug); break;
-                    case ttym_debug: tty_set_mode(ttym_def);   break;
-                    case ttym_panic: break;
+                    case ttym_def:    tty_set_mode(ttym_debug); break;
+                    case ttym_prompt: tty_set_mode(ttym_debug); break;
+                    case ttym_debug:  tty_set_mode(tty_bmode);   break;
+                    case ttym_panic:  break;
                 }
                 break;
                 case KEY_C:
                     if (~tty_owner && proc_alive(state.st_proc + tty_owner)) {
-						kprintf("^C\n");
+                		sq.shift += tty_writestringl("^C", 2, back_color);
                         send_sig_to_proc(tty_owner, SIGINT - 1);
 					}
                 break;
+				case KEY_D:
+					if (ib_size) {
+						sq.shift += tty_input_to_buffer();
+						if(fs_proc_write_tty(ibuffer, ib_size) != ib_size)
+							klogf(Log_error, "tty", "in_buffer saturated");
+						ib_size = ib_printed = 0;
+						sq.shift += tty_new_prompt();
+					} else {
+                		sq.shift += tty_writestringl("^D", 2, back_color);
+						fs_proc_send0_tty();
+					}
+				break;
             }
         } else {
             char kchar = keycode_to_printable(ev.key);
@@ -393,7 +427,7 @@ void tty_input(scancode_byte s, key_event ev) {
             }
         }
     }
-    if (p_updt) tty_seq_commit(&sq);
+    tty_seq_commit(&sq);
 }
 
 void tty_afficher_buffer_range(size_t idx_begin, size_t idx_end) {
@@ -522,6 +556,8 @@ size_t tty_update_prompt_pos() {
     return 0;//Pas de prompt
 }
 
+size_t cur_ln_x = 80;
+
 size_t tty_prompt_to_buffer(size_t in_len) {
     size_t index;
     size_t rt = tty_new_buffer_line(&index);
@@ -551,14 +587,12 @@ size_t tty_prompt_to_buffer(size_t in_len) {
         for (x=2; x < l_lim; ++it, ++x)
             sbuffer[index][x] = vga_entry(ibuffer[it], input_color);
     }
-
+	
     for(; x < VGA_WIDTH; ++x)
         sbuffer[index][x] = vga_entry(' ', input_color);
-    tty_force_new_line();
+	tty_force_new_line();
     return rt;
 }
-
-size_t cur_ln_x = 80;
 
 size_t tty_buffer_cur_idx(){
     return cur_ln_x < VGA_WIDTH
@@ -617,7 +651,7 @@ loop_enter:
     return rt;
 }
 
-size_t tty_writestringl(const char* str, size_t len) {
+size_t tty_writestringl(const char* str, size_t len, uint8_t color) {
     const char* end = str + len;
     size_t rt = 0;
     char c = *str;
@@ -630,21 +664,21 @@ loop_enter:
         for(; x < VGA_WIDTH && str!=end; ++x, c = *(++str)) {
             if(c == '\n') {
                 for(;x < VGA_WIDTH; ++x)
-                    sbuffer[ln_index][x] = vga_entry(' ', back_color);
+                    sbuffer[ln_index][x] = vga_entry(' ', color);
                 c = *(++str);
                 break;
             } else if (c == '\t') {
                 for(size_t i = 0; i < 4 && x < VGA_WIDTH; ++x, ++i)
-                    sbuffer[ln_index][x] = vga_entry(' ', back_color);
+                    sbuffer[ln_index][x] = vga_entry(' ', color);
                 c = *(++str);
                 break;
             }
-            sbuffer[ln_index][x] = vga_entry(c, back_color);
+            sbuffer[ln_index][x] = vga_entry(c, color);
         }
     }
     cur_ln_x = x;
     for(; x < VGA_WIDTH; ++x)
-        sbuffer[ln_index][x] = vga_entry(' ', back_color);
+        sbuffer[ln_index][x] = vga_entry(' ', color);
     return rt;
 }
 
@@ -652,5 +686,39 @@ void tty_writer(void* shift, const char *str) {
     *((size_t*)shift) = tty_writestring(str);
 }
 void tty_seq_write(void* seq, const char* s, size_t len) {
-    ((tty_seq_t*)seq)->shift += tty_writestringl(s, len);
+    ((tty_seq_t*)seq)->shift += tty_writestringl(s, len, back_color);
+}
+
+size_t tty_writei(uint8_t num, const char* str, size_t len) {
+	tty_seq_t sq;
+	tty_seq_init(&sq);
+	if (num == 1) {
+		size_t t_bg = 0;
+		for (size_t i = 0; i < len; ++i) {
+			if (str[i] == '\033') {
+				if (t_bg < i)
+					sq.shift += tty_writestringl(
+									str + t_bg, i - t_bg, buf_color);
+				size_t t_ed = i;
+				if (++i >= len) {
+					tty_seq_commit(&sq);
+					return t_ed;
+				}
+				switch (str[i]) {
+					case 'd':
+						tty_set_bmode(ttym_def);
+						break;
+					case 'p':
+						tty_set_bmode(ttym_prompt);
+						break;
+				}
+				t_bg = i + 1;
+			}
+		}
+		if (t_bg < len)
+			sq.shift += tty_writestringl(str + t_bg, len - t_bg, buf_color);
+	} else
+		sq.shift += tty_writestringl(str, len, err_color);
+	tty_seq_commit(&sq);
+	return len;
 }

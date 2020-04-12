@@ -1,5 +1,6 @@
 #include <libc/stdio.h>
 #include <libc/errno.h>
+#include <libc/unistd.h>
 
 const char * const err_list[NERRNO] = {
     "Success",
@@ -150,5 +151,5 @@ void _errno_init() {
 
 void perror(const char *s) {
     if (!s || !*s) return;
-    printf("%s: %s\n", s, err_list[errno]);
+    fdprintf(STDERR_FILENO, "%s: %s\n", s, err_list[errno]);
 }

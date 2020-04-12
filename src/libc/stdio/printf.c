@@ -149,14 +149,23 @@ int fpprintf(stringl_writer w, void* wi, const char* fmt, va_list ps) {
 
 #ifndef __is_kernel
 static void
-print(void *none __attribute__((unused)), const char *s, size_t len) {
-    write(1, s, len); // Write to stout
+fdprint(void *p_fd, const char *s, size_t len) {
+    write(*(int*)p_fd, s, len); // Write to stout
+}
+
+int fdprintf(int fd, const char *fmt, ...) {
+    va_list params;
+    va_start(params, fmt);
+    int cnt = fpprintf(&fdprint, &fd, fmt, params);
+    va_end(params);
+    return cnt;
 }
 
 int printf(const char *fmt, ...) {
     va_list params;
     va_start(params, fmt);
-    int cnt = fpprintf(&print, NULL, fmt, params);
+	int fd = STDOUT_FILENO;
+    int cnt = fpprintf(&fdprint, &fd, fmt, params);
     va_end(params);
     return cnt;
 }

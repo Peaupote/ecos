@@ -7,10 +7,11 @@
 #include <kernel/keyboard.h>
 #include <headers/proc.h>
 
-#define SB_HEIGHT 128
+#define SB_HEIGHT 512
 
 enum tty_mode {
     ttym_def,
+	ttym_prompt,
     ttym_debug,
     ttym_panic
 };
@@ -38,7 +39,7 @@ size_t tty_new_buffer_line(size_t* index);
 
 void   tty_force_new_line(void);
 size_t tty_writestring(const char* str);
-size_t tty_writestringl(const char* s, size_t len);
+size_t tty_writestringl(const char* s, size_t len, uint8_t color);
 void   tty_writer(void* shift, const char* str);
 
 typedef struct {
@@ -57,5 +58,7 @@ static inline void tty_seq_commit(tty_seq_t* s) {
     else tty_afficher_buffer_range(s->idx_bg, nidx);
 }
 void tty_seq_write(void* seq, const char* s, size_t len);
+
+size_t tty_writei(uint8_t num, const char* str, size_t len);
 
 #endif

@@ -263,12 +263,16 @@ ext2_inode_blocks(uint32_t block_count, struct ext2_superblock *sp) {
 // global
 
 int ext2_mount(void *fs, struct ext2_mount_info *info);
-uint32_t ext2_lookup(const char *fname, ino_t ino, struct ext2_mount_info*);
+uint32_t ext2_lookup(ino_t ino, const char *fname, struct mount_info*);
 int32_t  ext2_stat(ino_t ino, struct stat *st, struct ext2_mount_info *info);
 int32_t  ext2_read(ino_t ino, void *buf, off_t offset, size_t len,
                    struct ext2_mount_info *info);
 int32_t  ext2_write(ino_t ino, void *buf, off_t offset, size_t len,
                     struct ext2_mount_info *info);
+
+void     ext2_opench(ino_t, chann_adt_t*, struct mount_info*);
+void     ext2_open(ino_t ino, vfile_t*, struct mount_info*);
+void     ext2_close(ino_t ino, struct mount_info*);
 
 // blocks
 
@@ -323,6 +327,5 @@ uint32_t ext2_mkdir(uint32_t parent, const char *dirname, uint16_t type,
 
 int      ext2_getdents(ino_t, struct dirent* dst, size_t sz, 
 						chann_adt_t*, struct mount_info*);
-void     ext2_opench(ino_t, chann_adt_t*, struct mount_info*);
 
 #endif
