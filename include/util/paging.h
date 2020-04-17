@@ -59,6 +59,10 @@ static inline uint_ptr paging_lvl_shift(enum pgg_level lvl) {
 	return (lvl - 1) * PGG_LVL_SHIFT + PAGE_SHIFT;
 }
 
+static inline uint_ptr paging_lvl_trunc(enum pgg_level lvl) {
+	return (~(uint_ptr)0) << paging_lvl_shift(lvl);
+}
+
 static inline uint16_t paging_get_lvl(enum pgg_level lvl, uint_ptr v) {
 	return (v >> paging_lvl_shift(lvl)) & PAGE_IENT_MASK;
 }

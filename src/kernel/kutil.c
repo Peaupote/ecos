@@ -81,12 +81,6 @@ void kpanicf(const char *msg, const char *fmt, ...) {
     kprintf("\n");
     kpanic_stop();
 }
-void kpanic_ct(const char* msg) {
-    vga_init((uint16_t*)(low_addr + VGA_BUFFER));
-    vga_writestring("PANIC!\n");
-    vga_writestring(msg);
-    while(1) halt();
-}
 void kassert(uint8_t b, const char *msg) {
     if(!b) kpanic(msg);
 }

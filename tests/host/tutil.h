@@ -26,7 +26,6 @@ enum klog_level {
 };
 
 void kpanic(const char* p);
-void kpanic_ct(const char* p);
 void tassert(uint8_t, const char *msg);
 void klog (enum klog_level lvl, const char *head, const char *msg);
 void klogf(enum klog_level lvl, const char *head, const char *msgf, ...);

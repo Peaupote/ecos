@@ -16,15 +16,25 @@
 #include <kernel/sys.h>
 #include <kernel/proc.h>
 #include <kernel/kutil.h>
+#include <kernel/display.h>
+#include <util/multiboot.h>
 
 #include <kernel/tests.h>
 
-void kernel_init(uint32_t boot_info) {
+static void kernel_init(uint32_t boot_info) {
     gdt_init();
     kmem_init_paging();
-	vga_init((uint16_t*)(low_addr + VGA_BUFFER));
+	
+	kmem_bind_dynamic_range(0,
+			boot_info, boot_info + sizeof(multiboot_info_t));
+	multiboot_info_t* mbi = (multiboot_info_t*)
+			kmem_dynamic_slot_at(0, boot_info);
+
+	display_init(mbi);
     tty_init(ttym_def);
-    kmem_init_alloc(boot_info);
+
+    kmem_init_alloc(mbi);
+
     tss_init();
     idt_init();
 }

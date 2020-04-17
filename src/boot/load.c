@@ -54,6 +54,15 @@ void simp_copy(void* none __attribute__((unused)), Elf64_Xword flags,
         p_dst[i] = ((uint8_t*) src)[i];
 }
 
+struct VbeInfoBlock {
+   char VbeSignature[4];             // == "VESA"
+   uint16_t VbeVersion;                 // == 0x0300 for VBE 3.0
+   uint16_t OemStringPtr[2];            // isa vbeFarPtr
+   uint8_t Capabilities[4];
+   uint16_t VideoModePtr[2];         // isa vbeFarPtr
+   uint16_t TotalMemory;             // as # of 64KB blocks
+} __attribute__((packed));
+
 void load_kernel64(void){
     struct elf_loader el_v = {.fill0=&simp_fill0, .copy=&simp_copy};
     kernel_entry_addr = NULL;

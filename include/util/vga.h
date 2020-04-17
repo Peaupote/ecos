@@ -5,8 +5,6 @@
 #include <stddef.h>
 #include <stdint.h>
 
-#include "hdw.h" //VGA_BUFFER
-
 /* Hardware text mode color constants. */
 enum vga_color {
     VGA_COLOR_BLACK = 0,
@@ -27,11 +25,6 @@ enum vga_color {
     VGA_COLOR_WHITE = 15,
 };
 
-typedef struct {
-	size_t x;
-	size_t y;
-} vga_pos_t;
-
 static inline uint8_t vga_entry_color(enum vga_color fg, enum vga_color bg)
 {
     return fg | bg << 4;
@@ -41,26 +34,5 @@ static inline uint16_t vga_entry(unsigned char uc, uint8_t color)
 {
     return (uint16_t) uc | (uint16_t) color << 8;
 }
-
-static const size_t VGA_WIDTH = 80;
-static const size_t VGA_HEIGHT = 25;
-
-extern vga_pos_t vga_pos;
-extern uint8_t   vga_color;
-
-void vga_init(uint16_t* buffer);
-void vga_clear(void);
-void vga_setcolor(uint8_t color);
-void vga_putcentryat(uint16_t e, size_t x, size_t y);
-void vga_putentryat(char c, uint8_t color, size_t x, size_t y);
-void vga_nextline();
-void vga_cursor_at(size_t row, size_t col);
-
-/*caractère affichable*/
-void vga_putachar(char c);
-void vga_putchar(char c);
-void vga_write(const char* data, size_t size);
-void vga_writestring(const char* data);
-void vga_writer(void*, const char*);
 
 #endif

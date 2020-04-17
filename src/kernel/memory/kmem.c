@@ -58,16 +58,12 @@ void kmem_init_paging() {
 }
 
 
-void kmem_init_alloc(uint32_t boot_info) {
+void kmem_init_alloc(multiboot_info_t* mbi) {
 	//On récupère la carte de la mémoire fournie par GRUB
-	kmem_bind_dynamic_range(0,
-			boot_info, boot_info + sizeof(struct multiboot_header));
-	multiboot_info_t* mbh = (multiboot_info_t*)
-			kmem_dynamic_slot_at(0, boot_info);
-	if(! (mbh->flags & MULTIBOOT_INFO_MEM_MAP)) kpanic("mem map");
+	if(! (mbi->flags & MULTIBOOT_INFO_MEM_MAP)) kpanic("mem map");
 
-	phy_addr mmap_addr = mbh->mmap_addr;
-	size_t mmap_length = mbh->mmap_length;
+	phy_addr mmap_addr = mbi->mmap_addr;
+	size_t mmap_length = mbi->mmap_length;
 	if (mmap_length > 511 * PAGE_SIZE) kpanic("mem map size");
 
 	kmem_bind_dynamic_range(0, mmap_addr, mmap_addr + mmap_length);
@@ -194,7 +190,8 @@ uint16_t kmem_bind_dynamic_range(uint16_t num,
 	return num;
 }
 
-uint64_t* kmem_acc_pts_entry(uint_ptr v_addr, uint8_t rlvl, uint16_t flags) {
+uint64_t* kmem_acc_pts_entry(uint_ptr v_addr, enum pgg_level rlvl, 
+							 uint16_t flags) {
 	kAssert(flags & PAGING_FLAG_W);
 	uint64_t query_addr =
 		(uint64_t) paging_acc_pml4(paging_get_lvl(pgg_pml4, v_addr));
@@ -239,7 +236,8 @@ void kmem_print_paging(uint_ptr v_addr) {
 
 uint8_t paging_map_to(uint_ptr v_addr, phy_addr p_addr,
 		uint16_t flags, uint16_t p_flags) {
-	uint64_t* query = kmem_acc_pts_entry(v_addr, 1, flags | PAGING_FLAG_W);
+	uint64_t* query = kmem_acc_pts_entry(v_addr, pgg_pt, 
+							flags | PAGING_FLAG_W);
 	if (!query) return ~0;
 	if ( (*query) & PAGING_FLAG_P) return 1; //Déjà assignée
 	*query = p_addr | p_flags | PAGING_FLAG_P;
@@ -248,7 +246,8 @@ uint8_t paging_map_to(uint_ptr v_addr, phy_addr p_addr,
 
 uint8_t kmem_paging_alloc(uint_ptr v_addr,
 		uint16_t flags, uint16_t p_flags) {
-	uint64_t* query = kmem_acc_pts_entry(v_addr, 1, flags | PAGING_FLAG_W);
+	uint64_t* query = kmem_acc_pts_entry(v_addr, pgg_pt,
+							flags | PAGING_FLAG_W);
 	if (!query) return ~0;
 	if ( (*query) & PAGING_FLAG_P) {
 		*query |= p_flags;

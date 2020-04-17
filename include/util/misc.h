@@ -1,8 +1,6 @@
 #ifndef _U_MISC_H
 #define _U_MISC_H
 
-//reinterpret_cast TODO
-#define rei_cast(T, V) (*(T*)(&(V)))
 
 /*
  * Le premier argument étant découpé en 2^nstep parties de sz bits
@@ -45,6 +43,7 @@ GEN_BIT(8,   uint8_t)
 GEN_COMP(int)
 GEN_COMP(uint64_t)
 GEN_COMP(uint32_t)
+GEN_COMP(uint16_t)
 GEN_COMP(size_t)
 GEN_COMP(uint_ptr)
 GEN_COMP(phy_addr)

@@ -32,8 +32,6 @@ void kpanic(const char *msg);
 __attribute__((noreturn))
 void kpanicf(const char *msg, const char *fmt, ...);
 
-__attribute__((noreturn))
-void kpanic_ct(const char *msg);
 void kassert(uint8_t, const char *msg);
 
 #endif

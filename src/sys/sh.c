@@ -220,7 +220,7 @@ int main() {
     int rc;
 
     while(1) {
-		printf("\033p");
+		printf("\033psh> \033;");
         memset(line, 0, 258);
         rc = read(0, line, 256);
 		line[rc] = '\0';//TODO: attendre \n + ne pas aller plus loin

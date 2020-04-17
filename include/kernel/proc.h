@@ -288,7 +288,7 @@ void proc_execve_abort(pid_t aux_pid);
 
 static inline void* make_proc_stack() {
     *kmem_acc_pts_entry(paging_add_lvl(pgg_pd, USER_STACK_PD),
-                            2, PAGING_FLAG_U | PAGING_FLAG_W)
+                            pgg_pd, PAGING_FLAG_U | PAGING_FLAG_W)
         = SPAGING_FLAG_P | PAGING_FLAG_W | PAGING_FLAG_U;
     return (void*)paging_add_lvl(pgg_pd, USER_STACK_PD + 1);
 }

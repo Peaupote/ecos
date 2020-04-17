@@ -1,12 +1,18 @@
 #define ASM_FILE
 #include <util/gdt.h>
 #include <util/hdw.h>
+#include <def.h>
 
 /* From https://wiki.osdev.org/Bare_Bones */
 /* Declare constants for the multiboot header. */
 .set ALIGN,    1<<0             /* align loaded modules on page boundaries */
 .set MEMINFO,  1<<1             /* provide memory map */
-.set FLAGS,    ALIGN | MEMINFO  /* this is the Multiboot 'flag' field */
+.set GRAPHIC,  1<<2             /* specify prefered mode */
+
+.set GRAPHIC_LIN,  0
+.set GRAPHIC_TEXT, 1
+
+.set FLAGS,    ALIGN | MEMINFO | GRAPHIC
 .set MAGIC,    0x1BADB002       /* 'magic number' lets bootloader find the header */
 .set CHECKSUM, -(MAGIC + FLAGS) /* checksum of above, to prove we are multiboot */
 
@@ -22,6 +28,16 @@ forced to be within the first 8 KiB of the kernel file.
 .long MAGIC
 .long FLAGS
 .long CHECKSUM
+.skip 20
+/* graphic mode */
+#ifdef GRAPHIC_MODE_LIN
+.long GRAPHIC_LIN
+#else
+.long GRAPHIC_TEXT
+#endif
+.long 0    /* width:  no preference */
+.long 0    /* height: no preference */
+.long 0    /* depth:  no preference */
 
     .section .bss
 
@@ -75,6 +91,29 @@ _start:
     mov $stack_top, %esp
 
     call init_paging_structs
+
+/*	movl (mb_info), %ebx
+    movl 72(%ebx),  %ebx
+
+	movw 14(%ebx),   %ax
+	movl (mb_info), %ebx
+	movw %ax, 80(%ebx)*/
+
+/*	movw %ds, %cx
+	ldsw 14(%ebx),   %bx
+
+	movl $0, %eax
+	jmp  loop_test
+loop_bg:
+	leaw 2(%bx), %bx
+	incl %eax
+loop_test:
+	mov  %bx, %dx
+	cmpw 0xFFFF, %dx
+	jne  loop_bg
+
+	movw %cx, %ds*/
+
     /*
      On charge le kernel ici afin d'être sûr de pouvoir accéder
      aux données fournies par GRUB

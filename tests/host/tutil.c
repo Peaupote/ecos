@@ -50,9 +50,6 @@ void test_infoi(const char *fmt, int i) {
 void kpanic(const char *p) {
 	texit(p);
 }
-void kpanic_ct(const char *p) {
-	texit(p);
-}
 void tassert(uint8_t b, const char *p) {
 	if (!b) kpanic(p);
 }

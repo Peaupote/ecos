@@ -3,11 +3,10 @@
 
 #include <stddef.h>
 #include <stdint.h>
+#include <stdbool.h>
 
 #include <kernel/keyboard.h>
 #include <headers/proc.h>
-
-#define SB_HEIGHT 512
 
 enum tty_mode {
     ttym_def,
@@ -16,10 +15,21 @@ enum tty_mode {
     ttym_panic
 };
 
+typedef struct {
+	size_t x, y;
+} tty_pos_t;
+
+
+extern size_t  tty_width, tty_height;
+extern size_t  tty_sb_height;
+extern bool    tty_do_kprint;
+extern uint8_t tty_def_color;
+
 void   tty_init(enum tty_mode);
 void   tty_set_mode(enum tty_mode);
 void   tty_set_owner(pid_t p);
 void   tty_input(scancode_byte scb, key_event ev);
+size_t tty_built_in_exec(char* cmd);
 
 //L'affichage du prompt doit être mis à jour (tty_update_prompt_pos)
 void   tty_afficher_buffer_range(size_t idx_begin, size_t idx_end);
@@ -35,10 +45,9 @@ size_t tty_buffer_next_idx();
 
 //indice sans shift dans le buffer
 //retourne le shift_array effectué
-size_t tty_new_buffer_line(size_t* index);
+size_t tty_new_buffer_line_idx(size_t* index);
 
 void   tty_force_new_line(void);
-size_t tty_writestring(const char* str);
 size_t tty_writestringl(const char* s, size_t len, uint8_t color);
 void   tty_writer(void* shift, const char* str);
 
@@ -53,7 +62,7 @@ static inline void tty_seq_init(tty_seq_t* s) {
 static inline void tty_seq_commit(tty_seq_t* s) {
     s->shift   += tty_update_prompt_pos();
     size_t nidx = tty_buffer_next_idx();
-    if (s->shift || nidx - s->idx_bg >= SB_HEIGHT)
+    if (s->shift || nidx - s->idx_bg >= tty_sb_height)
         tty_afficher_buffer_all();
     else tty_afficher_buffer_range(s->idx_bg, nidx);
 }

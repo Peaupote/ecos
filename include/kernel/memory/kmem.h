@@ -14,11 +14,13 @@
 #define KERNEL_PDPT_DSLOT 0x180
 #define KERNEL_PDPT_HEAP  0x181
 #define KERNEL_PDPT_SPTR  0x182
+#define KERNEL_PDPT_PBUF  0x183 // Pixels buffer
 #define PML4_PSKD         0xfd
 #define PML4_COPY_RES     0xfe
 #define PML4_END_USPACE   PML4_KERNEL_VIRT_ADDR
 
 #include <kernel/kutil.h>
+#include <util/multiboot.h>
 #include "page_alloc.h"
 
 extern phy_addr kernel_pml4;
@@ -31,7 +33,8 @@ extern struct PageAllocator page_alloc;
 extern struct MemBlockTree  khep_alloc;
 
 void     kmem_init_paging();
-void     kmem_init_alloc(uint32_t boot_info);
+// Détruit mbi
+void     kmem_init_alloc(multiboot_info_t* mbi);
 
 // --Dynamic slots--
 // Permet de mapper des pages physiques dans l'espace virtuel
@@ -85,8 +88,10 @@ void  kfree_page(void* v_addr);
 
 // --Paging--
 
+//accède à l'entrée correspondant à v_addr dans la structure de niveau rlvl
 //flags doit contenir PAGING_FLAG_W
-uint64_t* kmem_acc_pts_entry(uint_ptr v_addr, uint8_t rlvl, uint16_t flags);
+uint64_t* kmem_acc_pts_entry(uint_ptr v_addr, enum pgg_level rlvl,
+		uint16_t flags);
 
 void kmem_print_paging(uint_ptr v_addr);
 

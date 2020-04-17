@@ -5,7 +5,9 @@ CFILES=main.c \
 		idt.c \
 		gdt.c \
 		keyboard.c \
+		display.c \
 		tty.c \
+		tty_builtin.c \
 		tests.c \
 		file.c \
 		proc/proc.c \

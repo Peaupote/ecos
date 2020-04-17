@@ -242,5 +242,5 @@ uint64_t invalid_syscall() {
 // Appels système de privilège ring 1
 
 void prires_proc_struct(uint16_t new_ring) {
-    state.st_proc[state.st_curr_pid].p_ring = rei_cast(uint8_t, new_ring);
+    state.st_proc[state.st_curr_pid].p_ring = new_ring & 0xff;
 }

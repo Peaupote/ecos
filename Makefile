@@ -32,7 +32,7 @@ tests:
 
 start: $(ISO)
 	@echo "QEMU RUN"
-	qemu-system-x86_64 -cdrom $(ISO) -monitor stdio -d int 2>&1 | tee qemu.out
+	qemu-system-x86_64 -cdrom $(ISO) -d int 2>&1 | tee qemu.out
 start-bochs: $(ISO)
 	@echo "BOCHS RUN"
 	bochs -qf bochsrc
