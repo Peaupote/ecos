@@ -51,10 +51,20 @@ int main(int argc, char *argv[]) {
             exit(1);
         }
     start:
+        l = 0;
+        w = 0;
+        c = 0;
+
+        int inw = 0;
         while ((rc = read(fd, buf, SZ)) > 0) {
             c += rc;
             for (int i = 0; i < rc; ++i) {
-                if (buf[i] == '\n') ++l;
+                switch (buf[i]) {
+                case '\n': ++l;
+                    // fall through
+                case ' ': if(inw) ++w, inw = 0; break;
+                default: inw = 1; break;
+                }
             }
         }
 
@@ -64,12 +74,12 @@ int main(int argc, char *argv[]) {
             exit(1);
         }
 
-        if (c > 1) ++l;
+        if (inw)   ++w;
 
         if (flags&L) printf("%d\t", l);
         if (flags&W) printf("%d\t", w);
         if (flags&C) printf("%d\t", c);
-        printf("%s\n", *ptr);
+        if (*ptr) printf("%s\n", *ptr);
 
         close(fd);
     }
