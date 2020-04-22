@@ -89,12 +89,25 @@ uint32_t ext2_add_dirent(uint32_t parent, uint32_t file,
     return file;
 }
 
-uint32_t ext2_mkdir(uint32_t parent __attribute__((unused)),
-                    const char *dirname __attribute__((unused)),
-                    uint16_t type __attribute__((unused)),
-                    struct ext2_mount_info *info __attribute__((unused))) {
-    // TODO
-    return 0;
+uint32_t ext2_mkdir(uint32_t parent, const char *dirname, uint16_t type,
+                    struct ext2_mount_info *info) {
+    uint32_t ino;
+
+    if ((ino = ext2_lookup(parent, dirname, (struct mount_info*)info)) &&
+        (ext2_get_inode(ino, info)->in_type&TYPE_DIR)) return 0;
+
+    if (!(type&TYPE_DIR)) return 0;
+
+    struct ext2_inode *p = ext2_get_inode(parent, info);
+    if (!(p->in_type&TYPE_DIR)) return 0;
+    if (!(ino = ext2_lookup_free_inode(info))) return 0;
+
+    ino = ext2_alloc_inode(type, 0, info);
+    if (!ext2_add_dirent(parent, ino, dirname, info) ||
+        !ext2_add_dirent(ino, ino, ".", info) ||
+        !ext2_add_dirent(ino, parent, "..", info)) return 0;
+
+    return ino;
 }
 
 struct ext2_cdt_dir { //sz <= CADT_SIZE

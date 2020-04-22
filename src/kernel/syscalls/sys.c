@@ -25,12 +25,14 @@ void sys_exit(int status) {
 
 pid_t sys_getpid() {
     klogf(Log_verb, "syscall", "getpid %d", state.st_curr_pid);
+    set_errno(SUCC);
     return state.st_curr_pid;
 }
 
 pid_t sys_getppid() {
     proc_t *p = &state.st_proc[state.st_curr_pid];
     klogf(Log_verb, "syscall", "getppid %d", p->p_ppid);
+    set_errno(SUCC);
     return p->p_ppid;
 }
 
@@ -77,7 +79,7 @@ pid_t sys_wait(int* rt_st) {
     } else {
         klogf(Log_verb, "syscall",
               "process %d has no child. dont wait", state.st_curr_pid);
-        set_errno(p, ECHILD);
+        set_errno(ECHILD);
         return -1;
     }
 }
@@ -115,7 +117,7 @@ pid_t sys_waitpid(pid_t cpid, int* rt_st) {
     } else {
         klogf(Log_info, "syscall", "process %d is not %d's child",
                 cpid, mpid);
-        set_errno(p, ECHILD);
+        set_errno(ECHILD);
         return -1;
     }
 }
@@ -126,14 +128,14 @@ pid_t sys_fork() {
     pid_t fpid = find_new_pid();
     // we didn't find place for a new processus
     if (!~fpid) {
-        set_errno(pp, EAGAIN);
+        set_errno(EAGAIN);
         return -1;
     }
 
-    fp          = state.st_proc + fpid;
+    fp         = state.st_proc + fpid;
     fp->p_ppid  = state.st_curr_pid;
 
-	// Ajout dans la liste des enfants
+    // Ajout dans la liste des enfants
     if (~pp->p_fchd) {
         proc_t *fc = state.st_proc + pp->p_fchd;
         if (fc->p_stat == ZOMB) {

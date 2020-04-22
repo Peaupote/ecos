@@ -4,6 +4,7 @@
 #include <kernel/kutil.h>
 #include <kernel/file.h>
 #include <kernel/proc.h>
+#include <kernel/sys.h>
 
 #include <fs/ext2.h>
 #include <fs/proc.h>
@@ -51,7 +52,7 @@ void vfs_init() {
     fst[EXT2_FS].fs_read           = (fs_rdwr_t*)&ext2_read;
     fst[EXT2_FS].fs_write          = (fs_rdwr_t*)&ext2_write;
     fst[EXT2_FS].fs_touch          = (fs_create_t*)ext2_touch;
-    fst[EXT2_FS].fs_mkdir          = 0; // not implemented yet
+    fst[EXT2_FS].fs_mkdir          = (fs_create_t*)&ext2_mkdir;
     fst[EXT2_FS].fs_getdents       = &ext2_getdents;
     fst[EXT2_FS].fs_opench         = &ext2_opench;
     fst[EXT2_FS].fs_open           = &ext2_open;
@@ -291,11 +292,32 @@ int vfs_close(vfile_t *vf) {
     return 0;
 }
 
-static vfile_t *
-vfs_alloc(struct device *dev, const char *parent, const char *fname,
-          mode_t perm, fs_create_t alloc) {
+ino_t vfs_create(const char *fname, mode_t perm) {
+    struct device *dev = find_device(fname);
+    if (!dev) {
+        klogf(Log_info, "vfs", "no mount point %s", fname);
+        set_errno(ENOENT);
+        return 0;
+    }
+
+    klogf(Log_info, "vfs", "create %s", fname);
+
+    // extract parent name from full name
+    char *filename = strrchr(fname, '/');
+    if (!filename) {
+        set_errno(EINVAL);
+        klogf(Log_error, "vfs", "invalid filename %s", fname);
+        return 0;
+    }
+
+    char parent[256] = { 0 };
+    memcpy(parent, fname, filename++ - fname);
+
+    // lookup for parent in fs
     struct stat st;
     struct fs *fs = fst + dev->dev_fs;
+    fs_create_t *create = perm&TYPE_DIR ? fs->fs_mkdir : fs->fs_touch;
+
     char *path = (char*)(parent + strlen(dev->dev_mnt));
     ino_t rc = vfs_lookup(&dev->dev_info, fs, path, &st);
     if (!rc) {
@@ -308,61 +330,8 @@ vfs_alloc(struct device *dev, const char *parent, const char *fname,
         return 0;
     }
 
-    size_t i;
-    for (i = 0; i < NFILE; i++) {
-        if (!state.st_files[i].vf_cnt) break;
-    }
-
-    if (i == NFILE) {
-        klogf(Log_error, "vfs", "alloc: to much file open");
-        return 0;
-    }
-
-    rc = alloc(rc, fname, perm, &dev->dev_info);
-    if (!rc || fs->fs_stat(rc, &state.st_files[i].vf_stat, &dev->dev_info) < 0) {
-        klogf(Log_error, "vfs", "failed to alloc %s / %s", parent, fname);
-        return 0;
-    }
-
-    state.st_files[i].vf_stat.st_dev = dev->dev_id;
-    state.st_files[i].vf_cnt = 1;
-    return state.st_files + i;
-}
-
-vfile_t *vfs_create(const char *fname, mode_t perm) {
-    struct device *dev = find_device(fname);
-    if (!dev) {
-        klogf(Log_info, "vfs", "no mount point %s", fname);
-        return 0;
-    }
-
-    klogf(Log_error, "vfs", "create %s", fname);
-
-    // extract parent name from full name
-    char *filename = strrchr(fname, '/');
-    if (!filename) {
-        klogf(Log_error, "vfs", "invalid filename %s", fname);
-        return 0;
-    }
-
-    char parent[256] = { 0 };
-    memcpy(parent, fname, filename++ - fname);
-
-    struct fs *fs = fst + dev->dev_fs;
-    return vfs_alloc(dev, parent, filename, perm, fs->fs_touch);
-}
-
-vfile_t *vfs_mkdir(const char *parent, const char *fname, mode_t perm) {
-    struct device *dev = find_device(parent);
-    if (!dev) {
-        klogf(Log_info, "vfs", "no mount point %s", parent);
-        return 0;
-    }
-
-    klogf(Log_info, "vfs", "mkdir %s/%s", parent, fname);
-
-    struct fs *fs = fst + dev->dev_fs;
-    return vfs_alloc(dev, parent, fname, perm, fs->fs_mkdir);
+    // create file
+    return create(rc, filename, perm, &dev->dev_info);
 }
 
 int vfs_getdents(vfile_t *vf, struct dirent* dst, size_t sz,

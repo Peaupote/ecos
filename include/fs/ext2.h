@@ -285,6 +285,8 @@ struct ext2_inode *
 ext2_get_inode(uint32_t inode, struct ext2_mount_info *info);
 
 uint32_t ext2_lookup_free_inode(struct ext2_mount_info *info);
+uint32_t ext2_alloc_inode(uint16_t type, uint16_t uid,
+                          struct ext2_mount_info *info);
 
 uint32_t ext2_inode_free(uint32_t inode, struct ext2_mount_info *info);
 

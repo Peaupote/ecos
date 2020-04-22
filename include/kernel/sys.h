@@ -7,10 +7,17 @@
 
 #include <headers/types.h>
 #include <headers/signal.h>
+#include <libc/errno.h>
 
 #include "proc.h"
 
-#define set_errno(p, e) if (p->p_errno) *p->p_errno = e;
+static inline void set_proc_errno(proc_t *p, int e) {
+    if (p->p_errno) *p->p_errno = e;
+}
+
+static inline void set_errno(int e) {
+    set_proc_errno(state.st_proc + state.st_curr_pid, e);
+}
 
 uint64_t sys_sleep(uint64_t);
 void     lookup_end_sleep(void);
@@ -32,6 +39,7 @@ int      sys_pipe(int fds[2]);
 ssize_t  sys_write(int fd, uint8_t *s, size_t len);
 ssize_t  sys_read(int fd, uint8_t *buf, size_t len);
 off_t    sys_lseek(int fd, off_t offset, int whence);
+int      mkdir(const char *fname, mode_t mode);
 
 int      sys_execve(reg_t fname, reg_t argv, reg_t env);
 

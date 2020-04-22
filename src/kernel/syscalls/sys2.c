@@ -24,7 +24,7 @@ int sys_open(const char *fname, int oflags, int perms) {
 
     if (cid == NCHAN) {
         klogf(Log_error, "sys", "no channel available");
-        set_errno(p, ENFILE);
+        set_errno(ENFILE);
         return -1;
     }
 
@@ -32,16 +32,16 @@ int sys_open(const char *fname, int oflags, int perms) {
     chann_t *c = state.st_chann + cid;
     c->chann_vfile = vfs_load(fname, oflags);
     if (!c->chann_vfile) {
-        if (oflags&O_CREAT) {
-            c->chann_vfile = vfs_create(fname, TYPE_REG|perms);
+        if (oflags&O_CREAT && vfs_create(fname, TYPE_REG|perms)) {
+            c->chann_vfile = vfs_load(fname, oflags);
             is_new_file   = 1;
             if (!c->chann_vfile) {
-                set_errno(p, ENOENT);
+                set_errno(ENOENT);
                 klogf(Log_error, "syscall", "couldn't create file %s", fname);
                 return -1;
             }
         } else {
-            set_errno(p, ENOENT);
+            set_errno(ENOENT);
             klogf(Log_error, "sys", "process %d couldn't open %s",
                   state.st_curr_pid, fname);
             return -1;
@@ -57,7 +57,7 @@ int sys_open(const char *fname, int oflags, int perms) {
             c->chann_waiting = PID_NONE;
             vfs_opench(c->chann_vfile, &c->chann_adt);
             p->p_fds[fd] = cid;
-            set_errno(p, SUCC);
+            set_errno(SUCC);
             klogf(Log_info, "syscall", "process %d open %s on %d (cid %d)",
                   state.st_curr_pid, fname, fd, cid);
             return fd;
@@ -66,7 +66,7 @@ int sys_open(const char *fname, int oflags, int perms) {
 
     // if file was juste created, clean the mess
     if (is_new_file) vfs_rm(fname);
-    set_errno(p, EMFILE);
+    set_errno(EMFILE);
 
     return -1;
 }
@@ -77,7 +77,7 @@ int sys_close(int filedes) {
 
     // invalid file descriptor
     if (filedes < 0 || filedes > NFD || p->p_fds[filedes] == -1) {
-        set_errno(p, EBADF);
+        set_errno(EBADF);
         return -1;
     }
 
@@ -91,7 +91,7 @@ int sys_close(int filedes) {
     }
 
     p->p_fds[filedes] = -1;
-    set_errno(p, SUCC);
+    set_errno(SUCC);
 
     return 0;
 }
@@ -101,21 +101,21 @@ int sys_dup(int fd) {
     int i;
 
     if (fd < 0 || fd > NFD || p->p_fds[fd] == -1) {
-        set_errno(p, EBADF);
+        set_errno(EBADF);
         return -1;
     }
 
     for (i = 0; i < NFD && p->p_fds[i] != -1; i++);
 
     if (i == NFD) {
-        set_errno(p, EMFILE);
+        set_errno(EMFILE);
         return -1;
     }
 
     p->p_fds[i] = p->p_fds[fd];
     ++state.st_chann[p->p_fds[fd]].chann_acc;
     klogf(Log_verb, "syscall", "dup %d on %d", fd, i);
-    set_errno(p, SUCC);
+    set_errno(SUCC);
     return i;
 }
 
@@ -123,7 +123,7 @@ int sys_dup2(int fd1, int fd2) {
     proc_t *p = &state.st_proc[state.st_curr_pid];
 
     if (fd1 < 0 || fd2 < 0 || fd1 > NFD || fd2 > NFD || p->p_fds[fd1] == -1) {
-        set_errno(p, EBADF);
+        set_errno(EBADF);
         return -1;
     }
 
@@ -175,17 +175,17 @@ int sys_pipe(int fd[2]) {
     kAssert(fvf[0] != NULL);
     kAssert(fvf[1] != NULL);
 
-    set_errno(p, SUCC);
+    set_errno(SUCC);
     klogf(Log_info, "syscall", "alloc pipe, read %d(%d), write %d(%d)",
             fdrd, rd, fdwt, wt);
     return 0;
 
 err_emfile:
-    set_errno(p, EMFILE);
+    set_errno(EMFILE);
     return -1;
 
 err_enfile:
-    set_errno(p, ENFILE);
+    set_errno(ENFILE);
     return -1;
 }
 
@@ -243,15 +243,15 @@ ssize_t sys_read(int fd, uint8_t *d, size_t len) {
     }
 
 succ:
-    set_errno(p, SUCC);
+    set_errno(SUCC);
     return rc;
 
 err_overflow:
-    set_errno(p, EOVERFLOW);
+    set_errno(EOVERFLOW);
     return -1;
 
 err_badf:
-    set_errno(p, EBADF);
+    set_errno(EBADF);
     return -1;
 }
 
@@ -294,15 +294,15 @@ ssize_t sys_write(int fd, uint8_t *s, size_t len) {
     }
 
 succ:
-    set_errno(p, SUCC);
+    set_errno(SUCC);
     return rc;
 
 err_overflow:
-    set_errno(p, EOVERFLOW);
+    set_errno(EOVERFLOW);
     return -1;
 
 err_badf:
-    set_errno(p, EBADF);
+    set_errno(EBADF);
     return -1;
 }
 
@@ -313,7 +313,7 @@ off_t sys_lseek(int fd, off_t off, int whence) {
           fd, off, whence);
 
     if (fd < 0 || fd > NFD || p->p_fds[fd] == -1) {
-        set_errno(p, EBADF);
+        set_errno(EBADF);
         return -1;
     }
 
@@ -341,11 +341,11 @@ off_t sys_lseek(int fd, off_t off, int whence) {
         goto err_einval;
 
     c->chann_pos = pos;
-    set_errno(p, SUCC);
+    set_errno(SUCC);
     return off;
 
 err_einval:
-    set_errno(p, EINVAL);
+    set_errno(EINVAL);
     return -1;
 }
 
@@ -358,10 +358,18 @@ int sys_fstat(int fd, struct stat *st) {
     if (c->chann_mode == UNUSED) goto err_badf;
 
     memcpy(st, &c->chann_vfile->vf_stat, sizeof (struct stat));
-    set_errno(p, SUCC);
+    set_errno(SUCC);
     return 0;
 
 err_badf:
-    set_errno(p, EBADF);
+    set_errno(EBADF);
     return -1;
+}
+
+int sys_mkdir(const char *path, mode_t mode) {
+    if (!path) return 0;
+
+    uint32_t ino = vfs_create(path, TYPE_DIR|mode);
+    set_errno(SUCC);
+    return ino ? 0 : -1;
 }

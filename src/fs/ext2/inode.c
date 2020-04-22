@@ -46,14 +46,24 @@ ext2_lookup_free_inode(struct ext2_mount_info *info) {
 uint32_t
 ext2_alloc_inode(uint16_t type, uint16_t uid,
                  struct ext2_mount_info *info) {
-    uint32_t ino = ext2_lookup_free_inode(info);
+    uint32_t ino;
+    if (!(ino = ext2_lookup_free_inode(info))) return 0;
 
     struct ext2_inode *inode = ext2_get_inode(ino, info);
+    inode->in_type = type;
+    inode->in_uid  = uid;
+    inode->in_size = 0;
 
-    inode->in_type  = type;
-    inode->in_uid   = uid;
-    inode->in_ctime = 0; // TODO : change
-    inode->in_size  = 0;
+    inode->in_atime = 0;
+    inode->in_ctime = 0;
+    inode->in_mtime = 0;
+    inode->in_dtime = 0;
+
+    inode->in_gid    = 0;
+    inode->in_hard   = 0;
+    inode->in_blocks = 0;
+    inode->in_flags  = 0;
+    inode->in_os     = EXT2_OS_OTHER;
 
     return ino;
 }
@@ -100,34 +110,18 @@ void ext2_set_inode_block(uint32_t nb, uint32_t block,
 
 uint32_t ext2_touch(uint32_t parent, const char *fname, uint16_t type,
                     struct ext2_mount_info *info) {
+
     uint32_t ino;
 
     if ((ino = ext2_lookup(parent, fname, (struct mount_info*)info)) &&
         !(ext2_get_inode(ino, info)->in_type&TYPE_DIR)) return 0;
 
-
     if (type&TYPE_DIR) return 0;
 
     struct ext2_inode *p = ext2_get_inode(parent, info);
     if (!(p->in_type&TYPE_DIR)) return 0;
-    if (!(ino = ext2_lookup_free_inode(info))) return 0;
 
-    struct ext2_inode *inode = ext2_get_inode(ino, info);
-    inode->in_type = type;
-    inode->in_uid  = 0;
-    inode->in_size = 0;
-
-    inode->in_atime = 0;
-    inode->in_ctime = 0;
-    inode->in_mtime = 0;
-    inode->in_dtime = 0;
-
-    inode->in_gid    = 0;
-    inode->in_hard   = 0;
-    inode->in_blocks = 0;
-    inode->in_flags  = 0;
-    inode->in_os     = EXT2_OS_OTHER;
-
+    ino = ext2_alloc_inode(type, 0, info);
     if (!ext2_add_dirent(parent, ino, fname, info)) return 0;
 
     return ino;

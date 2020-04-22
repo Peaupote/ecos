@@ -2,8 +2,11 @@
 #define _H_LIBC_ERRNO
 
 #define NERRNO 135
+
+#ifndef __is_kernel
 const char * const err_list[NERRNO];
 int errno;
+#endif
 
 enum error_kind {
     SUCC,               // Success

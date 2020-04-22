@@ -121,15 +121,12 @@ void     vfs_opench(vfile_t *vf, chann_adt_t* cdt);
 
 void vfs_unblock(vfile_t* vfile);
 
-int      vfs_close(vfile_t *vfile);
-int      vfs_read(vfile_t *vfile, void *buf, off_t pos, size_t len);
-int      vfs_write(vfile_t *vfile, void *buf, off_t pos, size_t len);
-
-vfile_t *vfs_create(const char *fname, mode_t perm);
-vfile_t *vfs_mkdir(const char *parent, const char *fname, mode_t perm);
-
-int      vfs_getdents(vfile_t *vf, struct dirent* dst, size_t sz,
-                        chann_adt_t* cdt);
+int   vfs_close(vfile_t *vfile);
+int   vfs_read(vfile_t *vfile, void *buf, off_t pos, size_t len);
+int   vfs_write(vfile_t *vfile, void *buf, off_t pos, size_t len);
+ino_t vfs_create(const char *fname, mode_t perm);
+int   vfs_getdents(vfile_t *vf, struct dirent* dst, size_t sz,
+                   chann_adt_t* cdt);
 
 int   vfs_rm(const char *fname);
 ino_t vfs_rmdir(const char *fname, uint32_t rec);
