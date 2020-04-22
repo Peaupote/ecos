@@ -297,7 +297,6 @@ vfs_alloc(struct device *dev, const char *parent, const char *fname,
     struct stat st;
     struct fs *fs = fst + dev->dev_fs;
     char *path = (char*)(parent + strlen(dev->dev_mnt));
-    kprintf("path %s\n", path);
     ino_t rc = vfs_lookup(&dev->dev_info, fs, path, &st);
     if (!rc) {
         klogf(Log_error, "vfs", "alloc: no file %s", path);

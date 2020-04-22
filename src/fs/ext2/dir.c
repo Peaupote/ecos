@@ -98,8 +98,8 @@ uint32_t ext2_mkdir(uint32_t parent __attribute__((unused)),
 }
 
 struct ext2_cdt_dir { //sz <= CADT_SIZE
-    char* it;
-    char* ed;
+    uint32_t size;
+    uint32_t pos;
 };
 
 void ext2_opench(ino_t ino, chann_adt_t* p_cdt,
@@ -109,37 +109,32 @@ void ext2_opench(ino_t ino, chann_adt_t* p_cdt,
 
     if (inode->in_type & EXT2_TYPE_DIR) {
         struct ext2_cdt_dir* cdt = (struct ext2_cdt_dir*) p_cdt;
-        cdt->it = (char*) ext2_get_inode_block(0, inode, info);
-        cdt->ed = cdt->it + inode->in_size;
+        cdt->pos  = 0;
+        cdt->size = inode->in_size;
     }
 }
 
-int ext2_getdents(ino_t ino __attribute__((unused)),
-            struct dirent* dst, size_t sz, chann_adt_t* p_cdt,
-            struct mount_info* none __attribute__((unused))) {
-    struct ext2_cdt_dir *cdt = (struct ext2_cdt_dir*)p_cdt;
+int ext2_getdents(ino_t ino, struct dirent* dst, size_t sz,
+                  chann_adt_t* p_cdt, struct mount_info* none) {
+    struct ext2_cdt_dir *cdt     = (struct ext2_cdt_dir*)p_cdt;
+    struct ext2_mount_info *info = (struct ext2_mount_info*)none;
 
     int rc = 0;
-    while (cdt->it < cdt->ed && sz >= offsetof(struct dirent, d_name)) {
-        const struct dirent* src = (const struct dirent*)cdt->it;
+    while (cdt->pos < cdt->size && sz >= offsetof(struct dirent, d_name)) {
+        struct dirent src;
+        ext2_read(ino, &src, cdt->pos, DIRENT_OFF, info);
 
-        size_t mlen = offsetof(struct dirent, d_name)
-                        + src->d_name_len + 1;
-        size_t rlen = align_to_size(mlen, 4);
-
-        if (sz < rlen) {
+        if (sz < src.d_rec_len) {
             if (rc) return rc;
-            memcpy(dst, src, offsetof(struct dirent, d_name));
+            memcpy(dst, &src, offsetof(struct dirent, d_name));
             return offsetof(struct dirent, d_name);
         }
 
-        memcpy(dst, src, mlen);
-        dst->d_rec_len = rlen;
-        dst->d_name[src->d_name_len] = '\0';
-        cdt->it += src->d_rec_len;
-        rc      += rlen;
-        sz      -= rlen;
-        dst = (struct dirent*)(rlen + (char*)dst);
+        ext2_read(ino, dst, cdt->pos, src.d_rec_len, info);
+        cdt->pos += src.d_rec_len;
+        rc      += src.d_rec_len;
+        sz      -= src.d_rec_len;
+        dst = (struct dirent*)(src.d_rec_len + (char*)dst);
     }
     return rc;
 }
