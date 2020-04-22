@@ -119,7 +119,7 @@ void parse_cmd() {
 
 void mk_redirection(char *file, int flag, int redir) {
     if (!file) return;
-    int fd = open(file, flag);
+    int fd = open(file, flag|O_CREAT, 0640); // TODO : umask
     if (fd < 0) {
         char buf[256];
         sprintf(buf, "sh: %s", file);
@@ -140,10 +140,10 @@ void binutil_exit(int argc, const char *argv[]) {
 }
 
 void exec_cmd() {
-	printf("\033d");
+    printf("\033d");
 
-	int fd_in = STDIN_FILENO;
-	int cpid  = PID_NONE;
+    int fd_in = STDIN_FILENO;
+    int cpid  = PID_NONE;
     for (int i = 0; i < ncmd; i++) {
         struct cmd *c = cmds + i;
 
@@ -152,31 +152,31 @@ void exec_cmd() {
 
         if (!strcmp(c->args[0], "exit")) binutil_exit(argc, c->args);
 
-		int next_fd_in = STDIN_FILENO;
-		int my_fd_out  = STDOUT_FILENO;
-		if (c->pipe) {
-			int fds[2] = { 42, 42 };
-			int rp = pipe(fds);
-			if (rp < 0) {
-				perror("sh");
-				exit(1);
-			}
-			
-			next_fd_in = fds[0];
-			my_fd_out  = fds[1];
-		}
+        int next_fd_in = STDIN_FILENO;
+        int my_fd_out  = STDOUT_FILENO;
+        if (c->pipe) {
+            int fds[2] = { 42, 42 };
+            int rp = pipe(fds);
+            if (rp < 0) {
+                perror("sh");
+                exit(1);
+            }
+
+            next_fd_in = fds[0];
+            my_fd_out  = fds[1];
+        }
 
         int rf = fork();
         if (rf < 0) {
             printf("error: fork\n");
         } else if (rf == 0) {
 
-			if (fd_in != STDIN_FILENO)
-				dup2(fd_in, STDIN_FILENO);
-			if (my_fd_out != STDOUT_FILENO)
-				dup2(my_fd_out, STDOUT_FILENO);
-			if (next_fd_in)
-				close(next_fd_in);
+            if (fd_in != STDIN_FILENO)
+                dup2(fd_in, STDIN_FILENO);
+            if (my_fd_out != STDOUT_FILENO)
+                dup2(my_fd_out, STDOUT_FILENO);
+            if (next_fd_in)
+                close(next_fd_in);
 
             // redirections
             mk_redirection(c->infile,  O_RDONLY, 0);
@@ -188,30 +188,30 @@ void exec_cmd() {
 
         } else cpid = rf;
 
-		if (fd_in != STDIN_FILENO)
-			close(fd_in);
-		if (my_fd_out != STDOUT_FILENO)
-			close(my_fd_out);
-		fd_in = next_fd_in;
-		
+        if (fd_in != STDIN_FILENO)
+            close(fd_in);
+        if (my_fd_out != STDOUT_FILENO)
+            close(my_fd_out);
+        fd_in = next_fd_in;
+
     }
 
-	if (fd_in != STDIN_FILENO)
-		close(fd_in);
+    if (fd_in != STDIN_FILENO)
+        close(fd_in);
 
-	fg_proc_pid = cpid;
-	sighandler_t prev_hnd;
-	if (~cpid)
-		prev_hnd = signal(SIGINT, &int_handler);
-	int rs;
+    fg_proc_pid = cpid;
+    sighandler_t prev_hnd;
+    if (~cpid)
+        prev_hnd = signal(SIGINT, &int_handler);
+    int rs;
     for (int i = 0; i < ncmd; i++) //TODO: utiliser errno
-		while (!~wait(&rs));
-	if (~cpid) {
-		signal(SIGINT, prev_hnd);
-		fg_proc_pid = PID_NONE;
-	}
+        while (!~wait(&rs));
+    if (~cpid) {
+        signal(SIGINT, prev_hnd);
+        fg_proc_pid = PID_NONE;
+    }
 
-	/* printf("process %d exited with status %x\n", rc, rs); */
+    /* printf("process %d exited with status %x\n", rc, rs); */
 }
 
 
@@ -220,12 +220,12 @@ int main() {
     int rc;
 
     while(1) {
-		printf("\033psh> \033;");
+        printf("\033psh> \033;");
         memset(line, 0, 258);
         rc = read(0, line, 256);
-		line[rc] = '\0';//TODO: attendre \n + ne pas aller plus loin
-		
-		if (rc == 0) return 0;
+        line[rc] = '\0';//TODO: attendre \n + ne pas aller plus loin
+
+        if (rc == 0) return 0;
         if (rc == 1) continue;
         if (rc < 0) {
             printf("an error occurred\n");

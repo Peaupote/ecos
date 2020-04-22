@@ -267,7 +267,7 @@ uint32_t ext2_lookup(ino_t ino, const char *fname, struct mount_info*);
 int32_t  ext2_stat(ino_t ino, struct stat *st, struct ext2_mount_info *info);
 int32_t  ext2_read(ino_t ino, void *buf, off_t offset, size_t len,
                    struct ext2_mount_info *info);
-int32_t  ext2_write(ino_t ino, void *buf, off_t offset, size_t len,
+int32_t  ext2_write(ino_t ino, const void *buf, off_t offset, size_t len,
                     struct ext2_mount_info *info);
 
 void     ext2_opench(ino_t, chann_adt_t*, struct mount_info*);
@@ -307,6 +307,10 @@ block_t ext2_get_inode_block(uint32_t block,
                              struct ext2_inode *inode,
                              struct ext2_mount_info *info);
 
+void ext2_set_inode_block(uint32_t nb, uint32_t block,
+                          struct ext2_inode *inode,
+                          struct ext2_mount_info *info);
+
 // dir
 
 struct dirent *
@@ -319,13 +323,13 @@ uint32_t ext2_lookup_dir(struct ext2_inode *inode, const char *fname,
 
 struct dirent *ext2_readdir(struct dirent *dir);
 
-uint32_t ext2_add_dirent(struct ext2_inode *parent, uint32_t file,
+uint32_t ext2_add_dirent(uint32_t parent, uint32_t file,
                          const char *fname, struct ext2_mount_info*);
 
 uint32_t ext2_mkdir(uint32_t parent, const char *dirname, uint16_t type,
                     struct ext2_mount_info *info);
 
-int      ext2_getdents(ino_t, struct dirent* dst, size_t sz, 
-						chann_adt_t*, struct mount_info*);
+int      ext2_getdents(ino_t, struct dirent* dst, size_t sz,
+                        chann_adt_t*, struct mount_info*);
 
 #endif

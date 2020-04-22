@@ -64,7 +64,7 @@ void ext2_block_free(uint32_t block, struct ext2_mount_info *info) {
 
 uint32_t ext2_lookup(ino_t ino, const char *fname,
                      struct mount_info *p_info) {
-	struct ext2_mount_info* info = (struct ext2_mount_info*) p_info;
+    struct ext2_mount_info* info = (struct ext2_mount_info*) p_info;
     struct ext2_inode *inode = ext2_get_inode(ino, info);
     if (!(inode->in_type&EXT2_TYPE_DIR)) return 0;
 
@@ -83,7 +83,7 @@ int ext2_stat(ino_t ino, struct stat *st, struct ext2_mount_info *info) {
     st->st_blocks  = inode->in_blocks;
     st->st_ctime   = inode->in_ctime;
     st->st_mtime   = inode->in_mtime;
-    return 1;
+    return st->st_ino;
 }
 
 int ext2_read(ino_t ino, void *buf, off_t pos, size_t len,
@@ -92,7 +92,6 @@ int ext2_read(ino_t ino, void *buf, off_t pos, size_t len,
     uint32_t block_nb = pos / info->block_size;
     char *block = ext2_get_inode_block(block_nb, inode, info);
     char *dst = (char*)buf;
-
 
     size_t i;
     for (i = 0; i < len && pos < inode->in_size; i++) {
@@ -105,16 +104,50 @@ int ext2_read(ino_t ino, void *buf, off_t pos, size_t len,
     return i;
 }
 
-int ext2_write(ino_t ino __attribute__((unused)),
-               void *buf __attribute__((unused)),
-               off_t pos __attribute__((unused)),
-               size_t len __attribute__((unused)),
-               struct ext2_mount_info *info __attribute__((unused))) {
-    return 0;
+int ext2_write(ino_t ino, const void *buf, off_t pos, size_t len,
+               struct ext2_mount_info *info) {
+    struct ext2_inode *inode = ext2_get_inode(ino, info);
+
+    if (pos > inode->in_size || len == 0) return 0;
+
+    uint32_t block_nb = pos / info->block_size;
+    uint32_t blk_size = inode->in_size / info->block_size; // round up div
+    if (inode->in_size > 0 && inode->in_size % info->block_size != 0) ++blk_size;
+
+    // alloc first block if dont exists
+    if (block_nb >= blk_size) {
+        uint32_t b = ext2_block_alloc(info);
+        ext2_set_inode_block(block_nb, b, inode, info);
+        ++blk_size;
+    }
+
+    char *block = ext2_get_inode_block(block_nb, inode, info);
+    const char *src = (const char*)buf;
+
+    size_t i;
+    for (i = 0; i < len; i++) {
+        block[pos++ % info->block_size] = *src++;
+        if (pos % info->block_size == 0) {
+            if (++block_nb > blk_size) { // alloc a new block at end of file
+                uint32_t b = ext2_block_alloc(info); // TODO : fail
+                ext2_set_inode_block(block_nb, b, inode, info);
+                ++blk_size;
+            }
+
+            block = ext2_get_inode_block(block_nb, inode, info);
+        }
+    }
+
+    if (pos > inode->in_size) {
+        inode->in_size   = pos;
+        inode->in_blocks = pos >> 9;
+    }
+
+    return i;
 }
 
 void ext2_close(ino_t ino       __attribute__((unused)),
-		struct mount_info* info __attribute__((unused))) {}
+        struct mount_info* info __attribute__((unused))) {}
 void ext2_open(ino_t ino        __attribute__((unused)),
-		vfile_t* vf             __attribute__((unused)),
-		struct mount_info* info __attribute__((unused))) {}
+        vfile_t* vf             __attribute__((unused)),
+        struct mount_info* info __attribute__((unused))) {}

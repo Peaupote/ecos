@@ -24,7 +24,7 @@ typedef struct vfile {
 #define CADT_SIZE 16
 
 typedef struct {
-	char d[CADT_SIZE] __attribute__((aligned(8))); 
+    char d[CADT_SIZE] __attribute__((aligned(8)));
 } chann_adt_t;
 
 /**
@@ -73,7 +73,7 @@ typedef int (fs_rdwr_t)(ino_t, void*, off_t, size_t, struct mount_info*);
  * p3: nombre maximal d'octet à lire
  */
 typedef int (fs_getdents_t)(ino_t, struct dirent*, size_t,
-							chann_adt_t*,  struct mount_info*);
+                            chann_adt_t*,  struct mount_info*);
 
 /**
  * Indique la création d'un nouveau canal vers le fichier
@@ -100,10 +100,10 @@ struct fs {
     fs_rdwr_t           *fs_write;
     fs_create_t         *fs_touch;
     fs_create_t         *fs_mkdir;
-	fs_getdents_t       *fs_getdents;
-	fs_opench_t         *fs_opench;
-	fs_open_t           *fs_open;
-	fs_close_t          *fs_close;
+    fs_getdents_t       *fs_getdents;
+    fs_opench_t         *fs_opench;
+    fs_open_t           *fs_open;
+    fs_close_t          *fs_close;
     fs_rm_t             *fs_rm;
     fs_destroy_dirent_t *fs_destroy_dirent;
     fs_readsymlink_t    *fs_readsymlink;
@@ -125,12 +125,13 @@ int      vfs_close(vfile_t *vfile);
 int      vfs_read(vfile_t *vfile, void *buf, off_t pos, size_t len);
 int      vfs_write(vfile_t *vfile, void *buf, off_t pos, size_t len);
 
-vfile_t *vfs_touch(const char *parent, const char *fname, mode_t perm);
+vfile_t *vfs_create(const char *fname, mode_t perm);
 vfile_t *vfs_mkdir(const char *parent, const char *fname, mode_t perm);
 
-int      vfs_getdents(vfile_t *vf, struct dirent* dst, size_t sz, 
-						chann_adt_t* cdt);
+int      vfs_getdents(vfile_t *vf, struct dirent* dst, size_t sz,
+                        chann_adt_t* cdt);
 
+int   vfs_rm(const char *fname);
 ino_t vfs_rmdir(const char *fname, uint32_t rec);
 
 #endif

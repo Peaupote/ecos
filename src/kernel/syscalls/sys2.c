@@ -15,7 +15,7 @@ void sys_errno(int *errno) {
     state.st_proc[state.st_curr_pid].p_errno = errno;
 }
 
-int sys_open(const char *fname, int oflags) {
+int sys_open(const char *fname, int oflags, int perms) {
     proc_t *p = &state.st_proc[state.st_curr_pid];
 
     cid_t cid;
@@ -28,13 +28,24 @@ int sys_open(const char *fname, int oflags) {
         return -1;
     }
 
+    int is_new_file = 0;
     chann_t *c = state.st_chann + cid;
     c->chann_vfile = vfs_load(fname, oflags);
     if (!c->chann_vfile) {
-        set_errno(p, ENOENT);
-        klogf(Log_error, "sys", "process %d couldn't open %s",
-                state.st_curr_pid, fname);
-        return -1;
+        if (oflags&O_CREAT) {
+            c->chann_vfile = vfs_create(fname, TYPE_REG|perms);
+            is_new_file   = 1;
+            if (!c->chann_vfile) {
+                set_errno(p, ENOENT);
+                klogf(Log_error, "syscall", "couldn't create file %s", fname);
+                return -1;
+            }
+        } else {
+            set_errno(p, ENOENT);
+            klogf(Log_error, "sys", "process %d couldn't open %s",
+                  state.st_curr_pid, fname);
+            return -1;
+        }
     }
 
     for (int fd = 0; fd < NFD; fd++) {
@@ -42,9 +53,9 @@ int sys_open(const char *fname, int oflags) {
             c->chann_acc  = 1;
             c->chann_mode = oflags&3;
             c->chann_pos  = 0;
-			c->chann_nxw  = cid;
-			c->chann_waiting = PID_NONE;
-			vfs_opench(c->chann_vfile, &c->chann_adt);
+            c->chann_nxw  = cid;
+            c->chann_waiting = PID_NONE;
+            vfs_opench(c->chann_vfile, &c->chann_adt);
             p->p_fds[fd] = cid;
             set_errno(p, SUCC);
             klogf(Log_info, "syscall", "process %d open %s on %d (cid %d)",
@@ -53,6 +64,8 @@ int sys_open(const char *fname, int oflags) {
         }
     }
 
+    // if file was juste created, clean the mess
+    if (is_new_file) vfs_rm(fname);
     set_errno(p, EMFILE);
 
     return -1;
@@ -137,8 +150,8 @@ int sys_pipe(int fd[2]) {
     for (rd = 0; rd < NCHAN && state.st_chann[rd].chann_mode != UNUSED; rd++);
     if (rd == NCHAN) goto err_enfile;
 
-    for (wt = rd + 1; 
-			wt < NCHAN && state.st_chann[wt].chann_mode != UNUSED; wt++);
+    for (wt = rd + 1;
+            wt < NCHAN && state.st_chann[wt].chann_mode != UNUSED; wt++);
     if (wt == NCHAN) goto err_enfile;
 
     chann_t *crd = &state.st_chann[rd],
@@ -154,17 +167,17 @@ int sys_pipe(int fd[2]) {
     cwt->chann_acc  = 1;
     cwt->chann_mode = WRITE;
 
-	vfile_t* fvf[2];
+    vfile_t* fvf[2];
     if (!~vfs_pipe(fvf))
-		return -1; //TODO errno
+        return -1; //TODO errno
     crd->chann_vfile = fvf[0];
     cwt->chann_vfile = fvf[1];
-	kAssert(fvf[0] != NULL);
-	kAssert(fvf[1] != NULL);
+    kAssert(fvf[0] != NULL);
+    kAssert(fvf[1] != NULL);
 
     set_errno(p, SUCC);
     klogf(Log_info, "syscall", "alloc pipe, read %d(%d), write %d(%d)",
-			fdrd, rd, fdwt, wt);
+            fdrd, rd, fdwt, wt);
     return 0;
 
 err_emfile:
@@ -195,10 +208,10 @@ ssize_t sys_read(int fd, uint8_t *d, size_t len) {
 
     switch (vfile->vf_stat.st_mode&0xf000) {
     case TYPE_DIR:
-		rc = vfs_getdents(vfile, (struct dirent*)d, len,
-				&chann->chann_adt);
-		if (rc < 0) goto err_overflow; //TODO
-		goto succ;
+        rc = vfs_getdents(vfile, (struct dirent*)d, len,
+                &chann->chann_adt);
+        if (rc < 0) goto err_overflow; //TODO
+        goto succ;
     case TYPE_REG:
         if (chann->chann_pos == vfile->vf_stat.st_size)
             goto succ;
@@ -218,10 +231,10 @@ ssize_t sys_read(int fd, uint8_t *d, size_t len) {
             wait_file(state.st_curr_pid, cid);
 
         rc = vfs_read(vfile, d, 0, len);
-		if (rc == -2)
+        if (rc == -2)
             wait_file(state.st_curr_pid, cid);
-		else if (rc < 0)
-			goto err_overflow; //TODO
+        else if (rc < 0)
+            goto err_overflow; //TODO
 
         goto succ;
 
@@ -253,7 +266,7 @@ ssize_t sys_write(int fd, uint8_t *s, size_t len) {
     vfile_t *vfile = chann->chann_vfile;
     klogf(Log_verb, "syscall", "process %d write on %d(%d -> %d@%d)",
             state.st_curr_pid, fd, p->p_fds[fd],
-			vfile->vf_stat.st_ino, vfile->vf_stat.st_dev);
+            vfile->vf_stat.st_ino, vfile->vf_stat.st_dev);
 
     int rc = 0;
 
@@ -270,10 +283,10 @@ ssize_t sys_write(int fd, uint8_t *s, size_t len) {
     case TYPE_FIFO:
     case TYPE_CHAR:
         rc = vfs_write(vfile, s, 0, len);
-		if (rc == -2)
+        if (rc == -2)
             wait_file(state.st_curr_pid, cid);
-		else if (rc < 0)
-			goto err_overflow; //TODO
+        else if (rc < 0)
+            goto err_overflow; //TODO
         goto succ;
 
     default:

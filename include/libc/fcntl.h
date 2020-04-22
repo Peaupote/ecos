@@ -4,6 +4,6 @@
 #include <headers/proc.h>
 #include <headers/file.h>
 
-int      open(const char* fname, enum chann_mode mode);
+int open(const char* fname, int oflags, ...);
 
 #endif

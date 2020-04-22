@@ -25,7 +25,7 @@ void     sys_exit(int status);
 pid_t    sys_getpid(void);
 pid_t    sys_getppid(void);
 
-int      sys_open(const char* fname, int oflags);
+int      sys_open(const char* fname, int oflags, int perms);
 int      sys_close(int fd);
 int      sys_dup(int fd);
 int      sys_pipe(int fds[2]);
