@@ -297,6 +297,8 @@ uint32_t ext2_alloc_inode_block(struct ext2_inode *inode,
 uint32_t ext2_touch(uint32_t parent, const char *fname, uint16_t type,
                     struct ext2_mount_info *info);
 
+uint32_t ext2_truncate(uint32_t ino, struct ext2_mount_info *info);
+
 uint32_t *ext2_get_inode_block_ptr(uint32_t block,
                                    struct ext2_inode *inode,
                                    struct ext2_mount_info *info);

@@ -35,6 +35,7 @@ void vfs_init() {
     fst[PROC_FS].fs_write          = &fs_proc_write;
     fst[PROC_FS].fs_touch          = &fs_proc_touch;
     fst[PROC_FS].fs_mkdir          = &fs_proc_mkdir;
+    fst[PROC_FS].fs_truncate       = &fs_proc_truncate;
     fst[PROC_FS].fs_getdents       = &fs_proc_getdents;
     fst[PROC_FS].fs_opench         = &fs_proc_opench;
     fst[PROC_FS].fs_open           = &fs_proc_open;
@@ -42,7 +43,6 @@ void vfs_init() {
     fst[PROC_FS].fs_rm             = &fs_proc_rm;
     fst[PROC_FS].fs_destroy_dirent = &fs_proc_destroy_dirent;
     fst[PROC_FS].fs_readsymlink    = &fs_proc_readsymlink;
-
 
     klogf(Log_info, "vfs", "setup ext2 file system");
     memcpy(fst[EXT2_FS].fs_name, "ext2", 5);
@@ -53,6 +53,7 @@ void vfs_init() {
     fst[EXT2_FS].fs_write          = (fs_rdwr_t*)&ext2_write;
     fst[EXT2_FS].fs_touch          = (fs_create_t*)ext2_touch;
     fst[EXT2_FS].fs_mkdir          = (fs_create_t*)&ext2_mkdir;
+    fst[EXT2_FS].fs_truncate       = (fs_truncate_t*)&ext2_truncate;
     fst[EXT2_FS].fs_getdents       = &ext2_getdents;
     fst[EXT2_FS].fs_opench         = &ext2_opench;
     fst[EXT2_FS].fs_open           = &ext2_open;
@@ -167,7 +168,8 @@ vfile_t *vfs_load(const char *filename, int flags) {
     ino_t rc = vfs_lookup(&dev->dev_info, fs, fname, &st);
 
     if (!rc) {
-        klogf(Log_error, "vfs", "file %s dont exists", filename);
+        set_errno(ENOENT);
+        klogf(Log_info, "vfs", "file %s dont exists", filename);
         return 0;
     }
 
@@ -332,6 +334,14 @@ ino_t vfs_create(const char *fname, mode_t perm) {
 
     // create file
     return create(rc, filename, perm, &dev->dev_info);
+}
+
+ino_t vfs_truncate(vfile_t *vf) {
+    struct device *dev = devices + vf->vf_stat.st_dev;
+    struct fs *fs = fst + dev->dev_fs;
+    ino_t ino = fs->fs_truncate(vf->vf_stat.st_ino, &dev->dev_info);
+    if (ino) fs->fs_stat(ino, &vf->vf_stat, &dev->dev_info);
+    return ino;
 }
 
 int vfs_getdents(vfile_t *vf, struct dirent* dst, size_t sz,

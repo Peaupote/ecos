@@ -137,3 +137,24 @@ uint32_t ext2_inode_free(uint32_t ino, struct ext2_mount_info *info) {
 
     return 0;
 }
+
+uint32_t ext2_truncate(uint32_t ino, struct ext2_mount_info *info) {
+    struct ext2_inode *inode = ext2_get_inode(ino, info);
+    if (!inode->in_size) return ino;
+
+    uint32_t nbblk = inode->in_size / info->block_size;
+    if (inode->in_size % info->block_size) ++nbblk;
+
+    for (uint32_t b = 0; b < nbblk; ++b) {
+        uint32_t block = ext2_get_inode_block_nb(b, inode, info);
+
+        uint32_t group = block / info->sp->s_blocks_per_group;
+        struct ext2_group_desc *bg = info->bg + group;
+        uint8_t *bitmap = ext2_get_block(bg->g_block_bitmap, info);
+        bitmap[block >> 3] &= ~(1 << (block&7));
+    }
+
+    inode->in_size = 0;
+    inode->in_blocks = 0;
+    return ino;
+}

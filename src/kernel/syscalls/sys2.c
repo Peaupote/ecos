@@ -46,6 +46,8 @@ int sys_open(const char *fname, int oflags, int perms) {
                   state.st_curr_pid, fname);
             return -1;
         }
+    } else if (oflags & O_TRUNC) {
+        vfs_truncate(c->chann_vfile);
     }
 
     for (int fd = 0; fd < NFD; fd++) {

@@ -57,6 +57,13 @@ typedef uint32_t (fs_create_t)(ino_t parent, const char *fname, uint16_t type,
                                struct mount_info *info);
 
 /**
+ * Remove content of the file, update the inode consequently
+ * but leave user and permissions unchanged
+ * return inode number
+ */
+typedef uint32_t (fs_truncate_t)(ino_t ino, struct mount_info *info);
+
+/**
  * Read/Write in file specified by given ino
  * return the number of char read, -1 if error, -2 if wait
  */
@@ -100,6 +107,7 @@ struct fs {
     fs_rdwr_t           *fs_write;
     fs_create_t         *fs_touch;
     fs_create_t         *fs_mkdir;
+    fs_truncate_t       *fs_truncate;
     fs_getdents_t       *fs_getdents;
     fs_opench_t         *fs_opench;
     fs_open_t           *fs_open;
@@ -125,6 +133,7 @@ int   vfs_close(vfile_t *vfile);
 int   vfs_read(vfile_t *vfile, void *buf, off_t pos, size_t len);
 int   vfs_write(vfile_t *vfile, void *buf, off_t pos, size_t len);
 ino_t vfs_create(const char *fname, mode_t perm);
+ino_t vfs_truncate(vfile_t *vfile);
 int   vfs_getdents(vfile_t *vf, struct dirent* dst, size_t sz,
                    chann_adt_t* cdt);
 
