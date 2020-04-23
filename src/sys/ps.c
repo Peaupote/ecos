@@ -43,7 +43,7 @@ int main () {
         int p; char cmd[256]; char st;
         sscanf(buf, "%d %s %c", &p, cmd, &st);
 
-        printf("%d\t%c\t%s\n", pid, st, cmd);
+        printf("%d\t%c\t\t%s\n", pid, st, cmd);
 
         close(fd);
 

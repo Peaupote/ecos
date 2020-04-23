@@ -2,20 +2,26 @@
 #include <headers/sys.h>
 
 #include <kernel/proc.h>
+#include <kernel/sys.h>
+
+#include <libc/errno.h>
 
 #include <util/misc.h>
+
+static inline bool contain_id(sigset_t set, int sigid) {
+	return (set >> sigid) & 1;
+}
 
 void sys_sigsethnd(sighandler_t h) {
 	cur_proc()->p_shnd.usr = h;
 }
 
 uint8_t sys_signal(int sigid, uint8_t hnd) {
-	if (sigid < 0 || sigid >= SIG_COUNT
-		|| ((((sigset_t)1) << sigid) & SIG_NOTCTB) )
+	if (sigid < 0 || sigid >= SIG_COUNT || contain_id(SIG_NOTCTB, sigid))
 			return ~(uint8_t)0;
-	proc_t* p  = cur_proc();
-	uint8_t rt = ((p->p_shnd.ign >> sigid) & 0x1)
-			   | (((p->p_shnd.dfl >> sigid) & 0x1) << 1);
+	proc_t* p = cur_proc();
+	int    rt = (contain_id(p->p_shnd.ign, sigid) ? 1 : 0)
+			  | (contain_id(p->p_shnd.dfl, sigid) ? 2 : 0);
 	p->p_shnd.ign = (p->p_shnd.ign & ~(((sigset_t)1) << sigid))
 				  | (((sigset_t)(hnd & 0x1)) << sigid);
 	p->p_shnd.dfl = (p->p_shnd.dfl & ~(((sigset_t)1) << sigid))
@@ -40,6 +46,15 @@ void sys_sigreturn() {
 	iret_to_proc(p);
 }
 
+static inline void abort_syscalls(proc_t* p) {
+	if (p->p_stat == BLOCR) {
+		// Si un appel système est en cours il est interrompu et renvoi -1
+		p->p_stat         = RUN;
+		p->p_reg.r.rax.rd = ~(reg_data_t)0;
+		set_errno(p, EINTR);
+	}
+}
+
 void proc_hndl_sig_i(int sigid) {
 	klogf(Log_info, "hndl", "i%d -> %d", sigid, state.st_curr_pid);
 	proc_t* p  = cur_proc();
@@ -47,18 +62,21 @@ void proc_hndl_sig_i(int sigid) {
 
 	if ((p->p_shnd.ign >> sigid) & 1)
 		return;
-	if ((p->p_shnd.dfl >> sigid) & 1) {
+
+	if (contain_id(p->p_shnd.dfl, sigid)) {
 		if ((SIG_DFLKIL >> sigid) & 1)
 			kill_proc_nr((sigid+1) * 0x100);
+		if (contain_id(SIG_DFLSTP, sigid)) {
+			abort_syscalls(p);
+			p->p_stat = STOP;
+			schedule_proc();
+		}
 		return; //ignore
 	}
 
 	// User handler
-	if (p->p_stat == BLOCR) {
-		// Si un appel système est en cours il est interrompu et renvoi -1
-		p->p_stat         = RUN;
-		p->p_reg.r.rax.rd = ~(reg_data_t)0;
-	}
+
+	abort_syscalls(p);
 
 	uint_ptr sv_loc = (uint_ptr)p->p_reg.rsp.p;
 	sv_loc &= ~(uint_ptr)0xf; //align 16
@@ -81,6 +99,7 @@ int8_t send_sig_to_proc(pid_t pid, int sigid) {
 	klogf(Log_info, "send", "send i%d to %d", sigid, (int)pid);
 	proc_t* p  = state.st_proc + pid;
 	if (sigid + 1 == SIGKILL) {
+
 		if (state.st_curr_pid != pid) {
 			switch (p->p_stat) {
 				case BLOCK:
@@ -100,6 +119,18 @@ int8_t send_sig_to_proc(pid_t pid, int sigid) {
 		}
 		kill_proc(SIGKILL * 0x100);
 		return 1;
+
+	} else if (!contain_id(p->p_shnd.ign, sigid)
+			&&  contain_id(p->p_shnd.dfl, sigid)) {
+
+		if (contain_id(SIG_DFLCNT, sigid)) {
+			if (p->p_stat == STOP) {
+				p->p_stat = RUN;
+				sched_add_proc(pid);
+			}
+			return 0;
+		}
+
 	}
 	p->p_spnd |= ((sigset_t)1) << sigid;
 	if (p->p_stat == BLOCK)

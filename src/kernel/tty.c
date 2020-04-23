@@ -49,18 +49,21 @@ static size_t   input_min_height;
 
 static uint8_t  input_color, prompt_color, vprompt_color,
                 buf_color,    err_color;
-uint8_t tty_def_color;
+uint8_t         tty_def_color;
 
 static enum tty_mode tty_mode;
+
 static enum tty_mode tty_bmode;
+static char     input_msg_b[IM_LENGTH];
+static uint16_t input_msg_len_b;
 
-bool   tty_do_kprint = false;
+bool            tty_do_kprint = false;
 
-size_t tty_width, tty_height, tty_sb_height;
+size_t          tty_width, tty_height, tty_sb_height;
 
-static size_t cur_ln_x;
+static size_t   cur_ln_x;
 
-static pid_t tty_owner = PID_NONE;
+static pid_t    tty_owner = PID_NONE;
 
 
 static inline void putat(char c, uint8_t col, size_t x, size_t y) {
@@ -115,6 +118,7 @@ void tty_init(enum tty_mode m) {
 
 	tty_force_new_line();
 
+	input_msg_len_b = 0;
 	tty_bmode = m;
     tty_set_mode(m);
 }
@@ -168,10 +172,19 @@ void tty_set_mode(enum tty_mode m) {
 		tty_afficher_prompt_all();
 }
 
-void tty_set_bmode(enum tty_mode m) {
+void tty_set_mode_to_b() {
+	memcpy(input_msg, input_msg_b, input_msg_len_b);
+	input_msg_len = input_msg_len_b;
+	tty_set_mode(tty_bmode);
+}
+
+void tty_set_bmode(enum tty_mode m, uint16_t msg_len, const char* msg) {
 	tty_bmode = m;
-	if (tty_mode < ttym_debug)	
-		tty_set_mode(m);
+	memcpy(input_msg_b, msg, msg_len);
+	input_msg_len_b = msg_len;
+
+	if (tty_mode < ttym_debug)
+		tty_set_mode_to_b();
 }
 
 void tty_set_owner(pid_t p) {
@@ -256,7 +269,7 @@ void tty_input(scancode_byte s, key_event ev) {
                 switch (tty_mode) {
                     case ttym_def:    tty_set_mode(ttym_debug); break;
                     case ttym_prompt: tty_set_mode(ttym_debug); break;
-                    case ttym_debug:  tty_set_mode(tty_bmode);   break;
+                    case ttym_debug:  tty_set_mode_to_b();      break;
                     case ttym_panic:  break;
                 }
                 break;
@@ -266,6 +279,12 @@ void tty_input(scancode_byte s, key_event ev) {
                         send_sig_to_proc(tty_owner, SIGINT - 1);
 					}
                 break;
+				case KEY_Z:
+                    if (~tty_owner && proc_alive(state.st_proc + tty_owner)) {
+                		sq.shift += tty_writestringl("^Z", 2, tty_def_color);
+                        send_sig_to_proc(tty_owner, SIGTSTP - 1);
+					}
+				break;
 				case KEY_D:
 					if (ib_size) {
 						sq.shift += tty_input_to_buffer();
@@ -516,19 +535,18 @@ size_t tty_writestringl(const char* str, size_t len, uint8_t color) {
         rt += new_buffer_line(&line);
         x = 0;
 loop_enter:
-        for(; x < tty_width && str!=end; ++x, c = *(++str)) {
+        for(; x < tty_width && str!=end; c = *(++str)) {
             if(c == '\n') {
                 for(;x < tty_width; ++x)
                     line[x] = vga_entry(' ', color);
                 c = *(++str);
                 break;
-            } else if (c == '\t') {
-                for(size_t i = 0; i < 4 && x < tty_width; ++x, ++i)
-                    line[x] = vga_entry(' ', color);
-                c = *(++str);
-                break;
-            }
-            line[x] = vga_entry(c, color);
+            } else if (c == '\t')
+				do {
+					line[x++] = vga_entry(' ', color);
+				} while(x < tty_width && x % 4 != 0);
+            else
+				line[x++] = vga_entry(c, color);
         }
     }
     cur_ln_x = x;
@@ -561,8 +579,7 @@ size_t tty_writei(uint8_t num, const char* str, size_t len) {
 				}
 				switch (str[i]) {
 					case 'd':
-						input_msg_len = 0;
-						tty_set_bmode(ttym_def);
+						tty_set_bmode(ttym_def, 0, NULL);
 						break;
 					case 'p':
 						for (++i; i < len; ++i) {
@@ -573,11 +590,10 @@ size_t tty_writei(uint8_t num, const char* str, size_t len) {
 						tty_seq_commit(&sq);
 						return t_ed;
 					set_p_mode:
-						input_msg_len = min_uint16_t(IB_LENGTH,
-											(i - 1) - (t_ed + 2));
-						memcpy(input_msg, str + t_ed + 2, input_msg_len);
-						tty_set_bmode(ttym_prompt);
-						break;
+						tty_set_bmode(ttym_prompt,
+								min_uint16_t(IB_LENGTH, (i - 1) - (t_ed + 2)),
+								str + t_ed + 2);
+					break;
 				}
 				t_bg = i + 1;
 			}

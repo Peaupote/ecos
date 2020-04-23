@@ -40,10 +40,21 @@ void sq_test_memcmp() {
     tAssert(my_memcmp(t2, t1, 3) < 0);
 }
 
+void sq_test_strtok() {
+	char text[] = "cmd arg1  arg2";
+	const char delim[] = " ";
+	char* saveptr;
+
+	tAssert(!my_strcmp(my_strtok_rnull(text, delim, &saveptr), "cmd"));
+	tAssert(!my_strcmp(my_strtok_rnull(NULL, delim, &saveptr), "arg1"));
+	tAssert(!my_strcmp(my_strtok_rnull(NULL, delim, &saveptr), "arg2"));
+}
+
 int main(void) {
     test_init("libc string.h\n");
     sq_test_strlen();
     sq_test_memcmp();
     sq_test_strcmp();
+	sq_test_strtok();
     return 0;
 }

@@ -10,7 +10,9 @@
 
 #include "proc.h"
 
-#define set_errno(p, e) if (p->p_errno) *p->p_errno = e;
+static inline void set_errno(proc_t* p, int e) {
+	if (p->p_errno) *p->p_errno = e;
+}
 
 uint64_t sys_sleep(uint64_t);
 void     lookup_end_sleep(void);
@@ -49,7 +51,7 @@ void     sys_sigreturn();
 
 // 0 <= sigid < SIG_COUNT
 // hnd[0]: ign, hnd[1]: dfl
-int      sys_signal(int sigid, uint8_t hnd);
+uint8_t  sys_signal(int sigid, uint8_t hnd);
 int      sys_kill(pid_t pid, int signum);
 
 int      sys_debug_block(int v);

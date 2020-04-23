@@ -28,7 +28,7 @@ tutil:
 	@$(MAKE) -C ../ tutil.o
 
 run: $(TESTS_LIBC)
-	$(foreach t, $(TESTS_LIBC), "./$(t)" ;)
+	$(foreach t, $(TESTS_LIBC), "./$(t)" &&) echo done
 
 clean:
 	rm -f *.o *.out *.s *.a

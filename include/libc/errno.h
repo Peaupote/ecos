@@ -3,7 +3,10 @@
 
 #define NERRNO 135
 const char * const err_list[NERRNO];
+
+#ifndef __is_kernel
 int errno;
+#endif
 
 enum error_kind {
     SUCC,               // Success

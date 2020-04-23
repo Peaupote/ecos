@@ -3,7 +3,9 @@
 #include <stdio.h>
 #include <string.h>
 
-int main() {
+#define NB_TEST 2
+
+int test_0() {
     pid_t pid;
     int fds[2];
     int rc = pipe(fds);
@@ -43,4 +45,27 @@ int main() {
 
     close(fds[1]);
     return 0;
+}
+
+int test_1() {
+	int* p = NULL;
+	*p = 42;
+	return 1;
+}
+
+typedef int (*test_t)(void);
+test_t tests[NB_TEST] = {test_0, test_1};
+
+int main(int argc, char* argv[]) {
+	for (int i = 1; i < argc; ++i) {
+		int testnum;
+		if (sscanf(argv[i], "%d", &testnum) != 1
+				|| testnum < 0 || testnum >= NB_TEST)
+			printf("Argument incorrect: '%s'\n", argv[i]);
+		else {
+			int rt = tests[testnum]();
+			if (rt) return rt;
+		}
+	}
+	return 0;
 }

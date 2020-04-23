@@ -20,7 +20,7 @@ tutil:
 	@$(MAKE) -C ../ tutil.o
 
 run:$(TESTRUN)
-	$(foreach e,$(TESTRUN),"./$(e)";)
+	$(foreach e,$(TESTRUN),"./$(e)" &&) echo done
 
 .depends:
 	@$(ROOT)/tools/mkdep.sh "$(CC) $(FLAGS) $(INCLUDES)" $(TESTDEP) > .depends
