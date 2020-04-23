@@ -57,6 +57,14 @@ int sys_open(const char *fname, int oflags, int perms) {
             c->chann_waiting = PID_NONE;
             vfs_opench(c->chann_vfile, &c->chann_adt);
             p->p_fds[fd] = cid;
+
+            if (oflags&O_APPEND) {
+                klogf(Log_info, "syscall", "flag O_APPEND is on for %d", fd);
+                int rc = sys_lseek(fd, 0, SEEK_END);
+                if (rc < 0) return rc;
+                return fd;
+            }
+
             set_errno(SUCC);
             klogf(Log_info, "syscall", "process %d open %s on %d (cid %d)",
                   state.st_curr_pid, fname, fd, cid);
@@ -265,8 +273,8 @@ ssize_t sys_write(int fd, uint8_t *s, size_t len) {
     chann_t *chann = &state.st_chann[cid];
     vfile_t *vfile = chann->chann_vfile;
     klogf(Log_verb, "syscall", "process %d write on %d(%d -> %d@%d)",
-            state.st_curr_pid, fd, p->p_fds[fd],
-            vfile->vf_stat.st_ino, vfile->vf_stat.st_dev);
+          state.st_curr_pid, fd, p->p_fds[fd],
+          vfile->vf_stat.st_ino, vfile->vf_stat.st_dev);
 
     int rc = 0;
 

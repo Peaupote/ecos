@@ -28,6 +28,7 @@ char *ptr, line[258];
 
 struct cmd {
     const char *args[NARGS];
+    int oflags;
     char *infile, *outfile;
     struct cmd *pipe;
 } cmds[NCMD];
@@ -82,7 +83,11 @@ start:
         goto start;
 
     case '<' : fill_redir(&curr->infile); break;
-    case '>': fill_redir(&curr->outfile); break;
+    case '>':
+        curr->oflags = O_CREAT;
+        if (ptr[1] == '>') ++ptr, curr->oflags = curr->oflags|O_APPEND;
+        fill_redir(&curr->outfile);
+        break;
 
     default:
         *aptr++ = ptr; // set argv
@@ -119,7 +124,7 @@ void parse_cmd() {
 
 void mk_redirection(char *file, int flag, int redir) {
     if (!file) return;
-    int fd = open(file, flag|O_CREAT, 0640); // TODO : umask
+    int fd = open(file, flag, 0640); // TODO : umask
     if (fd < 0) {
         char buf[256];
         sprintf(buf, "sh: %s", file);
@@ -179,8 +184,8 @@ void exec_cmd() {
                 close(next_fd_in);
 
             // redirections
-            mk_redirection(c->infile,  O_RDONLY, 0);
-            mk_redirection(c->outfile, O_WRONLY, 1);
+            mk_redirection(c->infile,  c->oflags|O_RDONLY, 0);
+            mk_redirection(c->outfile, c->oflags|O_WRONLY, 1);
 
             execvp(c->args[0], c->args);
             perror("sh");
