@@ -12,6 +12,7 @@
 
 #define KEY_D           0x20
 #define KEY_C           0x2E
+#define KEY_Z           0x11
 
 #define KEY_KP_ENTER	0x9C
 #define KEY_ALTGR		0xB8

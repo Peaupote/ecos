@@ -20,7 +20,7 @@
 
 #include <fs/proc.h>
 
-char proc_state_char[6] = {'f', 'S', 'B', 'L', 'R', 'Z'};
+char proc_state_char[7] = {'f', 'S', 'B', 'L', 'R', 'Z', 'T'};
 
 extern void proc_idle_entry(void);
 extern void proc_init_entry(void);
@@ -176,7 +176,7 @@ pid_t sched_pop_proc() {
     return pid;
 }
 
-void schedule_proc() {
+void _schedule_proc() {
     if (state.st_sched.pres) {
         kAssert(state.st_sched.nb_proc > 0);
         // pick a new process to run

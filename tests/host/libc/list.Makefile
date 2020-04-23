@@ -9,7 +9,8 @@ export LIBC_CFILES=\
 	string/strncmp.c \
 	string/strcmp.c \
 	stdio/scanf.c \
-	ctype/ctype.c
+	ctype/ctype.c \
+	string/strtok_r.c
 export LIBK_AS_FILES=
 export LIBK_CFILES=\
 	string/strlen.c \

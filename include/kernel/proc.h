@@ -28,9 +28,10 @@ enum proc_state {
     BLOCK, // blocked by a syscall
     BLOCR, // blocked by a syscall, in file to return
     RUN,   // running
-    ZOMB   // just terminated
+    ZOMB,  // just terminated
+	STOP   // stopped
 };
-extern char proc_state_char[6];
+extern char proc_state_char[7];
 
 // offset to access in structure
 #define RFL 0
@@ -88,7 +89,6 @@ typedef struct proc {
     pid_t            p_nxsb;     // next sibling
     pid_t            p_fchd;     // first child
     uint64_t         p_nchd;     // number of child processus
-    //TODO: bit field
     enum proc_state  p_stat;     // current status of the processus
     uint8_t          p_ring;     // ring level (2 bits)
     priority_t       p_prio;     // priority of the process
@@ -180,7 +180,9 @@ void  sched_add_proc(pid_t);
 pid_t sched_pop_proc();
 
 __attribute__ ((noreturn))
-void  schedule_proc(); // TODO: reset rsp to avoid stack overflow
+void  schedule_proc(); // reset rsp to avoid stack overflow
+__attribute__ ((noreturn))
+void  _schedule_proc();
 // Renvoi le nouveau processus
 pid_t schedule_proc_ev();
 
@@ -188,6 +190,7 @@ pid_t schedule_proc_ev();
 //  les objets doivent se trouver dans l'espace du kernel
 uint8_t proc_create_userspace(void* prg_elf, proc_t *proc);
 
+// Gestion des signaux en attente pour le processus actuel
 // 0 <= sigid < SIG_COUNT
 void proc_hndl_sig_i(int sigid);
 static inline void proc_hndl_sigs() {

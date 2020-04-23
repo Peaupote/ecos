@@ -25,7 +25,7 @@ char *strtok_rnull(char *src, const char *delim, char** saveptr) {
     if (!c) return NULL;
     for (const char* d_it = delim; *d_it; ) {
         if (c == *d_it) {
-            if(!*++it) return NULL;
+            if(!(c = *++it)) return NULL;
             d_it = delim;
         } else
             ++d_it;

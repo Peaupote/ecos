@@ -13,6 +13,8 @@
 #include <kernel/proc.h>
 #include <kernel/kutil.h>
 
+#include <headers/unistd.h>
+
 #include <util/vga.h>
 #include <util/string.h>
 
@@ -69,10 +71,38 @@ const char *error_desc[NEXCEPTION + 1] = {
     "Unknown exception"
 };
 
+
+__attribute__ ((noreturn))
+static inline void kill_cur_for_err(uint8_t errnum, uint64_t errcode) {
+    const char *desc = error_desc[errnum < NEXCEPTION ? errnum : NEXCEPTION];
+    klogf(Log_error, "exception", "proc %d %s: error code %llx",
+						(int)state.st_curr_pid, desc, errcode);
+	proc_t* p = cur_proc();
+
+	if (~p->p_fds[STDERR_FILENO]) { //TODO
+		chann_t *chann = &state.st_chann[p->p_fds[STDERR_FILENO]];
+		vfile_t *vfile = chann->chann_vfile;
+    	if (chann->chann_mode == WRITE || chann->chann_mode == RDWR) {
+			char buf[255];
+			int wc = sprintf(buf, "%d %x %s\n",
+					(int)state.st_curr_pid, errnum, desc);
+			switch (vfile->vf_stat.st_mode & FTYPE_MASK) {
+				case TYPE_REG:
+					vfs_write(vfile, buf, chann->chann_pos, wc);
+					break;
+				case TYPE_FIFO: case TYPE_CHAR:
+					vfs_write(vfile, buf, 0, wc);
+					break;
+				default: break;
+			}
+		}
+	}
+
+	kill_proc_nr(0x3300 + errnum);
+}
+
 void common_hdl(uint8_t num, uint64_t errcode) {
-    // TODO : something
-    const char *desc = error_desc[num < NEXCEPTION ? num : NEXCEPTION];
-    kpanicf("exception", "%s: error code %llx", desc, errcode);
+	kill_cur_for_err(num, errcode);
 }
 
 
@@ -116,17 +146,20 @@ void pit_hdl_switch(void) {
 
 // ! Processus partiellement sauvegardé
 void exception_PF_hdl(uint_ptr fault_vaddr, uint64_t errcode) {
-    klogf(Log_verb, "exc", "#PF on %p, errcode=%llx",
+    klogf(Log_verb, "#PF", "on %p, errcode=%llx",
             fault_vaddr, errcode);
     if (!(errcode & EXC_PF_ERC_P)
             && paging_get_lvl(pgg_pml4, fault_vaddr) < PML4_END_USPACE) {
-        if (handle_PF(fault_vaddr))
-            kpanicf("#PF handling", "on %p errcode=%llx",
+        if (!handle_PF(fault_vaddr)) {
+			klogf(Log_verb, "exc", "#PF handled");
+			return;
+		}
+		klogf(Log_error, "#PF", "fail handling on %p errcode=%llx",
+				fault_vaddr, errcode);
+    } else
+        klogf(Log_error, "#PF", "can't handle on %p errcode=%llx",
                     fault_vaddr, errcode);
-    } else //TODO: kill process
-        kpanicf("#PF not handled", "on %p errcode=%llx",
-                    fault_vaddr, errcode);
-    klogf(Log_verb, "exc", "#PF handled");
+	kill_cur_for_err(0xe, errcode);
 }
 
 static inline void idt_int_asgn(int n, uint64_t addr, uint8_t attr,

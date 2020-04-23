@@ -5,6 +5,7 @@
 
 #ifndef __is_kernel
 const char * const err_list[NERRNO];
+
 int errno;
 #endif
 

@@ -12,8 +12,11 @@ typedef int32_t sigset_t;
 // 0 <= sigid = signum - 1 < SIG_COUNT
 #define SIG_COUNT 31
 
-#define SIG_NOTCTB 0x10100 //SIGKILL + SIGSTOP
-#define SIG_DFLKIL 0x00102 //SIGKILL + SIGINT
+// masques de sigid
+#define SIG_NOTCTB 0x00010100 // SIGKILL + SIGSTOP
+#define SIG_DFLKIL 0x00000102 // SIGKILL + SIGINT
+#define SIG_DFLSTP 0x00030000 // SIGSTOP + SIGTSTP
+#define SIG_DFLCNT 0x00040000 // SIGCONT
 
 #define SIG_IGN ((sighandler_t)0)
 #define SIG_DFL ((sighandler_t)1)
@@ -23,5 +26,7 @@ typedef int32_t sigset_t;
 #define SIGINT   2
 #define SIGKILL  9
 #define SIGSTOP 17
+#define SIGTSTP 18
+#define SIGCONT 19
 
 #endif

@@ -3,6 +3,7 @@
 #include <fcntl.h>
 #include <stdlib.h>
 #include <signal.h>
+#include <errno.h>
 
 int main(int argc, char *argv[]) {
     char buf[1024];
@@ -20,11 +21,12 @@ int main(int argc, char *argv[]) {
         }
 
     start:
-        while ((rc = read(fd, buf, 1024)) > 0) {
+        while ((rc = read(fd, buf, 1024)) > 0)
             write(STDOUT_FILENO, buf, rc);
-        }
 
         if (rc < 0) {
+			if (errno == EINTR)
+				goto start;
             sprintf(buf, "cat: %s", i ? argv[i] : "stdin");
             perror(buf);
             exit(1);

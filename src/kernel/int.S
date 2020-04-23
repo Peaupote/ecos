@@ -61,6 +61,8 @@ syscall_ring1c_tab:
 
 .global kpanic_do_stop
 
+.global schedule_proc
+
 .extern st_curr_reg
 .extern common_hdl
 .extern keyboard_hdl
@@ -72,6 +74,8 @@ syscall_ring1c_tab:
 .extern pit_hdl
 .extern pit_hdl_switch
 .extern panic_rsp
+.extern _schedule_proc
+.extern kernel_stack_top
 
 // Sauvegarde des registres associés au processus courant (st_curr_reg)
 // Utilise la valeur actuelle des registres ainsi qu'une structure d'iret
@@ -394,3 +398,8 @@ kpanic_do_stop:
     sti
 1:  hlt
     jmp 1b
+
+schedule_proc:
+	movabs $kernel_stack_top, %rsp
+	movabs $_schedule_proc,   %rax
+	jmpq   *%rax

@@ -57,7 +57,7 @@ void     sys_sigreturn();
 
 // 0 <= sigid < SIG_COUNT
 // hnd[0]: ign, hnd[1]: dfl
-int      sys_signal(int sigid, uint8_t hnd);
+uint8_t  sys_signal(int sigid, uint8_t hnd);
 int      sys_kill(pid_t pid, int signum);
 
 int      sys_debug_block(int v);
