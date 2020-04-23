@@ -84,8 +84,9 @@ start:
 
     case '<' : fill_redir(&curr->infile); break;
     case '>':
-        curr->oflags = O_CREAT|O_TRUNC;
-        if (ptr[1] == '>') ++ptr, curr->oflags = curr->oflags|O_APPEND;
+        curr->oflags = O_CREAT;
+        if (ptr[1] == '>') ++ptr, curr->oflags |= O_APPEND;
+        else curr->oflags |= O_TRUNC;
         fill_redir(&curr->outfile);
         break;
 
