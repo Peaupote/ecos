@@ -7,11 +7,16 @@
 
 #include <headers/types.h>
 #include <headers/signal.h>
+#include <libc/errno.h>
 
 #include "proc.h"
 
-static inline void set_errno(proc_t* p, int e) {
-	if (p->p_errno) *p->p_errno = e;
+static inline void set_proc_errno(proc_t *p, int e) {
+    if (p->p_errno) *p->p_errno = e;
+}
+
+static inline void set_errno(int e) {
+    set_proc_errno(state.st_proc + state.st_curr_pid, e);
 }
 
 uint64_t sys_sleep(uint64_t);
@@ -27,13 +32,14 @@ void     sys_exit(int status);
 pid_t    sys_getpid(void);
 pid_t    sys_getppid(void);
 
-int      sys_open(const char* fname, int oflags);
+int      sys_open(const char* fname, int oflags, int perms);
 int      sys_close(int fd);
 int      sys_dup(int fd);
 int      sys_pipe(int fds[2]);
 ssize_t  sys_write(int fd, uint8_t *s, size_t len);
 ssize_t  sys_read(int fd, uint8_t *buf, size_t len);
 off_t    sys_lseek(int fd, off_t offset, int whence);
+int      mkdir(const char *fname, mode_t mode);
 
 int      sys_execve(reg_t fname, reg_t argv, reg_t env);
 

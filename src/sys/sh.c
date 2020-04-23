@@ -86,6 +86,7 @@ char *ptr, line[258];
 
 struct cmd {
     const char *args[NARGS];
+    int oflags;
     char *infile, *outfile;
     struct cmd *pipe;
 } cmds[NCMD];
@@ -140,7 +141,11 @@ start:
         goto start;
 
     case '<' : fill_redir(&curr->infile); break;
-    case '>': fill_redir(&curr->outfile); break;
+    case '>':
+        curr->oflags = O_CREAT|O_TRUNC;
+        if (ptr[1] == '>') ++ptr, curr->oflags = curr->oflags|O_APPEND;
+        fill_redir(&curr->outfile);
+        break;
 
     default:
         *aptr++ = ptr; // set argv
@@ -177,7 +182,7 @@ void parse_cmd() {
 
 void mk_redirection(char *file, int flag, int redir) {
     if (!file) return;
-    int fd = open(file, flag);
+    int fd = open(file, flag, 0640); // TODO : umask
     if (fd < 0) {
         char buf[256];
         sprintf(buf, "sh: %s", file);
@@ -254,7 +259,7 @@ void fg(int argc, const char *argv[]) {
 }
 
 void exec_cmd() {
-	printf("\033d");
+    printf("\033d");
 
 	if (ncmd == 1 && !strcmp(cmds->args[0], "fg")) {
         int argc = 0;
@@ -263,8 +268,6 @@ void exec_cmd() {
 		return;
 	}
 
-	int fd_in = STDIN_FILENO;
-
 	struct exd_cmd* ecmd = malloc(sizeof(struct exd_cmd) + ncmd * sizeof(pid_t));
 	ecmd->num  = next_exd_num++;
 	ecmd->next = exd_llist;
@@ -272,6 +275,7 @@ void exec_cmd() {
 	ecmd->nb_proc  = ncmd;
 	ecmd->nb_alive = 0;
 
+    int fd_in = STDIN_FILENO;
     for (int i = 0; i < ncmd; i++) {
         struct cmd  *c = cmds + i;
 		ecmd->procs[i] = PID_NONE;
@@ -281,35 +285,35 @@ void exec_cmd() {
 
         if (!strcmp(c->args[0], "exit")) binutil_exit(argc, c->args);
 
-		int next_fd_in = STDIN_FILENO;
-		int my_fd_out  = STDOUT_FILENO;
-		if (c->pipe) {
-			int fds[2] = { 42, 42 };
-			int rp = pipe(fds);
-			if (rp < 0) {
-				perror("sh");
-				exit(1);
-			}
-			
-			next_fd_in = fds[0];
-			my_fd_out  = fds[1];
-		}
+        int next_fd_in = STDIN_FILENO;
+        int my_fd_out  = STDOUT_FILENO;
+        if (c->pipe) {
+            int fds[2] = { 42, 42 };
+            int rp = pipe(fds);
+            if (rp < 0) {
+                perror("sh");
+                exit(1);
+            }
+
+            next_fd_in = fds[0];
+            my_fd_out  = fds[1];
+        }
 
         int rf = fork();
         if (rf < 0) {
             printf("error: fork\n");
         } else if (rf == 0) {
 
-			if (fd_in != STDIN_FILENO)
-				dup2(fd_in, STDIN_FILENO);
-			if (my_fd_out != STDOUT_FILENO)
-				dup2(my_fd_out, STDOUT_FILENO);
-			if (next_fd_in)
-				close(next_fd_in);
+            if (fd_in != STDIN_FILENO)
+                dup2(fd_in, STDIN_FILENO);
+            if (my_fd_out != STDOUT_FILENO)
+                dup2(my_fd_out, STDOUT_FILENO);
+            if (next_fd_in)
+                close(next_fd_in);
 
             // redirections
-            mk_redirection(c->infile,  O_RDONLY, 0);
-            mk_redirection(c->outfile, O_WRONLY, 1);
+            mk_redirection(c->infile,  c->oflags|O_RDONLY, 0);
+            mk_redirection(c->outfile, c->oflags|O_WRONLY, 1);
 
             execvp(c->args[0], c->args);
             perror("sh");
@@ -320,20 +324,20 @@ void exec_cmd() {
 			++ecmd->nb_alive;
 		}
 
-		if (fd_in != STDIN_FILENO)
-			close(fd_in);
-		if (my_fd_out != STDOUT_FILENO)
-			close(my_fd_out);
-		fd_in = next_fd_in;
-		
+        if (fd_in != STDIN_FILENO)
+            close(fd_in);
+        if (my_fd_out != STDOUT_FILENO)
+            close(my_fd_out);
+        fd_in = next_fd_in;
+
     }
 
-	if (fd_in != STDIN_FILENO)
-		close(fd_in);
+    if (fd_in != STDIN_FILENO)
+        close(fd_in);
 
 	run_fg();
 
-	/* printf("process %d exited with status %x\n", rc, rs); */
+    /* printf("process %d exited with status %x\n", rc, rs); */
 }
 
 int main() {
@@ -341,12 +345,12 @@ int main() {
     int rc;
 
     while(1) {
-		printf("\033psh> \033;");
+        printf("\033psh> \033;");
         memset(line, 0, 258);
         rc = read(0, line, 256);
-		line[rc] = '\0';//TODO: attendre \n + ne pas aller plus loin
-		
-		if (rc == 0) return 0;
+        line[rc] = '\0';//TODO: attendre \n + ne pas aller plus loin
+
+        if (rc == 0) return 0;
         if (rc == 1) continue;
         if (rc < 0) {
             printf("an error occurred\n");

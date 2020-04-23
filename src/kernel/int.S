@@ -29,6 +29,7 @@ syscall_tab:
     .quad sys_lseek
     .quad sys_execve
     .quad sys_fstat
+    .quad sys_mkdir
     .quad sys_setpriority
     .quad sys_getpriority
     .quad sys_sbrk

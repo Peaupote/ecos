@@ -51,7 +51,7 @@ static inline void abort_syscalls(proc_t* p) {
 		// Si un appel système est en cours il est interrompu et renvoi -1
 		p->p_stat         = RUN;
 		p->p_reg.r.rax.rd = ~(reg_data_t)0;
-		set_errno(p, EINTR);
+		set_proc_errno(p, EINTR);
 	}
 }
 

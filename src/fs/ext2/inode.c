@@ -1,5 +1,6 @@
 #include <fs/ext2.h>
 
+#include <libc/string.h>
 #include <util/test.h>
 
 struct ext2_inode *
@@ -45,39 +46,26 @@ ext2_lookup_free_inode(struct ext2_mount_info *info) {
 uint32_t
 ext2_alloc_inode(uint16_t type, uint16_t uid,
                  struct ext2_mount_info *info) {
-    uint32_t ino = ext2_lookup_free_inode(info);
+    uint32_t ino;
+    if (!(ino = ext2_lookup_free_inode(info))) return 0;
 
     struct ext2_inode *inode = ext2_get_inode(ino, info);
+    inode->in_type = type;
+    inode->in_uid  = uid;
+    inode->in_size = 0;
 
-    inode->in_type  = type;
-    inode->in_uid   = uid;
-    inode->in_ctime = 0; // TODO : change
-    inode->in_size  = 0;
+    inode->in_atime = 0;
+    inode->in_ctime = 0;
+    inode->in_mtime = 0;
+    inode->in_dtime = 0;
+
+    inode->in_gid    = 0;
+    inode->in_hard   = 0;
+    inode->in_blocks = 0;
+    inode->in_flags  = 0;
+    inode->in_os     = EXT2_OS_OTHER;
 
     return ino;
-}
-
-uint32_t ext2_alloc_inode_block(struct ext2_inode *inode,
-                                uint32_t blknb, uint32_t block,
-                                struct ext2_mount_info *info) {
-    uint32_t inf = 0;
-    uint32_t sup = EXT2_DIRECT_BLOCK;
-    uint32_t *b; // indirection block
-
-    if (blknb < sup) {
-        inode->in_block[blknb] = block;
-        return block;
-    }
-
-    inf = sup;
-    sup += info->block_size >> 2;
-    if (blknb < sup) {
-        b = ext2_get_block(inode->in_block[12], info);
-        b[blknb - inf] = block;
-        return block;
-    }
-
-    return 0; // TODO : finish indirection
 }
 
 uint32_t *ext2_get_inode_block_ptr(uint32_t block,
@@ -103,7 +91,7 @@ uint32_t ext2_get_inode_block_nb(uint32_t block,
                                  struct ext2_inode *inode,
                                  struct ext2_mount_info *info) {
     uint32_t *b = ext2_get_inode_block_ptr(block, inode, info);
-    return b ? *b : 0;
+    return *b;
 }
 
 block_t ext2_get_inode_block(uint32_t block,
@@ -113,37 +101,28 @@ block_t ext2_get_inode_block(uint32_t block,
     return ext2_get_block(b, info);
 }
 
+void ext2_set_inode_block(uint32_t nb, uint32_t block,
+                          struct ext2_inode *inode,
+                          struct ext2_mount_info *info) {
+    uint32_t *b = ext2_get_inode_block_ptr(nb, inode, info);
+    *b = block;
+}
+
 uint32_t ext2_touch(uint32_t parent, const char *fname, uint16_t type,
                     struct ext2_mount_info *info) {
+
     uint32_t ino;
 
     if ((ino = ext2_lookup(parent, fname, (struct mount_info*)info)) &&
-        !(ext2_get_inode(ino, info)->in_type&TYPE_DIR))
-        return 0;
+        !(ext2_get_inode(ino, info)->in_type&TYPE_DIR)) return 0;
 
     if (type&TYPE_DIR) return 0;
 
     struct ext2_inode *p = ext2_get_inode(parent, info);
     if (!(p->in_type&TYPE_DIR)) return 0;
-    if (!(ino = ext2_lookup_free_inode(info))) return 0;
 
-    if (!ext2_add_dirent(p, ino, fname, info)) return 0;
-
-    struct ext2_inode *inode = ext2_get_inode(ino, info);
-    inode->in_type = type;
-    inode->in_uid  = 0;
-    inode->in_size = 0;
-
-    inode->in_atime = 0;
-    inode->in_ctime = 0;
-    inode->in_mtime = 0;
-    inode->in_dtime = 0;
-
-    inode->in_gid    = 0;
-    inode->in_hard   = 1;
-    inode->in_blocks = 0;
-    inode->in_flags  = 0;
-    inode->in_os     = EXT2_OS_OTHER;
+    ino = ext2_alloc_inode(type, 0, info);
+    if (!ext2_add_dirent(parent, ino, fname, info)) return 0;
 
     return ino;
 }
@@ -157,4 +136,25 @@ uint32_t ext2_inode_free(uint32_t ino, struct ext2_mount_info *info) {
     bitmap[ino >> 3] &= ~(1 << (ino & 7));
 
     return 0;
+}
+
+uint32_t ext2_truncate(uint32_t ino, struct ext2_mount_info *info) {
+    struct ext2_inode *inode = ext2_get_inode(ino, info);
+    if (!inode->in_size) return ino;
+
+    uint32_t nbblk = inode->in_size / info->block_size;
+    if (inode->in_size % info->block_size) ++nbblk;
+
+    for (uint32_t b = 0; b < nbblk; ++b) {
+        uint32_t block = ext2_get_inode_block_nb(b, inode, info);
+
+        uint32_t group = block / info->sp->s_blocks_per_group;
+        struct ext2_group_desc *bg = info->bg + group;
+        uint8_t *bitmap = ext2_get_block(bg->g_block_bitmap, info);
+        bitmap[block >> 3] &= ~(1 << (block&7));
+    }
+
+    inode->in_size = 0;
+    inode->in_blocks = 0;
+    return ino;
 }

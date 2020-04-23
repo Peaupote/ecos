@@ -51,6 +51,7 @@ mksc _signal      SYS_SIGNAL
 mksc kill         SYS_KILL
 mksc _seterrno    SYS_SETERRNO
 mksc debug_block  SYS_DEBUG_BLOCK
+mksc mkdir        SYS_MKDIR
 
 mksc1j r1_prires  SYS_R1J_PRIRES
 mksc1c r1_ttyown  SYS_R1C_TTYOWN

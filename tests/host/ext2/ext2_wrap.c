@@ -2,6 +2,7 @@
 
 #include <util/test.h>
 #include <fs/ext2.h>
+#include <stdio.h>
 
 static struct ext2_mount_info info;
 
@@ -32,13 +33,15 @@ void print_type(uint16_t type) {
 
 void print_inode(struct ext2_inode *inode) {
     print_type(inode->in_type);
-    printf("mode : %o\n", inode->in_type&0777);
-    printf("uid  : %d\n", inode->in_uid);
-    printf("size : %d\n", inode->in_size);
+    printf("mode   : %o\n", inode->in_type&0777);
+    printf("uid    : %3d\n", inode->in_uid);
+    printf("size   : %3d\n", inode->in_size);
+    printf("nlinks : %3d\n", inode->in_hard);
     uint32_t block_count = inode->in_size / info.block_size;
+    if (inode->in_size > 0 && inode->in_size % info.block_size) ++block_count;
     printf("blocks:\n");
     for (size_t i = 0; i < block_count; i++) {
-        printf("%ld: %d\n", i, inode->in_block[i]);
+        printf("%2ld: %3d\n", i, inode->in_block[i]);
     }
     printf("total %d\n", block_count);
 }
@@ -48,8 +51,8 @@ int print_dir(struct dirent *dir) {
         printf("dir null\n");
         return 0;
     }
-    printf("%d (%d) %*s\n", dir->d_ino, dir->d_rec_len,
-           dir->d_name_len, dir->d_name);
+    printf("%4d (%4d) %.*s (name len %d)\n", dir->d_ino, dir->d_rec_len,
+           dir->d_name_len, dir->d_name, dir->d_name_len);
     return 0;
 }
 
@@ -64,7 +67,7 @@ int ls () {
 }
 
 void do_touch(char* s) {
-    if (!ext2_touch(curr_ino, s, 0640, &info))
+    if (!ext2_touch(curr_ino, s, TYPE_REG|0640, &info))
         test_errprintf("fail\n");
 }
 
@@ -142,5 +145,26 @@ void dump() {
                bg->g_free_inodes_count,
                bg->g_dir_count);
         printf("\n");
+    }
+}
+
+void do_cat(char *fname) {
+    uint32_t ino = ext2_lookup_dir(curr, fname, &info);
+    if (!ino) {
+        fprintf(stderr, "cat: unknown file %s\n", fname);
+        return;
+    }
+
+    char buf[1024] = { 0 };
+    int rc, pos = 0;
+
+    while ((rc = ext2_read(ino, buf, pos, 1024, &info)) > 0) {
+        printf("%*s", rc, buf);
+        pos += rc;
+    }
+
+    if (rc < 0) {
+        fprintf(stderr, "ERR: fail\n");
+        return;
     }
 }

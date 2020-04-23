@@ -28,6 +28,16 @@ void touch() {
     do_touch(s);
 }
 
+void cat() {
+    char *s = strtok(NULL, " \n");
+    if (!s) {
+        fprintf(stderr, "usage: cat file\n");
+        return;
+    }
+
+    do_cat(s);
+}
+
 void cd () {
     char *s1 = strchrnul(line, ' ');
     if (!s1) {
@@ -143,8 +153,8 @@ int main(int argc, char *argv[]) {
             rtst = 1;
             goto exit_main;
         }
-		char *cmd = strtok(line, " \r\n");
-		if (!cmd) continue;
+        char *cmd = strtok(line, " \r\n");
+        if (!cmd) continue;
         if (!strcmp(cmd, "ls")) {
             if(ls()) {
                 rtst = 1;
@@ -157,8 +167,9 @@ int main(int argc, char *argv[]) {
         else if (!strcmp(cmd, "save" )) save();
         else if (!strcmp(cmd, "dump" )) dump();
         else if (!strcmp(cmd, "touch")) touch();
+        else if (!strcmp(cmd, "cat"))   cat();
         else {
-            printf("unkonwn command %s", line);
+            printf("unkonwn command %s\n", line);
         }
     }
 

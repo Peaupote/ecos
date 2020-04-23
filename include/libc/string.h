@@ -24,6 +24,13 @@ void* memset(void*, int, size_t);
  * Return NULL if not found
  */
 char *strchr(const char *s, int c);
+
+/**
+ * Return a pointer to the last occurence of the character c in the string s.
+ * Retrun NULL if not found
+ */
+char *strrchr(const char *s, int c);
+
 /*
  * Return a ptr to the end ('\0') of the string if not found
  */

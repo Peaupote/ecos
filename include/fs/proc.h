@@ -27,21 +27,21 @@
 #define PROC_MOUNT "/proc"
 
 enum fp_pipe_end {
-	fp_pipe_in  = 0, // Write end
-	fp_pipe_out = 1  // Read end
+    fp_pipe_in  = 0, // Write end
+    fp_pipe_out = 1  // Read end
 };
 
 struct fp_pipe_cnt {
-	char*   buf;
-	size_t  sz;
-	size_t  ofs;
+    char*   buf;
+    size_t  sz;
+    size_t  ofs;
 };
 
 struct fp_pipe {
-	uint8_t  open;
-	mode_t   mode[2];
-	vfile_t* vfs[2];
-	struct fp_pipe_cnt cnt;
+    uint8_t  open;
+    mode_t   mode[2];
+    vfile_t* vfs[2];
+    struct fp_pipe_cnt cnt;
 };
 
 struct fp_pipe fp_pipes[NPIPE];
@@ -58,7 +58,7 @@ int      fs_proc_read(ino_t ino, void*, off_t, size_t, struct mount_info*);
 int      fs_proc_write(ino_t ino, void*, off_t, size_t, struct mount_info*);
 
 int      fs_proc_getdents(ino_t, struct dirent*, size_t,
-							chann_adt_t*, struct mount_info*);
+                            chann_adt_t*, struct mount_info*);
 void     fs_proc_opench(ino_t, chann_adt_t*, struct mount_info*);
 void     fs_proc_open(ino_t, vfile_t*, struct mount_info*);
 void     fs_proc_close(ino_t, struct mount_info*);
@@ -71,35 +71,36 @@ ino_t    fs_proc_rm(ino_t ino, struct mount_info *);
 ino_t    fs_proc_rmdir(ino_t ino, struct mount_info *);
 ino_t    fs_proc_destroy_dirent(ino_t p, ino_t ino, struct mount_info*);
 uint32_t fs_proc_touch(ino_t, const char*, uint16_t, struct mount_info*);
+ino_t    fs_proc_truncate(ino_t, struct mount_info*);
 
 
 void     fs_proc_init_pipes();
 uint32_t fs_proc_alloc_pipe(mode_t m_in, mode_t m_out);
 static inline int fs_proc_pipe_path(char* dst,
-			uint32_t pipeid, enum fp_pipe_end ed) {
-	return sprintf(dst, PROC_MOUNT "/pipes/%d%c", pipeid, ed ? 'o' : 'i');
+            uint32_t pipeid, enum fp_pipe_end ed) {
+    return sprintf(dst, PROC_MOUNT "/pipes/%d%c", pipeid, ed ? 'o' : 'i');
 }
 void     fs_proc_close_pipe(struct fp_pipe* p, uint8_t io);
 size_t   fs_proc_write_pipe(struct fp_pipe_cnt* p,
-							const void* src, size_t count);
+                            const void* src, size_t count);
 size_t   fs_proc_read_pipe(struct fp_pipe_cnt* p, void* dst, size_t count);
 
 void     fs_proc_init_tty_buf();
 bool     fs_proc_std_to_tty(proc_t *);
 static inline size_t fs_proc_write_tty(const char* src, size_t len) {
-	size_t rt = fs_proc_write_pipe(&ttyin_buf, src, len);
-	if (rt && ttyin_vfile) {
-		ttyin_vfile->vf_stat.st_size = ttyin_buf.sz;
-		vfs_unblock(ttyin_vfile);
-	}
-	return rt;
+    size_t rt = fs_proc_write_pipe(&ttyin_buf, src, len);
+    if (rt && ttyin_vfile) {
+        ttyin_vfile->vf_stat.st_size = ttyin_buf.sz;
+        vfs_unblock(ttyin_vfile);
+    }
+    return rt;
 }
 static inline void fs_proc_send0_tty() {
-	ttyin_force0 = true;
-	if (ttyin_vfile) {
-		ttyin_vfile->vf_stat.st_size = 1;
-		vfs_unblock(ttyin_vfile);
-	}
+    ttyin_force0 = true;
+    if (ttyin_vfile) {
+        ttyin_vfile->vf_stat.st_size = 1;
+        vfs_unblock(ttyin_vfile);
+    }
 }
 
 #endif

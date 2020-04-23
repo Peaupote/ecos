@@ -2,9 +2,10 @@
 #define _H_LIBC_ERRNO
 
 #define NERRNO 135
-const char * const err_list[NERRNO];
 
 #ifndef __is_kernel
+const char * const err_list[NERRNO];
+
 int errno;
 #endif
 

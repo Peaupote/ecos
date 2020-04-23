@@ -28,6 +28,7 @@ enum chann_mode {
 
 #define O_CREAT     4
 #define O_APPEND    8
-#define O_NOFOLLOW 16
+#define O_TRUNC    16
+#define O_NOFOLLOW 32
 
 #endif

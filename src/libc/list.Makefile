@@ -13,6 +13,7 @@ LIBC_CFILES?=libc_main.c \
 	  string/strtok_r.c \
 	  string/strtok.c \
 	  string/strchr.c \
+	  string/strrchr.c \
 	  string/strchrnul.c \
 	  stdio/printf.c \
 	  stdio/putchar.c \
@@ -48,6 +49,7 @@ LIBK_CFILES?=string/memcmp.c \
 	  string/strncmp.c \
 	  string/index.c \
 	  string/strchr.c \
+	  string/strrchr.c \
 	  string/strchrnul.c \
 	  string/strtok_r.c \
 	  stdio/printf.c \
