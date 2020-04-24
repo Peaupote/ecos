@@ -18,6 +18,8 @@
 // careful ! it's a modulo implemented with a bitwise &
 #define SCHED_FREQ 0x3
 
+#define TTY_CURSOR_T 24
+
 // Nombre de priorités (nice) dans le scheduler
 // Au sein du kernel la meilleure priorité est NB_PRIORITY_LVL-1, la pire 0
 // On réserve la priorité NB_PRIORITY_LVL-1 au processus STOP

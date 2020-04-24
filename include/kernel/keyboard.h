@@ -18,6 +18,8 @@
 #define KEY_ALTGR		0xB8
 #define KEY_UP_ARROW	0xC8
 #define KEY_DOWN_ARROW  0xD0
+#define KEY_LEFT_ARROW	0xCB
+#define KEY_RIGHT_ARROW 0xCD
 
 #define KEYS_MASK		0x7F
 #define KEYS_ENTER		0x1C

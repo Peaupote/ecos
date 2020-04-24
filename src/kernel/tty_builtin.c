@@ -73,10 +73,13 @@ static void inspect_channs() {
 }
 
 static uint_ptr read_ptr(const char str[]) {
-    if (str[0] == 'k')
-        return int64_of_str_hexa(str+1)
-            + paging_add_lvl(pgg_pml4, PML4_KERNEL_VIRT_ADDR);
-    return int64_of_str_hexa(str);
+	uint_ptr rt = 0;
+    if (str[0] == 'k') {
+		sscanf(str + 1, "%p", &rt);
+		rt += paging_add_lvl(pgg_pml4, PML4_KERNEL_VIRT_ADDR);
+	} else
+		sscanf(str + 1, "%p", &rt);
+    return rt;
 }
 
 /*
@@ -117,52 +120,58 @@ static void change_log(char** tokpt) {
 	}
 }
 
-size_t tty_built_in_exec(char* cmd) {
+void tty_built_in_exec(tty_seq_t* sq, char* cmd) {
     char* tokpt;
     char* cmd_name = strtok_rnull(cmd, " ", &tokpt);
-    if (!cmd_name) return 0;
+    if (!cmd_name) return;
+
     if (!strcmp(cmd_name, "memat")) {
         char* arg1 = strtok_rnull(NULL, " ", &tokpt);
-        if (!arg1) return 0;
+        if (!arg1) return;
         uint_ptr ptr = read_ptr(arg1);
-        char data_str[2];
-        int8_to_str_hexa(data_str, *(uint8_t*)ptr);
-        return tty_writestringl(data_str, 2, tty_def_color);
+		tty_seq_printf(sq, "%hhx", *(char*)ptr);
+
     } else if (!strcmp(cmd_name, "pg2")) {
         char* arg1 = strtok_rnull(NULL, " ", &tokpt);
-        if (!arg1) return 0;
+        if (!arg1) return;
         uint_ptr ptr = read_ptr(arg1);
         kmem_print_paging(ptr);
+
     } else if (!strcmp(cmd_name, "kprint"))
         tty_do_kprint = !tty_do_kprint;
+
     else if (!strcmp(cmd_name, "a"))
         use_azerty = 1;
+
     else if (!strcmp(cmd_name, "q"))
         use_azerty = 0;
+
     else if (!strcmp(cmd_name, "test")) {
         char* arg1 = strtok_rnull(NULL, " ", &tokpt);
-        if (!arg1) return 0;
+        if (!arg1) return;
         if (!strcmp(arg1, "statut"))      test_print_statut();
         else if(!strcmp(arg1, "kheap"))   test_kheap();
+
     } else if (!strcmp(cmd_name, "ps"))
         proc_ps();
+
     else if (!strcmp(cmd_name, "unblock")) {
         char* arg1 = strtok_rnull(NULL, " ", &tokpt);
-        if (!arg1) return 0;
+        if (!arg1) return;
         char* arg2 = strtok_rnull(NULL, " ", &tokpt);
-        if (!arg2) return 0;
+        if (!arg2) return;
         int   ipid, val = 0;
         sscanf(arg1, "%d", &ipid);
         pid_t pid = ipid;
         sscanf(arg2, "%i", &val);
         state.st_proc[pid].p_reg.r.rdi.i = val;
         proc_unblock_1(pid, state.st_proc + pid);
-    } else if (!strcmp(cmd_name, "ls")) ls(&tokpt);
-    else if (!strcmp(cmd_name, "kill")) {
+
+    } else if (!strcmp(cmd_name, "kill")) {
         char* arg1 = strtok_rnull(NULL, " ", &tokpt);
-        if (!arg1) return 0;
+        if (!arg1) return;
         char* arg2 = strtok_rnull(NULL, " ", &tokpt);
-        if (!arg2) return 0;
+        if (!arg2) return;
         int   ipid, signum = 0;
         sscanf(arg1, "%d", &ipid);
         pid_t pid = ipid;
@@ -176,9 +185,11 @@ size_t tty_built_in_exec(char* cmd) {
         if (cproc != state.st_curr_pid)
             switch_proc(cproc);
     }
+	
+	else if (!strcmp(cmd_name, "ls")) ls(&tokpt);
     else if (!strcmp(cmd_name, "vfiles")) inspect_vfiles();
     else if (!strcmp(cmd_name, "channs")) inspect_channs();
 	else if (!strcmp(cmd_name, "log"))    change_log(&tokpt);
 
-    return 0;
+    return;
 }

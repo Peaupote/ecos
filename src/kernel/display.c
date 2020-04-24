@@ -172,3 +172,9 @@ void display_echar_at(size_t x, size_t y, uint16_t e) {
 		display_char_at(x,y, c, colors[fg], colors[bg]);
 	}
 }
+
+void display_cursor_at(size_t x, size_t y) {
+	unsigned left = x * char_width,
+	          top = y * char_height;
+	display_draw_rect(left, top + 2, 1, char_height - 4, 0xeeeeee);
+}

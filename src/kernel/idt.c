@@ -109,6 +109,7 @@ void common_hdl(uint8_t num, uint64_t errcode) {
 // Processus partiellent sauvegardé
 bool pit_hdl(void) {
     static uint8_t clock = 0;
+	tty_on_pit();
     lookup_end_sleep();
     if ((clock++ & SCHED_FREQ) == 0) {
         pid_t pid = schedule_proc_ev();
