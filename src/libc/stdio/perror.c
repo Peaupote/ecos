@@ -151,5 +151,5 @@ void _errno_init() {
 
 void perror(const char *s) {
     if (!s || !*s) return;
-    fdprintf(STDERR_FILENO, "%s: %s\n", s, err_list[errno]);
+    dprintf(STDERR_FILENO, "%s: %s\n", s, err_list[errno]);
 }

@@ -19,6 +19,7 @@ LIBC_CFILES?=libc_main.c \
 	  stdio/putchar.c \
 	  stdio/puts.c \
 	  stdio/perror.c \
+	  stdio/file.c \
 	  stdlib/atoi.c \
 	  stdlib/malloc.c \
 	  stdlib/env.c \

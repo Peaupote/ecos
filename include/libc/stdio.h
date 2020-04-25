@@ -9,8 +9,44 @@ int  putchar(int c);
 
 int  puts(const char *s);
 
-int  fdprintf(int fd, const char *fmt, ...);
+typedef struct io_file {
+    int   fd;     // file descriptor to open file
+    int   flags;  // remember flags with which file was open
 
+    char *read_ptr;  // current read pointer
+    char *read_end;  // end data
+    char *read_buf;
+
+    char *write_ptr; // current write ptr
+    char *write_end; // end data
+    char *write_buf;
+} FILE;
+
+FILE *fopen(const char *fname, const char *mode);
+FILE *fdopen(int fd, const char *mode);
+int   fclose(FILE *stream);
+
+FILE *stdin;
+FILE *stdout;
+FILE *stderr;
+
+/**
+ * Read nmem items, each size bytes long, from stream to ptr
+ * returns number of items readed
+ */
+size_t fread(void *ptr, size_t size, size_t nmem, FILE *stream);
+
+/**
+ * Write nmem items, each size bytes long, from ptr to stream
+ * returns number of items readed
+ */
+size_t fwrite(const void *ptr, size_t size, size_t nmem, FILE *stream);
+
+int fseek(FILE *stream, long offset, int whence);
+int fflush(FILE *stream);
+
+int  fprintf(FILE *stream, const char *fmt, ...);
+int  dprintf(int fd, const char *fmt, ...);
 int  printf(const char *fmt, ...);
 
 int  scanf(const char *format, ...);

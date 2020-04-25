@@ -74,7 +74,7 @@ void read_flags(const char *flags) {
         case 'i': flag_inode = 1; break;
         case 'l': flag_long  = 1; break;
         default:
-            printf("unknown flag %c\n", *flags);
+            fprintf(stderr, "unknown flag %c\n", *flags);
             exit(1);
         }
     }

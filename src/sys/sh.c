@@ -11,11 +11,11 @@
 #include <stdbool.h>
 
 struct exd_cmd {
-	int    num;
-	struct exd_cmd* next;
-	int    nb_proc;
-	int    nb_alive;
-	pid_t  procs[];
+    int    num;
+    struct exd_cmd* next;
+    int    nb_proc;
+    int    nb_alive;
+    pid_t  procs[];
 };
 
 struct exd_cmd* exd_llist = NULL;
@@ -25,38 +25,38 @@ struct exd_cmd* fg_exd = NULL;
 bool   int_tstp;
 
 struct exd_proc_ref {
-	struct exd_cmd** cmd;
-	int    num;
+    struct exd_cmd** cmd;
+    int    num;
 };
 struct exd_proc_ref find_exd_proc(pid_t pid) {
-	for (struct exd_cmd** cmdr = &exd_llist; *cmdr; cmdr = &(*cmdr)->next) {
-		struct exd_cmd* cmd = *cmdr;
-		for (int i = 0; i < cmd->nb_proc; ++i) {
-			if (cmd->procs[i] == pid) {
-				struct exd_proc_ref rt = {cmdr, i};
-				return rt;
-			}
-		}
-	}
-	struct exd_proc_ref rt = {NULL, 0};
-	return rt;
+    for (struct exd_cmd** cmdr = &exd_llist; *cmdr; cmdr = &(*cmdr)->next) {
+        struct exd_cmd* cmd = *cmdr;
+        for (int i = 0; i < cmd->nb_proc; ++i) {
+            if (cmd->procs[i] == pid) {
+                struct exd_proc_ref rt = {cmdr, i};
+                return rt;
+            }
+        }
+    }
+    struct exd_proc_ref rt = {NULL, 0};
+    return rt;
 }
 struct exd_cmd** find_exd_num(int num) {
-	for (struct exd_cmd** cmdr = &exd_llist; *cmdr; cmdr = &(*cmdr)->next)
-		if ((*cmdr)->num == num)
-			return cmdr;
-	return NULL;
+    for (struct exd_cmd** cmdr = &exd_llist; *cmdr; cmdr = &(*cmdr)->next)
+        if ((*cmdr)->num == num)
+            return cmdr;
+    return NULL;
 }
 struct exd_cmd** on_child_end(pid_t pid) {
-	struct exd_proc_ref rf = find_exd_proc(pid);
-	if (!rf.cmd) {
-		printf("couldn't find %d\n", (int)pid);
-		return NULL;
-	}
-	struct exd_cmd* cmd = *rf.cmd;
-	cmd->procs[rf.num]  = PID_NONE;
-	--cmd->nb_alive;
-	return rf.cmd;
+    struct exd_proc_ref rf = find_exd_proc(pid);
+    if (!rf.cmd) {
+        printf("couldn't find %d\n", (int)pid);
+        return NULL;
+    }
+    struct exd_cmd* cmd = *rf.cmd;
+    cmd->procs[rf.num]  = PID_NONE;
+    --cmd->nb_alive;
+    return rf.cmd;
 }
 
 void int_handler(int signum) {
@@ -64,16 +64,16 @@ void int_handler(int signum) {
         printf("bad signal: %d\n", signum);
         return;
     }
-	for (int i = 0; i < fg_exd->nb_proc; ++i)
-		if (~fg_exd->procs[i] && kill(fg_exd->procs[i], SIGINT))
-    		perror("error sending SIGINT");
+    for (int i = 0; i < fg_exd->nb_proc; ++i)
+        if (~fg_exd->procs[i] && kill(fg_exd->procs[i], SIGINT))
+            perror("error sending SIGINT");
 }
 
 void tstp_handler(int signum __attribute__((unused))) {
-	for (int i = 0; i < fg_exd->nb_proc; ++i)
-		if (~fg_exd->procs[i] && kill(fg_exd->procs[i], SIGTSTP))
-    		perror("error sending SIGSTP");
-	int_tstp = true;
+    for (int i = 0; i < fg_exd->nb_proc; ++i)
+        if (~fg_exd->procs[i] && kill(fg_exd->procs[i], SIGTSTP))
+            perror("error sending SIGSTP");
+    int_tstp = true;
 }
 
 
@@ -204,82 +204,82 @@ void binutil_exit(int argc, const char *argv[]) {
 }
 
 void run_fg() {
-	struct exd_cmd* ecmd = fg_exd = exd_llist;
-	int_tstp = false;
-	sighandler_t
-		prev_hnd_int  = signal(SIGINT,  & int_handler),
-		prev_hnd_tstp = signal(SIGTSTP, &tstp_handler);
+    struct exd_cmd* ecmd = fg_exd = exd_llist;
+    int_tstp = false;
+    sighandler_t
+        prev_hnd_int  = signal(SIGINT,  & int_handler),
+        prev_hnd_tstp = signal(SIGTSTP, &tstp_handler);
 
-	int rs;
-	pid_t wpid;
+    int rs;
+    pid_t wpid;
     while (ecmd->nb_alive > 0) {
-		while (!~(wpid = wait(&rs))) {
-			if (int_tstp) {
-				signal(SIGINT,  prev_hnd_int);
-				signal(SIGTSTP, prev_hnd_tstp);
-				fg_exd = NULL;
-				printf("\tbg %d\n", ecmd->num);
-				return;
-			}
-		}
-		struct exd_cmd** er = on_child_end(wpid);
-		if (!er) continue;
-		struct exd_cmd*   e = *er;
-		if (e != ecmd && e->nb_alive <= 0) {
-			*er = e->next;
-			free(e);
-		}
-	}
-		
-	signal(SIGINT,  prev_hnd_int);
-	signal(SIGTSTP, prev_hnd_tstp);
-	fg_exd = NULL;
-	exd_llist = ecmd->next;
-	free(ecmd);
+        while (!~(wpid = wait(&rs))) {
+            if (int_tstp) {
+                signal(SIGINT,  prev_hnd_int);
+                signal(SIGTSTP, prev_hnd_tstp);
+                fg_exd = NULL;
+                printf("\tbg %d\n", ecmd->num);
+                return;
+            }
+        }
+        struct exd_cmd** er = on_child_end(wpid);
+        if (!er) continue;
+        struct exd_cmd*   e = *er;
+        if (e != ecmd && e->nb_alive <= 0) {
+            *er = e->next;
+            free(e);
+        }
+    }
+
+    signal(SIGINT,  prev_hnd_int);
+    signal(SIGTSTP, prev_hnd_tstp);
+    fg_exd = NULL;
+    exd_llist = ecmd->next;
+    free(ecmd);
 }
 
 void fg(int argc, const char *argv[]) {
-	int num;
-	if (argc != 2 || sscanf(argv[1], "%d", &num) != 1) return;
-	struct exd_cmd** er = find_exd_num(num);
-	if (!er) {
-		printf("Aucune commande corespondante: %d\n", num);
-		return;
-	}
-	
-	struct exd_cmd* e = *er;
-	*er       = e->next;
-	e->next   = exd_llist;
-	exd_llist = e;
-	
-	for (int i = 0; i < e->nb_proc; ++i)
-		if (~e->procs[i] && kill(e->procs[i], SIGCONT))
-    		perror("error sending SIGCONT");
+    int num;
+    if (argc != 2 || sscanf(argv[1], "%d", &num) != 1) return;
+    struct exd_cmd** er = find_exd_num(num);
+    if (!er) {
+        printf("Aucune commande corespondante: %d\n", num);
+        return;
+    }
 
-	run_fg();
+    struct exd_cmd* e = *er;
+    *er       = e->next;
+    e->next   = exd_llist;
+    exd_llist = e;
+
+    for (int i = 0; i < e->nb_proc; ++i)
+        if (~e->procs[i] && kill(e->procs[i], SIGCONT))
+            perror("error sending SIGCONT");
+
+    run_fg();
 }
 
 void exec_cmd() {
     printf("\033d");
 
-	if (ncmd == 1 && !strcmp(cmds->args[0], "fg")) {
+    if (ncmd == 1 && !strcmp(cmds->args[0], "fg")) {
         int argc = 0;
         while (cmds->args[argc]) argc++;
-		fg(argc, cmds->args);
-		return;
-	}
+        fg(argc, cmds->args);
+        return;
+    }
 
-	struct exd_cmd* ecmd = malloc(sizeof(struct exd_cmd) + ncmd * sizeof(pid_t));
-	ecmd->num  = next_exd_num++;
-	ecmd->next = exd_llist;
-	exd_llist  = ecmd;
-	ecmd->nb_proc  = ncmd;
-	ecmd->nb_alive = 0;
+    struct exd_cmd* ecmd = malloc(sizeof(struct exd_cmd) + ncmd * sizeof(pid_t));
+    ecmd->num  = next_exd_num++;
+    ecmd->next = exd_llist;
+    exd_llist  = ecmd;
+    ecmd->nb_proc  = ncmd;
+    ecmd->nb_alive = 0;
 
     int fd_in = STDIN_FILENO;
     for (int i = 0; i < ncmd; i++) {
         struct cmd  *c = cmds + i;
-		ecmd->procs[i] = PID_NONE;
+        ecmd->procs[i] = PID_NONE;
 
         int argc = 0;
         while (c->args[argc]) argc++;
@@ -321,9 +321,9 @@ void exec_cmd() {
             exit(1);
 
         } else {
-			ecmd->procs[i] = rf;
-			++ecmd->nb_alive;
-		}
+            ecmd->procs[i] = rf;
+            ++ecmd->nb_alive;
+        }
 
         if (fd_in != STDIN_FILENO)
             close(fd_in);
@@ -336,7 +336,7 @@ void exec_cmd() {
     if (fd_in != STDIN_FILENO)
         close(fd_in);
 
-	run_fg();
+    run_fg();
 
     /* printf("process %d exited with status %x\n", rc, rs); */
 }
@@ -346,7 +346,7 @@ int main() {
     int rc;
 
     while(1) {
-        printf("\033psh> \033;");
+        printf("\033psh> \033;"); fflush(stdout);
         memset(line, 0, 258);
         rc = read(0, line, 256);
         line[rc] = '\0';//TODO: attendre \n + ne pas aller plus loin

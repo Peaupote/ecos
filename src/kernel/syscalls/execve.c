@@ -433,7 +433,7 @@ void proc_execve_end() {
 
     free_tr();
     proc_set_curr_pid(mp->p_ppid);
-	klogf(Log_info, "syscall", "end execve - return to %d", mp->p_ppid);
+    klogf(Log_info, "syscall", "end execve - return to %d", mp->p_ppid);
     iret_to_proc(pp);
 }
 

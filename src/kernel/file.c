@@ -228,8 +228,8 @@ int vfs_read(vfile_t *vfile, void *buf, off_t pos, size_t len) {
     struct device *dev = devices + dev_id;
     struct fs *fs = fst + dev->dev_fs;
 
-    klogf(Log_verb, "vfs", "read %d (dev %d)",
-          vfile->vf_stat.st_ino, vfile->vf_stat.st_dev);
+    klogf(Log_verb, "vfs", "read %d (dev %d) at pos %d",
+          vfile->vf_stat.st_ino, vfile->vf_stat.st_dev, pos);
 
     int rc = fs->fs_read(vfile->vf_stat.st_ino, buf, pos, len, &dev->dev_info);
     fs->fs_stat(vfile->vf_stat.st_ino, &vfile->vf_stat, &dev->dev_info);

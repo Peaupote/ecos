@@ -149,11 +149,16 @@ int fpprintf(stringl_writer w, void* wi, const char* fmt, va_list ps) {
 
 #ifndef __is_kernel
 static void
+fprint(void *p_stream, const char *s, size_t len) {
+    fwrite(s, 1, len, (FILE*)p_stream); // Write to stout
+}
+
+static void
 fdprint(void *p_fd, const char *s, size_t len) {
     write(*(int*)p_fd, s, len); // Write to stout
 }
 
-int fdprintf(int fd, const char *fmt, ...) {
+int dprintf(int fd, const char *fmt, ...) {
     va_list params;
     va_start(params, fmt);
     int cnt = fpprintf(&fdprint, &fd, fmt, params);
@@ -161,12 +166,23 @@ int fdprintf(int fd, const char *fmt, ...) {
     return cnt;
 }
 
+int fprintf(FILE *stream, const char *fmt, ...) {
+    va_list params;
+    va_start(params, fmt);
+    int cnt = fpprintf(&fprint, stream, fmt, params);
+    va_end(params);
+
+    if (strchr(fmt, '\n')) fflush(stream);
+    return cnt;
+}
+
 int printf(const char *fmt, ...) {
     va_list params;
     va_start(params, fmt);
-	int fd = STDOUT_FILENO;
-    int cnt = fpprintf(&fdprint, &fd, fmt, params);
+    int cnt = fpprintf(&fprint, stdout, fmt, params);
     va_end(params);
+
+    if (strchr(fmt, '\n')) fflush(stdout);
     return cnt;
 }
 #endif

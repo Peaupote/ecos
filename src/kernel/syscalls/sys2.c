@@ -23,7 +23,7 @@ int sys_open(const char *fname, int oflags, int perms) {
         if (state.st_chann[cid].chann_mode == UNUSED) break;
 
     if (cid == NCHAN) {
-        klogf(Log_error, "sys", "no channel available");
+        klogf(Log_info, "sys", "no channel available");
         set_errno(ENFILE);
         return -1;
     }
@@ -37,12 +37,12 @@ int sys_open(const char *fname, int oflags, int perms) {
             is_new_file   = 1;
             if (!c->chann_vfile) {
                 set_errno(ENOENT);
-                klogf(Log_error, "syscall", "couldn't create file %s", fname);
+                klogf(Log_info, "syscall", "couldn't create file %s", fname);
                 return -1;
             }
         } else {
             set_errno(ENOENT);
-            klogf(Log_error, "sys", "process %d couldn't open %s",
+            klogf(Log_info, "sys", "process %d couldn't open %s",
                   state.st_curr_pid, fname);
             return -1;
         }
@@ -223,8 +223,10 @@ ssize_t sys_read(int fd, uint8_t *d, size_t len) {
         if (rc < 0) goto err_overflow; //TODO
         goto succ;
     case TYPE_REG:
-        if (chann->chann_pos == vfile->vf_stat.st_size)
+        if (chann->chann_pos >= vfile->vf_stat.st_size) {
+            chann->chann_pos = vfile->vf_stat.st_size;
             goto succ;
+        }
 
         rc = vfs_read(vfile, d, chann->chann_pos, len);
         if (rc < 0)

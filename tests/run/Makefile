@@ -19,8 +19,12 @@ home: sys
 	cp $(ROOT)/src/sys/wc.out    home/bin/wc
 	cp $(ROOT)/src/sys/env.out   home/bin/env
 	cp $(ROOT)/src/sys/mkdir.out home/bin/mkdir
+
 	cp $(ROOT)/src/sys/test.c    home/test/test.c
 	cp $(ROOT)/src/sys/test.out  home/test/test
+	cp $(ROOT)/src/sys/test2.out home/test/test2
+	cp $(ROOT)/src/sys/test3.out home/test/test3
+
 
 home.img: home
 	$(ROOT)/tools/build-ext2.sh home home.img
