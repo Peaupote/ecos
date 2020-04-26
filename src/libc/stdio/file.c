@@ -170,3 +170,102 @@ size_t fwrite(const void *ptr, size_t size, size_t nmem, FILE *s) {
 
     return cnt / size;
 }
+
+int fputc(int c, FILE *s) {
+    if (!s || !(s->flags&WRITE)) {
+        errno = EINVAL;
+        return -1;
+    }
+
+    if (s->write_ptr == s->write_end) {
+        int rc = write(s->fd, s->write_buf, s->write_ptr - s->write_buf);
+        if (rc <= 0) return EOF;
+        s->write_ptr = s->write_buf;
+    }
+
+    *s->write_ptr++ = c;
+    return c;
+}
+
+int fputs(const char *src, FILE *s) {
+    if (!src || !s || !(s->flags&WRITE)) {
+        errno = EINVAL;
+        return EOF;
+    }
+
+    int c;
+    while(*src && (c = fputc(*src, s)) != EOF) ++src;
+    return 1;
+}
+
+int fgetc(FILE *s) {
+    if (!s || !(s->flags&READ)) {
+        errno = EINVAL;
+        return -1;
+    }
+
+    if (s->read_ptr == s->read_end) {
+        int rc = read(s->fd, s->read_buf, FILE_BUF_SIZE);
+        if (rc < 0) return EOF;
+
+        s->read_ptr = s->read_buf;
+        s->read_end = s->read_buf + rc;
+        if (!rc) return EOF;
+    }
+
+    return *s->read_ptr++;
+}
+
+char *fgets(char *dst, int size, FILE *s) {
+    if (!dst || !s || size < 0 || !(s->flags&READ)) {
+        errno = EINVAL;
+        return 0;
+    }
+
+    char *rt = dst;
+    int c;
+    while(size > 0 && (c = fgetc(s)) != EOF) --size, *dst++ = c;
+    return rt == dst ? 0 : rt;
+}
+
+ssize_t getdelim(char **lineptr, size_t *n, int delim, FILE *stream) {
+    if (!lineptr || !n || delim < 0 || !stream || !(stream->flags&READ)) {
+        errno = EINVAL;
+        return -1;
+    }
+
+    if (!*lineptr) {
+        *lineptr = malloc(1024);
+        if (!lineptr) return -1;
+        *n = 1024;
+    }
+
+    char *dst = *lineptr;
+    int c;
+    size_t cnt = 0;
+    while ((c = fgetc(stream)) != EOF) {
+        if (cnt == *n) {
+            // realloc
+            char *ptr = malloc(*n << 1);
+            if (!*ptr) return -1;
+
+            memcpy(ptr, *lineptr, *n);
+            *lineptr = ptr;
+            *n <<= 1;
+            dst = *lineptr;
+        }
+
+        *dst++ = c;
+        ++cnt;
+
+        if (c == delim) break;
+    }
+
+    *dst++ = 0;
+
+    return cnt;
+}
+
+ssize_t getline(char **lineptr, size_t *n, FILE *stream) {
+    return getdelim(lineptr, n, '\n', stream);
+}

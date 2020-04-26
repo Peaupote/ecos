@@ -23,6 +23,7 @@ LIBC_CFILES?=libc_main.c \
 	  stdlib/atoi.c \
 	  stdlib/malloc.c \
 	  stdlib/env.c \
+	  stdlib/exit.c \
 	  unistd/brk.c \
 	  unistd/exec.c \
 	  stdio/scanf.c \

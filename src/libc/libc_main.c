@@ -4,6 +4,7 @@
 #include <libc/stdlib.h>
 #include <libc/stdio.h>
 
+extern void _exit(int status);
 extern void _errno_init();
 extern void _env_init();
 extern void _env_cleanup();
@@ -29,5 +30,5 @@ void _libc_exit(int code) {
     fclose(stderr);
 
     _env_cleanup();
-    exit(code);
+    _exit(code);
 }
