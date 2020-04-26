@@ -35,7 +35,7 @@ void sched_init() {
     }
 }
 
-void proc_start() {
+void proc_init() {
     sched_init();
 
     // processus 0: p_idle
@@ -125,8 +125,13 @@ void proc_start() {
     state.st_curr_pid = PID_INIT;
     st_curr_reg       = &p_init->p_reg;
 
-	kAssert(fs_proc_std_to_tty(state.st_proc + PID_INIT));
+	kAssert(fs_proc_std_to_tty(p_init));
+	kpanic_is_early = false;
 
+}
+
+void proc_start(void) {
+	proc_t* p_init = state.st_proc + PID_INIT;
     klogf(Log_info, "init", "Start process init @ %p", p_init->p_reg.rip.p);
     iret_to_proc(p_init);
 }

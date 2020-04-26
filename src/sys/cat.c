@@ -7,9 +7,10 @@ int main(int argc, char *argv[]) {
     FILE *fp = stdin;
     size_t rc;
 
+	int i = 1;
     if (argc == 1) goto start;
 
-    for (int i = 1; i < argc; i++) {
+    for (; i < argc; ++i) {
         fp = fopen(argv[i], "r");
         if (!fp) {
             sprintf(buf, "cat: %s", argv[i]);

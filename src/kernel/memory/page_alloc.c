@@ -202,7 +202,8 @@ mblock_split_f mblock_split[3] = {
 
 uint16_t mblock_alloc_page(struct MemBlock* b) {
     uint16_t rt;
-    if (!b->nb_at_lvl[0]) {
+    
+	if (!b->nb_at_lvl[0]) {
         if (!b->nb_at_lvl[1]) {
             if (!b->nb_at_lvl[2]) {
                 rt = 0;
@@ -213,6 +214,7 @@ uint16_t mblock_alloc_page(struct MemBlock* b) {
         } else rt = mblock_alloc_lvl_1(b);
         mblock_split_lvl_1(b, rt, 1);
     } else rt = mblock_alloc_lvl_0(b);
+
     return rt;
 }
 
@@ -400,19 +402,22 @@ phy_addr palloc_alloc_page(struct PageAllocator* a) {
     size_t b;
     if (mbtree_non_empty(&a->mbt_part))
         b = mbtree_find(&a->mbt_part);
-    else if(mbtree_non_empty(&a->mbt_full))
+	else if(mbtree_non_empty(&a->mbt_full))
         b = mbtree_find(&a->mbt_full);
-    else {
+	else {
         kpanic("Out of memory");
         return 0; //Non atteint
     }
 
-    bool prev_3    = mblock_full_free (a->mblocks + b);
+	kAssert(mblock_non_empty(a->mblocks + b));
+    
+	bool prev_3    = mblock_full_free (a->mblocks + b);
     uint16_t p_rel = mblock_alloc_page(a->mblocks + b);
-    if (prev_3) {
+    
+	if (prev_3) {
         mbtree_add(&a->mbt_part,  b);
         mbtree_rem(&a->mbt_full, b);
-    } else if (!mblock_non_empty(a->mblocks+b))
+    } else if (!mblock_non_empty(a->mblocks + b))
         mbtree_rem(&a->mbt_part,  b);
 
     phy_addr rt = p_rel << PAGE_SHIFT;

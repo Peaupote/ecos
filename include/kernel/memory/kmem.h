@@ -55,14 +55,14 @@ uint16_t kmem_bind_dynamic_range(uint16_t num,
 
 // --Allocation de pages physiques--
 
+static inline size_t kmem_nb_page_free() {
+    return palloc_nb_free_page(&page_alloc);
+}
 static inline phy_addr kmem_alloc_page() {
 	return palloc_alloc_page(&page_alloc);
 }
 static inline void kmem_free_page(phy_addr p) {
-    palloc_free_page(&page_alloc, p);
-}
-static inline size_t kmem_nb_page_free() {
-    return palloc_nb_free_page(&page_alloc);
+	palloc_free_page(&page_alloc, p);
 }
 
 // --KHeap--

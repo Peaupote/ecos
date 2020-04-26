@@ -1,6 +1,7 @@
 #ifndef __is_test_unit
 #include <libc/stdlib.h>
 #include <libc/unistd.h>
+//#define MALLOC_PRINT
 #endif
 
 #include <libc/string.h>
@@ -78,7 +79,13 @@ static inline void llist_insert_before(struct free_bloc* ref,
     b->next   = ref;
 }
 
+#ifdef MALLOC_PRINT
+#include <libc/stdio.h>
+#endif
+
 void* TEST_U(malloc)(size_t dsize) {
+	if (!dsize) return NULL;
+
     size_t size = MALLOC_MIN_DSZ + MALLOC_HD_SZ;
     if (dsize > MALLOC_MIN_DSZ)
         size = align_to_size(dsize + MALLOC_HD_SZ, MALLOC_ALIGN);
@@ -89,7 +96,6 @@ void* TEST_U(malloc)(size_t dsize) {
             uint32_t bsz = MBLOC_SIZE_MASK & *hd;
 
             if (bsz >= size + MALLOC_MIN_DSZ + MALLOC_HD_SZ) {
-                // On fragmente le bloc
                 free_bloc_t* rem = (free_bloc_t*) (size + (uint_ptr)it);
                 uint32_t rsz       = bsz - size;
 
@@ -107,17 +113,26 @@ void* TEST_U(malloc)(size_t dsize) {
 
                 *hd &= ~(uint32_t)MBLOC_FREE;
             }
+#ifdef MALLOC_PRINT
+			fprintf(stderr, "malloc rt(0)=%p\n", it);
+#endif
+			return it;
         }
-        return it;
     }
 
     void *rt_hd       = sbrk((intptr_t)size);
     *(uint32_t*)rt_hd = size;
     up_lim            = (uint_ptr)rt_hd + size;
+#ifdef MALLOC_PRINT
+	fprintf(stderr, "malloc rt(1)=%p\n", (void*)(MALLOC_HD_SZ + (uint_ptr)rt_hd));
+#endif
     return (void*)(MALLOC_HD_SZ + (uint_ptr)rt_hd);
 }
 
 void TEST_U(free)(void* ptr) {
+#ifdef MALLOC_PRINT
+	fprintf(stderr, "free %p\n", ptr);
+#endif
     if (!ptr) return;
 
     free_bloc_t*      b = (free_bloc_t*) ptr;
@@ -167,4 +182,17 @@ void *calloc(size_t nmemb, size_t size) {
     }
 
     return ret;
+}
+
+void* realloc(void* ptr, size_t size) {
+	if (!size) {
+		free(ptr);
+		return NULL;
+	}
+	void *rt = malloc(size);
+	if (rt) {
+		memcpy(rt, ptr, size);
+		free(ptr);
+	}
+	return rt;
 }

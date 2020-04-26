@@ -30,10 +30,13 @@ static void kernel_init(uint32_t boot_info) {
 	multiboot_info_t* mbi = (multiboot_info_t*)
 			kmem_dynamic_slot_at(0, boot_info);
 
+    kmem_init_alloc(mbi);
+	
 	display_init(mbi);
     tty_init(ttym_def);
+	klog_level = Log_error;
 
-    kmem_init_alloc(mbi);
+	proc_init();
 
     tss_init();
     idt_init();
@@ -50,6 +53,6 @@ void kernel_main(uint32_t boot_info) {
     tty_afficher_buffer_all();
 
     tty_new_prompt();
-
+	
     proc_start();
 }

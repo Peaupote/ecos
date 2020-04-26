@@ -27,10 +27,13 @@ int kprintf(const char *format, ...) {
     return count;
 }
 
-enum klog_level klog_level = Log_error;
+enum klog_level klog_level = Log_early;
 char klog_filtr[256] = "";
+int  nb_early_error  = 0;
+bool kpanic_is_early = true;
 
 bool klog_pass_filtr(enum klog_level lvl, const char* hd) {
+	if (klog_level == Log_early && lvl <= Log_error) ++nb_early_error;
 	return lvl <= klog_level
 		&& (*klog_filtr == '\0' || !strcmp(hd, klog_filtr));
 }
@@ -66,12 +69,19 @@ void kpanic_stop() {
     kpanic_do_stop();
 }
 
+__attribute__((noreturn))
+void kpanic_early() {
+	while(true) halt();
+}
+
 void kpanic(const char *msg) {
+	if (kpanic_is_early) kpanic_early();
     kprintf("PANIC! cpid=%d\n", (int)state.st_curr_pid);
     kprintf("%s", msg);
     kpanic_stop();
 }
 void kpanicf(const char *msg, const char *fmt, ...) {
+	if (kpanic_is_early) kpanic_early();
     kprintf("PANIC! cpid=%d\n", (int)state.st_curr_pid);
     kprintf("%s\n", msg);
     va_list params;

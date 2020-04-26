@@ -169,8 +169,11 @@ static inline proc_t* cur_proc() {
 
 /**
  * Initialize state of the machine
- * create process IDLE and INIT
- * start INIT
+ * create process IDLE, INIT and STOP
+ */
+void proc_init(void);
+
+/** start INIT
  */
 __attribute__ ((noreturn))
 void proc_start(void);

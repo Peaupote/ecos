@@ -9,7 +9,7 @@
 struct dirp *opendir(const char *fname) {
     int serr, fd = open(fname, READ);
     struct stat st;
-    struct dirp *dirp = 0;
+    struct dirp *dirp = NULL;
 
     if (fd < 0) goto error;
 

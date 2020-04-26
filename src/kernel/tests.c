@@ -9,6 +9,7 @@
 #include <kernel/idt.h>
 #include <kernel/gdt.h>
 #include <kernel/kutil.h>
+#include <kernel/memory/page_alloc.h>
 
 uint8_t test_struct_layout() {
     return
@@ -22,7 +23,8 @@ void test_print_statut(void) {
     uint16_t ss;
     asm("movq %%rsp, %0" : "=r"(rsp));
     asm("movw %%ss, %0" : "=r"(ss));
-    klogf(Log_info, "test", "rsp=%p ss=%x", rsp, (unsigned int)ss);
+    kprintf("rsp=%p ss=%x\n", rsp, (unsigned int)ss);
+	kprintf("early err: %d\n", nb_early_error);
 }
 
 void test_kheap(void) {
