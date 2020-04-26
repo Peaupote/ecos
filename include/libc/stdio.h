@@ -30,6 +30,8 @@ FILE *stdin;
 FILE *stdout;
 FILE *stderr;
 
+#define EOF -1
+
 /**
  * Read nmem items, each size bytes long, from stream to ptr
  * returns number of items readed
@@ -48,6 +50,15 @@ int fflush(FILE *stream);
 int  fprintf(FILE *stream, const char *fmt, ...);
 int  dprintf(int fd, const char *fmt, ...);
 int  printf(const char *fmt, ...);
+
+int fgetc(FILE *stream);
+char *fgets(char *s, int size, FILE *stream);
+
+int fputc(int c, FILE *stream);
+int fputs(const char *s, FILE *stream);
+
+ssize_t getline(char **lineptr, size_t *n, FILE *stream);
+ssize_t getdelim(char **lineptr, size_t *n, int delim, FILE *stream);
 
 int  scanf(const char *format, ...);
 

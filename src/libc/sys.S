@@ -27,7 +27,7 @@
 
 mksc sleep        SYS_SLEEP
 mksc fork         SYS_FORK
-mksc exit         SYS_EXIT
+mksc _exit        SYS_EXIT
 mksc wait         SYS_WAIT
 mksc waitpid      SYS_WAITPID
 mksc getpid       SYS_GETPID
