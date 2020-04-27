@@ -30,7 +30,7 @@ FILE *stdin;
 FILE *stdout;
 FILE *stderr;
 
-#define EOF -1
+#define EOF (-1)
 
 /**
  * Read nmem items, each size bytes long, from stream to ptr

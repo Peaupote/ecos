@@ -1,3 +1,5 @@
+export TEST_SEED?=
+
 ROOT=../../..
 include ../vars.Makefile
 

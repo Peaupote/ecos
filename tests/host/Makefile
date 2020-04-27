@@ -1,4 +1,4 @@
-TEST_SEED=
+export TEST_SEED?=
 
 include ./vars.Makefile
 ifdef TEST_SEED

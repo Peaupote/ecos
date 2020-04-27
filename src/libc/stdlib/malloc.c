@@ -37,8 +37,8 @@ struct free_bloc {
 };
 
 // fin du dernier bloc, qui est nécessairement alloué
-uint_ptr    up_lim;
-free_bloc_t root;
+static uint_ptr    up_lim;
+static free_bloc_t root;
 
 void _malloc_init() {
     up_lim    = (uint_ptr) sbrk(0);
@@ -97,10 +97,11 @@ void* TEST_U(malloc)(size_t dsize) {
 
             if (bsz >= size + MALLOC_MIN_DSZ + MALLOC_HD_SZ) {
                 free_bloc_t* rem = (free_bloc_t*) (size + (uint_ptr)it);
-                uint32_t rsz       = bsz - size;
+                uint32_t rsz     = bsz - size;
 
-                *bloc_head(rem) = *(uint32_t*)(bsz + (uint_ptr)hd)
-                                   = rsz | MBLOC_FREE;
+                *bloc_head(rem) 
+					= *(uint32_t*)(bsz - MALLOC_HD_SZ + (uint_ptr)hd)
+                    = rsz | MBLOC_FREE;
 
                 llist_replace(it, rem);
                 *hd = size | (MBLOC_PREV_FREE & *hd);

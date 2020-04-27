@@ -133,7 +133,7 @@ pid_t sys_fork() {
     }
 
     fp         = state.st_proc + fpid;
-    fp->p_ppid  = state.st_curr_pid;
+    fp->p_ppid = state.st_curr_pid;
 
     // Ajout dans la liste des enfants
     if (~pp->p_fchd) {
