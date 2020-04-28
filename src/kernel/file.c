@@ -12,6 +12,8 @@
 extern char home_partition[];
 extern char home_partition_end[];
 
+uint32_t home_dev;
+
 void vfs_init() {
     klogf(Log_info, "vfs", "Initialize");
 
@@ -65,7 +67,7 @@ void vfs_init() {
     vfs_mount(PROC_MOUNT, PROC_FS, 0);
     klogf(Log_info, "ext2", "home_part: %p - %p",
                     home_partition, home_partition_end);
-    vfs_mount("/home", EXT2_FS, home_partition);
+    home_dev = vfs_mount("/home", EXT2_FS, home_partition);
 }
 
 int vfs_mount(const char *path, uint8_t fs, void *partition) {
@@ -123,16 +125,15 @@ struct device *find_device(const char *fname) {
 
 // TODO : follow symlink
 static ino_t vfs_lookup(struct mount_info *info, struct fs *fs,
-                        const char *full_name, struct stat *st) {
+                        ino_t ino, const char *full_name, struct stat *st) {
     klogf(Log_info, "vfs", "lookup for %s", full_name);
     char name[256] = { 0 };
     char *start, *end;
 
-    if (!full_name) return 0;
+    if (!full_name) return ino;
+
     start = (char*)(*full_name == '/' ? full_name + 1 : full_name);
     end = strchrnul(start, '/');
-
-    ino_t ino = info->root_ino;
 
     while (*start) {
         memcpy(name, start, end - start);
@@ -150,22 +151,41 @@ static ino_t vfs_lookup(struct mount_info *info, struct fs *fs,
     return fs->fs_stat(ino, st, info);
 }
 
+static char *fname_to_ino(const char *fname, ino_t *ino, struct device **dev) {
+    // if fullpath start with / then start at device root
+    // otherwise start at current work directory
+    if (*fname == '/') {
+        *dev = find_device(fname);
+        if (!dev) {
+            klogf(Log_info, "vfs", "no mount point %s", fname);
+            return 0;
+        }
+
+        *ino = (*dev)->dev_info.root_ino;
+        return (char*)fname + strlen((*dev)->dev_mnt);
+    }
+
+    *ino = state.st_proc[state.st_curr_pid].p_cino;
+    *dev = devices + state.st_proc[state.st_curr_pid].p_dev;
+
+    return (char*)fname;
+}
+
 vfile_t *vfs_load(const char *filename, int flags) {
     if (!filename || !*filename) return 0;
 
-    struct device *dev = find_device(filename);
-    if (!dev) {
-        klogf(Log_info, "vfs", "no mount point %s", filename);
-        return 0;
-    }
+    ino_t ino;
+    struct device *dev;
+    char *fname;
+
+    if (!(fname = fname_to_ino(filename, &ino, &dev))) return 0;
 
     klogf(Log_info, "vfs", "load %s from %s (device id %d)",
           filename, dev->dev_mnt, dev->dev_id);
 
     struct fs *fs = fst + dev->dev_fs;
     struct stat st;
-    char *fname = (char*)(filename + strlen(dev->dev_mnt));
-    ino_t rc = vfs_lookup(&dev->dev_info, fs, fname, &st);
+    ino_t rc = vfs_lookup(&dev->dev_info, fs, ino, fname, &st);
 
     if (!rc) {
         set_errno(ENOENT);
@@ -294,36 +314,33 @@ int vfs_close(vfile_t *vf) {
     return 0;
 }
 
-ino_t vfs_create(const char *fname, mode_t perm) {
-    struct device *dev = find_device(fname);
-    if (!dev) {
-        klogf(Log_info, "vfs", "no mount point %s", fname);
-        set_errno(ENOENT);
-        return 0;
-    }
+ino_t vfs_create(const char *fullname, mode_t perm) {
+    ino_t curr_ino;
+    struct device *dev;
+    char *fname;
+
+    if (!(fname=fname_to_ino(fullname, &curr_ino, &dev))) return 0;
 
     klogf(Log_info, "vfs", "create %s", fname);
 
     // extract parent name from full name
-    char *filename = strrchr(fname, '/');
-    if (!filename) {
-        set_errno(EINVAL);
-        klogf(Log_error, "vfs", "invalid filename %s", fname);
-        return 0;
-    }
-
     char parent[256] = { 0 };
-    memcpy(parent, fname, filename++ - fname);
+    char *filename = strrchr(fname, '/');
+    if (!filename) { // parent is current dir
+        filename = fname;
+        memcpy(parent, ".", 2);
+    } else {
+        memcpy(parent, fname, filename++ - fname);
+    }
 
     // lookup for parent in fs
     struct stat st;
     struct fs *fs = fst + dev->dev_fs;
     fs_create_t *create = perm&TYPE_DIR ? fs->fs_mkdir : fs->fs_touch;
 
-    char *path = (char*)(parent + strlen(dev->dev_mnt));
-    ino_t rc = vfs_lookup(&dev->dev_info, fs, path, &st);
+    ino_t rc = vfs_lookup(&dev->dev_info, fs, curr_ino, parent, &st);
     if (!rc) {
-        klogf(Log_error, "vfs", "alloc: no file %s", path);
+        klogf(Log_error, "vfs", "alloc: no file %s", parent);
         return 0;
     }
 

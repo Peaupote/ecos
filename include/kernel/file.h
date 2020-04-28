@@ -117,6 +117,8 @@ struct fs {
     fs_readsymlink_t    *fs_readsymlink;
 } fst [NFST];
 
+uint32_t home_dev;
+
 void vfs_init();
 int  vfs_mount(const char *path, uint8_t fs, void *partition);
 

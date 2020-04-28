@@ -30,6 +30,7 @@ syscall_tab:
     .quad sys_execve
     .quad sys_fstat
     .quad sys_mkdir
+    .quad sys_chdir
     .quad sys_setpriority
     .quad sys_getpriority
     .quad sys_sbrk
@@ -400,6 +401,6 @@ kpanic_do_stop:
     jmp 1b
 
 schedule_proc:
-	movabs $kernel_stack_top, %rsp
-	movabs $_schedule_proc,   %rax
-	jmpq   *%rax
+    movabs $kernel_stack_top, %rsp
+    movabs $_schedule_proc,   %rax
+    jmpq   *%rax
