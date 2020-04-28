@@ -4,7 +4,7 @@ ROOT=../..
 include $(ROOT)/vars.Makefile
 
 CFILES=init1.c sh.c cat.c echo.c stat.c ls.c ps.c wc.c env.c mkdir.c \
-		head.c test.c test2.c test3.c
+		head.c pwd.c test.c test2.c test3.c
 OUT=$(CFILES:.c=.out)
 SRCDEP=$(CFILES) start.S
 INCLUDE_LIBC?=-I ../../include/libc
