@@ -10,6 +10,7 @@
 #include <kernel/tty.h>
 #include <kernel/gdt.h>
 #include <kernel/memory/kmem.h>
+#include <kernel/file.h>
 
 #include <libc/sys/wait.h>
 #include <libc/stdio.h>
@@ -76,6 +77,11 @@ void proc_init() {
     p_init->p_shnd.ign = 0;
     p_init->p_shnd.dfl = ~(sigset_t)0;
 
+    // set init's work directory to root of home partition
+    // (defined during vfs_init)
+    p_init->p_dev  = home_dev;
+    p_init->p_cino = devices[home_dev].dev_info.root_ino;
+
     // processus 2: stop, utilisé en cas de panic
     proc_t *p_stop = &state.st_proc[PID_STOP];
     p_stop->p_ppid = PID_STOP;
@@ -117,22 +123,20 @@ void proc_init() {
         state.st_proc[pid].p_nxfr = pid + 1;
     }
     state.st_proc[NPROC - 1].p_nxfr = PID_NONE;
-	state.st_free_proc_last = NPROC - 1;
-
-    vfs_init();
+    state.st_free_proc_last = NPROC - 1;
 
     sched_add_proc(PID_IDLE);
 
     state.st_curr_pid = PID_INIT;
     st_curr_reg       = &p_init->p_reg;
 
-	kAssert(fs_proc_std_to_tty(p_init));
-	kpanic_is_early = false;
+    kAssert(fs_proc_std_to_tty(p_init));
+    kpanic_is_early = false;
 
 }
 
 void proc_start(void) {
-	proc_t* p_init = state.st_proc + PID_INIT;
+    proc_t* p_init = state.st_proc + PID_INIT;
     klogf(Log_info, "init", "Start process init @ %p", p_init->p_reg.rip.p);
     iret_to_proc(p_init);
 }
@@ -290,7 +294,7 @@ void proc_ps() {
                     pid==state.st_curr_pid ? '*' : ' ',
                     (int)pid, (int)proc_state_char[p->p_stat],
                     (int)p->p_ppid, 19 - (int)p->p_prio,
-					p->p_pml4, p->p_cmd);
+                    p->p_pml4, p->p_cmd);
     }
 }
 
@@ -324,7 +328,7 @@ static inline bool is_waiting_me(proc_t* pp, pid_t mpid) {
 }
 
 static void kill_proc_remove(pid_t pid __attribute__((unused)),
-		proc_t* p, proc_t* pp) {
+        proc_t* p, proc_t* pp) {
     if (~p->p_fchd) {
         // Les enfants du processus reçoivent INIT comme nouveau parent
         proc_t* fcp = state.st_proc + p->p_fchd;

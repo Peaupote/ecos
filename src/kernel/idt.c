@@ -76,40 +76,40 @@ __attribute__ ((noreturn))
 static inline void kill_cur_for_err(uint8_t errnum, uint64_t errcode) {
     const char *desc = error_desc[errnum < NEXCEPTION ? errnum : NEXCEPTION];
     klogf(Log_error, "exception", "proc %d %s: error code %llx",
-						(int)state.st_curr_pid, desc, errcode);
-	proc_t* p = cur_proc();
+                        (int)state.st_curr_pid, desc, errcode);
+    proc_t* p = cur_proc();
 
-	if (~p->p_fds[STDERR_FILENO]) { //TODO
-		chann_t *chann = &state.st_chann[p->p_fds[STDERR_FILENO]];
-		vfile_t *vfile = chann->chann_vfile;
-    	if (chann->chann_mode == WRITE || chann->chann_mode == RDWR) {
-			char buf[255];
-			int wc = sprintf(buf, "%d %x %s\n",
-					(int)state.st_curr_pid, errnum, desc);
-			switch (vfile->vf_stat.st_mode & FTYPE_MASK) {
-				case TYPE_REG:
-					vfs_write(vfile, buf, chann->chann_pos, wc);
-					break;
-				case TYPE_FIFO: case TYPE_CHAR:
-					vfs_write(vfile, buf, 0, wc);
-					break;
-				default: break;
-			}
-		}
-	}
+    if (~p->p_fds[STDERR_FILENO]) { //TODO
+        chann_t *chann = &state.st_chann[p->p_fds[STDERR_FILENO]];
+        vfile_t *vfile = chann->chann_vfile;
+        if (chann->chann_mode == WRITE || chann->chann_mode == RDWR) {
+            char buf[255];
+            int wc = sprintf(buf, "%d %x %s\n",
+                    (int)state.st_curr_pid, errnum, desc);
+            switch (vfile->vf_stat.st_mode & FTYPE_MASK) {
+                case TYPE_REG:
+                    vfs_write(vfile, buf, chann->chann_pos, wc);
+                    break;
+                case TYPE_FIFO: case TYPE_CHAR:
+                    vfs_write(vfile, buf, 0, wc);
+                    break;
+                default: break;
+            }
+        }
+    }
 
-	kill_proc_nr(0x3300 + errnum);
+    kill_proc_nr(0x3300 + errnum);
 }
 
 void common_hdl(uint8_t num, uint64_t errcode) {
-	kill_cur_for_err(num, errcode);
+    kill_cur_for_err(num, errcode);
 }
 
 
 // Processus partiellent sauvegardé
 bool pit_hdl(void) {
     static uint8_t clock = 0;
-	tty_on_pit();
+    tty_on_pit();
     lookup_end_sleep();
     if ((clock++ & SCHED_FREQ) == 0) {
         pid_t pid = schedule_proc_ev();
@@ -120,7 +120,7 @@ bool pit_hdl(void) {
     }
 
     write_eoi();
-	proc_hndl_sigs();
+    proc_hndl_sigs();
     return false;
 }
 
@@ -132,8 +132,8 @@ void pit_hdl_switch(void) {
           state.st_sched.nb_proc + 1, state.st_curr_pid,
           p->p_reg.rip.p, p->p_reg.rsp.p);
 
-	write_eoi();
-	proc_hndl_sigs();
+    write_eoi();
+    proc_hndl_sigs();
     run_proc(p);
 }
 
@@ -152,15 +152,16 @@ void exception_PF_hdl(uint_ptr fault_vaddr, uint64_t errcode) {
     if (!(errcode & EXC_PF_ERC_P)
             && paging_get_lvl(pgg_pml4, fault_vaddr) < PML4_END_USPACE) {
         if (!handle_PF(fault_vaddr)) {
-			klogf(Log_verb, "exc", "#PF handled");
-			return;
-		}
-		klogf(Log_error, "#PF", "fail handling on %p errcode=%llx",
-				fault_vaddr, errcode);
+            klogf(Log_verb, "exc", "#PF handled");
+            return;
+        }
+        klogf(Log_error, "#PF", "fail handling on %p errcode=%llx",
+                fault_vaddr, errcode);
     } else
         klogf(Log_error, "#PF", "can't handle on %p errcode=%llx",
                     fault_vaddr, errcode);
-	kill_cur_for_err(0xe, errcode);
+
+    kill_cur_for_err(0xe, errcode);
 }
 
 static inline void idt_int_asgn(int n, uint64_t addr, uint8_t attr,

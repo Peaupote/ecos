@@ -20,6 +20,7 @@ home: sys
 	cp $(ROOT)/src/sys/env.out   home/bin/env
 	cp $(ROOT)/src/sys/mkdir.out home/bin/mkdir
 	cp $(ROOT)/src/sys/head.out  home/bin/head
+	cp $(ROOT)/src/sys/pwd.out   home/bin/pwd
 
 	cp $(ROOT)/src/sys/test.c    home/test/test.c
 	cp $(ROOT)/src/sys/test.out  home/test/test

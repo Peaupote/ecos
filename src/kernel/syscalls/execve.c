@@ -357,6 +357,8 @@ int sys_execve(reg_t fname, reg_t argv, reg_t env) {
     ep->p_reg.r.rdx = env;
     ep->p_errno = 0;
     strncpy(ep->p_cmd, (char*)fname.p, 256);
+    ep->p_cino = p->p_cino;
+    ep->p_dev  = p->p_dev;
 
     // On arrête processus appelant en le passant en BLOCK
     p->p_stat            = BLOCK;

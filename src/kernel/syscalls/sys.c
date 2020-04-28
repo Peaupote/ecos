@@ -132,7 +132,7 @@ pid_t sys_fork() {
         return -1;
     }
 
-    fp         = state.st_proc + fpid;
+    fp        = state.st_proc + fpid;
     fp->p_ppid = state.st_curr_pid;
 
     // Ajout dans la liste des enfants
@@ -165,6 +165,8 @@ pid_t sys_fork() {
     fp->p_spnd  = 0;
     fp->p_shnd  = pp->p_shnd;
     fp->p_errno = pp->p_errno;
+    fp->p_cino  = pp->p_cino;
+    fp->p_dev   = pp->p_dev;
 
     pp->p_nchd++; // one more child
     memcpy(&fp->p_reg, &pp->p_reg, sizeof(struct reg));

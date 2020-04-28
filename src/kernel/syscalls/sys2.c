@@ -385,3 +385,30 @@ int sys_mkdir(const char *path, mode_t mode) {
     set_errno(SUCC);
     return ino ? 0 : -1;
 }
+
+int sys_chdir(const char *fname) {
+    if (!fname) {
+        set_errno(EINVAL);
+        return -1;
+    }
+
+    vfile_t *vf = vfs_load(fname, 0);
+    if (!vf) {
+        set_errno(ENOENT);
+        vfs_close(vf);
+        return -1;
+    }
+
+    if (!(vf->vf_stat.st_mode&TYPE_DIR)) {
+        set_errno(ENOTDIR);
+        vfs_close(vf);
+        return -1;
+    }
+
+    proc_t *p = state.st_proc + state.st_curr_pid;
+    p->p_cino = vf->vf_stat.st_ino;
+    p->p_dev  = vf->vf_stat.st_dev;
+    vfs_close(vf);
+
+    return 0;
+}

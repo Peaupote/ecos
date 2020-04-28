@@ -4,7 +4,7 @@ ROOT=../..
 include $(ROOT)/vars.Makefile
 
 CFILES_0=init1.c cat.c echo.c stat.c ls.c ps.c wc.c env.c mkdir.c \
-		head.c test.c test2.c test3.c
+		head.c pwd.c test.c test2.c test3.c
 CFILES_SH=sh/main.c sh/ast.c sh/parse.c sh/run.c
 CFILES=$(CFILES_0) $(CFILES_SH)
 OUT=$(CFILES_0:.c=.out) sh.out

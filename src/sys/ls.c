@@ -83,7 +83,7 @@ void read_flags(const char *flags) {
 int main (int argc, char *argv[]) {
     int i, rc = 0, count = 0;
     char *fnames[256], **fptr = fnames;
-    char *cwd = "/home"; // TODO getcwd
+    char *cwd = "."; // TODO getcwd
 
     for (i = 1; i < argc; i++) {
         if (*argv[i] == '-') read_flags(argv[i]);

@@ -42,6 +42,7 @@ mksc read         SYS_READ
 mksc lseek        SYS_LSEEK
 mksc execve       SYS_EXECVE
 mksc fstat        SYS_FSTAT
+mksc chdir        SYS_CHDIR
 mksc _setpriority SYS_SETPRIO
 mksc _getpriority SYS_GETPRIO
 mksc sbrk         SYS_SBRK

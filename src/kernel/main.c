@@ -24,19 +24,20 @@
 static void kernel_init(uint32_t boot_info) {
     gdt_init();
     kmem_init_paging();
-	
-	kmem_bind_dynamic_range(0,
-			boot_info, boot_info + sizeof(multiboot_info_t));
-	multiboot_info_t* mbi = (multiboot_info_t*)
-			kmem_dynamic_slot_at(0, boot_info);
+
+    kmem_bind_dynamic_range(0,
+            boot_info, boot_info + sizeof(multiboot_info_t));
+    multiboot_info_t* mbi = (multiboot_info_t*)
+            kmem_dynamic_slot_at(0, boot_info);
 
     kmem_init_alloc(mbi);
-	
-	display_init(mbi);
-    tty_init(ttym_def);
-	klog_level = Log_error;
 
-	proc_init();
+    display_init(mbi);
+    tty_init(ttym_def);
+    klog_level = Log_error;
+
+    vfs_init();
+    proc_init();
 
     tss_init();
     idt_init();
@@ -53,6 +54,6 @@ void kernel_main(uint32_t boot_info) {
     tty_afficher_buffer_all();
 
     tty_new_prompt();
-	
+
     proc_start();
 }
