@@ -9,6 +9,7 @@ int main(int argc, char *argv[]) {
     char buf[1024];
     int fd = STDIN_FILENO, i = 0;
     ssize_t rc;
+	int rts = 0;
 
     if (argc == 1) goto start;
 
@@ -17,7 +18,8 @@ int main(int argc, char *argv[]) {
         if (fd < 0) {
             sprintf(buf, "cat: %s", argv[i]);
             perror(buf);
-            continue;
+            rts = 1;
+			continue;
         }
 
     start:
@@ -35,5 +37,5 @@ int main(int argc, char *argv[]) {
         close(fd);
     }
 
-    return 0;
+    return rts;
 }

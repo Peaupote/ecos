@@ -21,6 +21,7 @@
 
 #define PROC_TTY_INO   2
 #define PROC_PIPES_INO 3
+#define PROC_NULL_INO  4
 #define PROC_TTYI_INO(I) (0x10|(I))
 #define PROC_PIPEI_INO(I) ((1<<31)|(I))
 #define PROC_PID_INO(P)      PROC_INO_PID_PART(P)
@@ -133,22 +134,30 @@ static inline bool dirent_stc(int* rc, struct dirent** d,
 
 static int root_getents(fpd_dt_t* n __attribute__((unused)),
         int rc, bool begin, cdt_t* dt, struct dirent* d, size_t sz) {
-    pid_t i = begin ? -1 : dt->pid;
+    pid_t i = begin ? -2 : dt->pid;
     switch (i) {
-        case -1:
+        case -2:
             if(!dirent_stc(&rc, &d, &sz,
                         PROC_TTY_INO, TYPE_DIR, "tty", 3)) {
+                dt->pid = -2;
+                return rc;
+            }
+            // FALLTHRU
+        case -1:
+            if (!dirent_stc(&rc, &d, &sz,
+                        PROC_PIPES_INO, TYPE_DIR, "pipes", 5)) {
                 dt->pid = -1;
                 return rc;
             }
             // FALLTHRU
-        case 0:
-            if (!dirent_stc(&rc, &d, &sz,
-                        PROC_PIPES_INO, TYPE_DIR, "pipes", 5)) {
+		case 0:
+            if(!dirent_stc(&rc, &d, &sz,
+                    PROC_NULL_INO, TYPE_REG, "null", 4)) {
                 dt->pid = 0;
                 return rc;
             }
             i = 1;
+			break;
     }
     for (; i < NPROC; ++i) {
         if (proc_alive(state.st_proc + i)) {
@@ -288,6 +297,30 @@ static int pipei_write(file_ins* ins, void* src,
             pi->vfs[fp_pipe_in]->vf_stat.st_size  = pi->cnt.sz;
     }
     return wc;
+}
+
+// --/null --
+
+static int null_stat(file_ins* ins __attribute__((unused)),
+					 struct stat* st) {
+    st->st_mode    = TYPE_REG|0666;
+    st->st_nlink   = 1;
+    st->st_size    = 0;
+    st->st_blksize = PROC_BLOCK_SIZE;
+    st->st_blocks  = 0;
+    return st->st_ino;
+}
+static int null_read(file_ins* ins __attribute__((unused)),
+		void* dst __attribute__((unused)),
+        off_t ofs __attribute__((unused)),
+		size_t sz __attribute__((unused))) {
+	return 0;
+}
+static int null_write(file_ins* ins __attribute__((unused)),
+		void* src __attribute__((unused)),
+        off_t ofs __attribute__((unused)),
+		size_t sz) {
+	return sz;
 }
 
 // -- /<pid> --
@@ -547,6 +580,17 @@ static struct fs_proc_file
             .lookup   = NULL,
             .getdents = NULL,
             .readsymlink = NULL
+    },
+    fun_null = {
+            .opench   = NULL,
+            .open     = NULL,
+            .close    = NULL,
+            .stat     = null_stat,
+            .read     = null_read,
+            .write    = null_write,
+            .lookup   = NULL,
+            .getdents = NULL,
+            .readsymlink = NULL
     };
 
 static inline fpd_dt_t* set_dir_dt(file_ins* ins, ino_t p, dir_getents e) {
@@ -570,6 +614,9 @@ static bool fs_proc_from_ino(ino_t ino, file_ins* ins, struct fs_proc_file** rt)
             *rt = &fun_dir;
             set_dir_dt(ins, PROC_ROOT_INO, pipes_getents);
             return true;
+		case PROC_NULL_INO:
+			*rt = &fun_null;
+			return true;
         default:
             if (ino & (1<<31)) {
                 // /pipes/<pipei>

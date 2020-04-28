@@ -9,7 +9,7 @@
 #define CR0_PG 31
 
 //Page Size Extensions
-#define CR4_PSE 5
+#define CR4_PSE 4
 //Physical Address Extension
 #define CR4_PAE 5
 //Page Global Enable

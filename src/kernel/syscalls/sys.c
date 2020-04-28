@@ -168,6 +168,7 @@ pid_t sys_fork() {
 
     pp->p_nchd++; // one more child
     memcpy(&fp->p_reg, &pp->p_reg, sizeof(struct reg));
+	strncpy(fp->p_cmd, pp->p_cmd, 256);
 
     fp->p_pml4 = kmem_alloc_page();
     kmem_fork_paging(fp->p_pml4);

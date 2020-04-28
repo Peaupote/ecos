@@ -16,6 +16,7 @@ void*    malloc(size_t size);
 void*    realloc(void* ptr, size_t size);
 void     free(void* ptr);
 
-void     exit(int status); //TODO: _exit()
+__attribute__((noreturn))
+void     exit(int status);
 
 #endif

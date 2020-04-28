@@ -3,9 +3,11 @@ export AS=x86_64-elf-as
 ROOT=../..
 include $(ROOT)/vars.Makefile
 
-CFILES=init1.c sh.c cat.c echo.c stat.c ls.c ps.c wc.c env.c mkdir.c \
+CFILES_0=init1.c cat.c echo.c stat.c ls.c ps.c wc.c env.c mkdir.c \
 		head.c test.c test2.c test3.c
-OUT=$(CFILES:.c=.out)
+CFILES_SH=sh/main.c sh/ast.c sh/parse.c sh/run.c
+CFILES=$(CFILES_0) $(CFILES_SH)
+OUT=$(CFILES_0:.c=.out) sh.out
 SRCDEP=$(CFILES) start.S
 INCLUDE_LIBC?=-I ../../include/libc
 INCLUDES=-I ../../include $(INCLUDE_LIBC)
@@ -22,6 +24,10 @@ INCLUDES=-I ../../include $(INCLUDE_LIBC)
 
 %.out:%.c libc start.o
 	$(CC) $(FLAGS_UR) -o $@ $< start.o ../libc/libc.a $(INCLUDES) -lgcc
+
+sh.out:sh/sh.h $(CFILES_SH) libc start.o
+	$(CC) $(FLAGS_UR) -o $@ $(CFILES_SH) $< start.o \
+		../libc/libc.a $(INCLUDES) -lgcc
 
 all:$(OUT)
 

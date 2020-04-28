@@ -51,6 +51,7 @@ void proc_init() {
     p_idle->p_brk  = 0;
     p_idle->p_reg.rsp.p = kernel_stack_top;
     p_idle->p_reg.rip.p = &proc_idle_entry;
+    strcpy(p_idle->p_cmd, "idle");
     p_idle->p_spnd = 0;
     p_idle->p_shnd.blk = 0;
     p_idle->p_shnd.ign = ~(sigset_t)0;
