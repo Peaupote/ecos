@@ -127,3 +127,7 @@ void pp_cmd_3(FILE* f, char lvl, const cmd_3_t* c) {
 			break;
 	}
 }
+const cmd_3_t* cmd_top(const cmd_3_t* c) {
+	while (c->parent) c = c->parent;
+	return c;
+}

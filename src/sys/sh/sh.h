@@ -74,10 +74,34 @@ typedef struct ecmd_2 {
 
 extern ecmd_2_t* ecmd_llist;
 extern int       next_cmd_num;
-extern char      line[258];
+extern char      line[];
+extern bool      update_cwd;
 
+typedef struct var {
+	char* name;
+	char* val;
+	struct var* next;
+} var_t;
+
+typedef bool (*builtin_top)(int argc, char** args, int* st);
+typedef int  (*builtin_syf)(int argc, char** args);
+typedef int  (*builtin_f  )(int argc, char** args);
+enum builtin_ty {
+	BLTI_TOP, BLTI_SYNC, BLTI_ASYNC
+};
+typedef struct builtin {
+	char*           name;
+	enum builtin_ty ty;
+	union {
+		builtin_f       fun;
+		builtin_syf     sfun;
+		builtin_top     tfun;
+	};
+	struct builtin* next;
+} builtin_t;
 
 #define GEN_BUF(T, N) \
+typedef T N##_data_t; \
 typedef struct {\
 	T*  c;\
 	size_t sz;\
@@ -94,7 +118,7 @@ static inline void N##_put(N##_t* b, T c) {\
 	}\
 	b->c[b->sz++] = c;\
 }\
-static inline void N##_putn(N##_t* b, T* c, size_t n) {\
+static inline void N##_putn(N##_t* b, const N##_data_t* c, size_t n) {\
 	if (b->sz + n > b->sp) {\
 		b->sp *= 2;\
 		b->c   = realloc(b->c, b->sp * sizeof(T));\
@@ -115,6 +139,7 @@ void destr_cmd_1(cmd_1_t* ptr);
 void destr_cmd_2(cmd_2_t* ptr);
 void destr_cmd_3(cmd_3_t* c);
 
+const cmd_3_t* cmd_top(const cmd_3_t* c);
 void pp_cmd_0(FILE* f, const cmd_0_t* c);
 void pp_redir(FILE* f, const redir_t* r);
 void pp_cmd_1(FILE* f, const cmd_1_t* c);
@@ -133,15 +158,20 @@ int parse_cmd_3a(const char** cr, cmd_3_t** rt);
 int parse_cmd_3b(const char** cr, cmd_3_t** rt);
 int parse_cmd_3c(const char** cr, cmd_3_t** rt);
 
-void expand(const char* c, pbuf_t* wds);
-ecmd_2_t* exec_cmd_2(const cmd_2_t* c2);
+void       init_builtins();
+builtin_t* find_builtin(const char* name);
+void       expand(const char* c, pbuf_t* wds);
+var_t*     var_set(const char* name, char* val);
+var_t*     find_lvar(const char* name);
+char*      get_var(const char* name);
+ecmd_2_t*  exec_cmd_2(const cmd_2_t* c2);
 __attribute__((noreturn))
-void      start_sub(const cmd_3_t* c3);
-int       exec_cmd_3_bg(const cmd_3_t* c3);
-ecmd_2_t* exec_cmd_3_down(const cmd_3_t* c3, int* r_st);
-ecmd_2_t* exec_cmd_3_up(const cmd_3_t* c3, int* r_st, int c_st);
-ecmd_2_t* continue_job(ecmd_2_t* e, int* st);
-int       run_sub(ecmd_2_t* e);
-bool      run_fg(int* st);
+void       start_sub(const cmd_3_t* c3);
+int        exec_cmd_3_bg(const cmd_3_t* c3);
+ecmd_2_t*  exec_cmd_3_down(const cmd_3_t* c3, int* r_st);
+ecmd_2_t*  exec_cmd_3_up(const cmd_3_t* c3, int* r_st, int c_st);
+ecmd_2_t*  continue_job(ecmd_2_t* e, int* st);
+int        run_sub(ecmd_2_t* e);
+bool       run_fg(int* st);
 
 #endif

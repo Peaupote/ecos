@@ -20,18 +20,17 @@ void _env_init(char **env_ptr) {
     _env[nenv] = 0;
 }
 
-void _env_cleanup() {
-    for (char **ptr = _env; *ptr; ++ptr) free(*ptr);
-}
-
 char *getenv(const char *name) {
     for (char **ptr = _env; *ptr; ++ptr) {
-        int len = 0; char *v = *ptr, *nptr = (char*)name;
-        while (*v != '=' && (*nptr++ == *v++)) ++len;
+		char *v = *ptr;
+		const char* nptr = name;
+        while (*v != '=' && (*nptr == *v)){
+			++nptr;
+			++v;
+		}
 
-        if (*v == '=' && !*nptr) {
+        if (*v == '=' && !*nptr)
             return ++v;
-        }
     }
 
     return 0;
@@ -45,8 +44,12 @@ int setenv(const char *name, const char *value, int overwrite) {
 
     char **ptr;
     for (ptr = _env; *ptr; ++ptr) {
-        int len = 0; char *v = *ptr, *nptr = (char*)name;
-        while (*v != '=' && (*nptr++ == *v++)) ++len;
+        char *v = *ptr;
+		const char *nptr = name;
+        while (*v != '=' && *nptr == *v) {
+			++nptr;
+			++v;
+		}
 
         if (*v == '=' && !*nptr) {
             if (overwrite) {
@@ -63,7 +66,6 @@ int setenv(const char *name, const char *value, int overwrite) {
         }
     }
 
-
     if (nenv + 1 == NENV) goto err_enomem;
 
     int len = strlen(name) + strlen(value) + 2;
@@ -73,6 +75,7 @@ int setenv(const char *name, const char *value, int overwrite) {
     _env[nenv] = 0;
 
     sprintf(s, "%s=%s", name, value);
+	return 0;
 
 err_enomem:
     errno = ENOMEM;

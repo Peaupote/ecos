@@ -169,6 +169,7 @@ int parse_cmd_0(const char** cr, cmd_0_t* rt) {
 		free(buf.c);
 		return rts;
 	}
+
 	do {
 		cbuf_put(&buf, ' ');
 	} while (!(rts = read_word1(cr, &buf)));

@@ -8,7 +8,7 @@
 
 int main(int argc __attribute__((unused)),
          char *argv[] __attribute__((unused))) {
-    int pos = 1024;
+    int pos = 1023;
     struct stat st = { 0 }, p = { 0 };
     char pwd[1024] = { 0 };
 

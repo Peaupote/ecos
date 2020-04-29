@@ -53,7 +53,7 @@ char *strcpy(char *dest, const char *src);
 //size_t strcspn(const char *s, const char *reject);
 
 /**
- * Return a duplicate of the string s in memory allocated using malloc(3).
+ * Return a duplicate of the string s in memory allocated using malloc.
  */
 //char *strdup(const char *s);
 

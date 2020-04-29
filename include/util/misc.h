@@ -59,4 +59,14 @@ GEN_ALIGN(align_to, uint_ptr, uint64_t)
 GEN_ALIGN(align_to_size, size_t, size_t)
 #undef GEN_ALIGN
 
+// hash_str(B, hash_str(A, h)) = hash_str(concat(A,B), h)
+static inline unsigned char hash_str(const char* s, unsigned char h) {
+	while (*s) {
+		h  = (h << 3) | (h >> 5);//rol
+		h ^= *s;
+		++s;
+	}
+	return h;
+}
+
 #endif

@@ -1,4 +1,5 @@
 #include <unistd.h>
+#include <stdlib.h>
 #include <libc/sys.h>
 
 int main() {
@@ -10,9 +11,11 @@ int main() {
     setpriority(-15);
 
     const char *args[1] = { 0 };
-    const char  *env[1] = { 0 };
 
-    execve("/home/bin/sh", args, env);
+    setenv("HOME", "/home/test", 0);
+    setenv("PATH", "/home/bin", 0);
+
+    execv("/home/bin/sh", args);
 
     return 0;
 }

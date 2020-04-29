@@ -4,42 +4,55 @@
 #include <string.h>
 #include <stdlib.h>
 
-ecmd_2_t* ecmd_llist   = NULL;
-int       next_cmd_num = 0;
-char      line[258];
+#include <sys/stat.h>
+#include <dirent.h>
 
-/*
-void fg(int argc, const char *argv[]) {
-    int num;
-    if (argc != 2 || sscanf(argv[1], "%d", &num) != 1) return;
-    ecmd_2_t** er = find_exd_num(num);
-    if (!er) {
-        printf("Aucune commande corespondante: %d\n", num);
-        return;
-    }
+#include <util/misc.h>
 
-    struct exd_cmd* e = *er;
-    *er        = e->next;
-    e->next    = ecmd_llist;
-    ecmd_llist = e;
+ecmd_2_t*   ecmd_llist   = NULL;
+int         next_cmd_num = 0;
+char        line[513];
+bool        update_cwd = true;
+static char cwd[256] = "";
 
-    for (int i = 0; i < e->nb_proc; ++i)
-        if (~e->procs[i].pid && kill(e->procs[i].pid, SIGCONT))
-            perror("error sending SIGCONT");
+static void do_update_cwd() {
+	struct stat st = { 0 }, p = { 0 };
+	stat(".", &st);
+	stat("..", &p);
+	if (st.st_ino == p.st_ino && st.st_dev == p.st_dev) {
+		cwd[0] = '\0';
+		return;
+	}
+    DIR *dirp = opendir("..");
+	if (!dirp) {
+		perror("cwd:dirp");
+		return;
+	}
 
-    run_fg();
+    struct dirent *dir;
+	while ((dir = readdir(dirp))) {
+		if (dir->d_ino == st.st_ino) {
+			size_t len = min_size_t(dir->d_name_len, 255);
+			memcpy(cwd, dir->d_name, len);
+			cwd[len] = '\0';
+			closedir(dirp);
+			return;
+		}
+	}
+
+	fprintf(stderr, "cwd\n");
+	cwd[0] = '\0';
 }
-*/
-
 
 int main() {
     printf("ecos-shell version 0.1\n");
+	init_builtins();
     int rc;
 
     while(1) {
-        printf("\033psh> \033;"); fflush(stdout);
-        memset(line, 0, 258);
-        rc = read(0, line, 256);
+		if (update_cwd) do_update_cwd();
+        printf("\033p%s> \033;", cwd); fflush(stdout);
+        rc = read(STDIN_FILENO, line, 512);
         line[rc] = '\0';//TODO: attendre \n + ne pas aller plus loin
 		
         if (rc == 0) return 0;
@@ -63,12 +76,39 @@ int main() {
 			continue;
 		cmd->parent = NULL;
 
-		pp_cmd_3(stdout, 'c', cmd);
-		printf("\n");
-		
     	printf("\033d"); fflush(stdout);
-	
+
 		int st = 0;
+		if (cmd->ty == C_CM2
+				&& cmd->cm2.cmdc == 1
+				&& cmd->cm2.cmds[0].redc   == 0
+				&& cmd->cm2.cmds[0].cmd.ty == C_BAS) {
+			
+			char *cstr      = cmd->cm2.cmds[0].cmd.bas;
+			char *end_cname = strchrnul(cstr, ' ');
+			const char end_cnamec = *end_cname;
+			*end_cname   = '\0';
+			builtin_t* b = find_builtin(cstr);
+			*end_cname   = end_cnamec;
+
+			if (b && b->ty == BLTI_TOP) {
+				pbuf_t args;
+				pbuf_init(&args, 8);
+				expand(cstr, &args);
+				pbuf_put(&args, NULL);
+				pbuf_shrink(&args);
+
+				bool ended = b->tfun(args.sz - 1, args.c, &st);
+
+				for (char** it = args.c; *it; ++it)
+					free(*it);
+				free(args.c);
+				destr_cmd_3(cmd);
+				free(cmd);
+				if (ended) goto check_status;
+				else       continue;
+			}
+		}
 		ecmd_2_t* ecmd = exec_cmd_3_down(cmd, &st);
 		if (ecmd) {
 			ecmd->num  = next_cmd_num++;
@@ -76,6 +116,7 @@ int main() {
 			ecmd_llist = ecmd;
 			if (!run_fg(&st)) continue;
 		}
+check_status:
 		if (st)
 			fprintf(stderr, "exit status %d\n", st);
     }
