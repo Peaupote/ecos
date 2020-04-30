@@ -34,13 +34,15 @@ static void kernel_init(uint32_t boot_info) {
 
     display_init(mbi);
     tty_init(ttym_def);
-    klog_level = Log_error;
+    klog_level = Log_warn;
 
     vfs_init();
     proc_init();
 
     tss_init();
     idt_init();
+    
+	kpanic_is_early = false;
 }
 
 __attribute__ ((noreturn))

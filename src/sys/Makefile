@@ -4,11 +4,11 @@ ROOT=../..
 include $(ROOT)/vars.Makefile
 
 CFILES_0=init1.c cat.c echo.c stat.c ls.c ps.c wc.c env.c mkdir.c \
-		head.c pwd.c test.c test2.c test3.c
+		head.c pwd.c
 CFILES_SH=sh/main.c sh/ast.c sh/parse.c sh/run.c
 CFILES=$(CFILES_0) $(CFILES_SH)
 OUT=$(CFILES_0:.c=.out) sh.out
-SRCDEP=$(CFILES) start.S
+SRCDEP=$(CFILES) "-MT start.s start.S"
 INCLUDE_LIBC?=-I ../../include/libc
 INCLUDES=-I ../../include $(INCLUDE_LIBC)
 
@@ -29,15 +29,26 @@ sh.out:sh/sh.h $(CFILES_SH) libc start.o
 	$(CC) $(FLAGS_UR) -o $@ $(CFILES_SH) $< start.o \
 		../libc/libc.a $(INCLUDES) -lgcc
 
-all:$(OUT)
+root.img:$(OUT)
+	@rm   -rf root
+	@mkdir -p root
+	@mkdir -p root/home
+	@mkdir -p root/bin
+	@mkdir -p root/proc
+	@$(foreach o,$(OUT),cp "$(o)" "root/bin/$(o:.out=)" &&) echo $(OUT)
+	$(ROOT)/tools/build-ext2.sh root root.img
+
+all:root.img
 
 libc:
 	$(MAKE) -C ../libc libc.a
 
 .depends:
-	../../tools/mkdep.sh "$(CC) $(FLAGS_U) $(INCLUDES)" $(SRCDEP) > .depends
+	../../tools/mkdep.sh "$(CC) $(FLAGS_UR) $(INCLUDES)" \
+		$(SRCDEP) > .depends
 
 include .depends
 
 clean:
-	rm -f *.out *.s *.o .depends
+	rm -f *.out *.s *.o .depends *.img
+	rm -rf ./root

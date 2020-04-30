@@ -99,7 +99,7 @@ typedef ino_t (fs_rm_t)(ino_t, struct mount_info*);
 typedef ino_t (fs_readsymlink_t)(ino_t, char*, struct mount_info*);
 
 struct fs {
-    char                 fs_name[4];
+    char                 fs_name[8];
     fs_mnt_t            *fs_mnt;
     fs_lookup_t         *fs_lookup;
     fs_stat_t           *fs_stat;
@@ -117,15 +117,16 @@ struct fs {
     fs_readsymlink_t    *fs_readsymlink;
 } fst [NFST];
 
-uint32_t home_dev;
-
 void vfs_init();
+int  vfs_mount_root(uint8_t fs, void* partition);
 int  vfs_mount(const char *path, uint8_t fs, void *partition);
 
 // rt[0]: read end ie output
 // rt[1]: write end ie input
 uint32_t vfs_pipe(vfile_t* rt[2]);
 
+// *pathend doit être '/' ou '\0'
+bool vfs_find(const char* path, const char* pathend, dev_t* dev, ino_t* ino);
 vfile_t *vfs_load(const char *path, int flags);
 void     vfs_opench(vfile_t *vf, chann_adt_t* cdt);
 

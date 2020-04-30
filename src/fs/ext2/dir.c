@@ -137,17 +137,29 @@ int ext2_getdents(ino_t ino, struct dirent* dst, size_t sz,
         struct dirent src;
         ext2_read(ino, &src, cdt->pos, DIRENT_OFF, info);
 
-        if (sz < src.d_rec_len) {
+		size_t mlen = offsetof(struct dirent, d_name)
+	                        + src.d_name_len + 1;
+        size_t rlen = align_to_size(mlen, 4);
+
+        if (sz < rlen) {
             if (rc) return rc;
             memcpy(dst, &src, offsetof(struct dirent, d_name));
             return offsetof(struct dirent, d_name);
         }
 
-        ext2_read(ino, dst, cdt->pos, src.d_rec_len, info);
+        ext2_read(ino, offsetof(struct dirent, d_name) + (char*)dst,
+						cdt->pos + offsetof(struct dirent, d_name),
+						src.d_name_len, info);
+		dst->d_ino       = src.d_ino;
+		dst->d_rec_len   = rlen;
+		dst->d_name_len  = src.d_name_len;
+		dst->d_file_type = src.d_file_type;
+		dst->d_name[src.d_name_len] = '\0'; 
+
         cdt->pos += src.d_rec_len;
-        rc      += src.d_rec_len;
-        sz      -= src.d_rec_len;
-        dst = (struct dirent*)(src.d_rec_len + (char*)dst);
+        rc      += rlen;
+        sz      -= rlen;
+        dst = (struct dirent*)(rlen + (char*)dst);
     }
     return rc;
 }

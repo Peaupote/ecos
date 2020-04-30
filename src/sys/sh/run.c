@@ -11,7 +11,7 @@
 var_t* lvars[256] = {NULL};
 
 var_t* var_set(const char* name, char* val) {
-	unsigned char h = hash_str(name, 0);
+	unsigned char h = hash_str8(name, 0);
 	for (var_t* it = lvars[h]; it; it = it->next)
 		if (!strcmp(name, it->name)) {
 			free(it->val);
@@ -26,7 +26,7 @@ var_t* var_set(const char* name, char* val) {
 	return lvars[h] = v;
 }
 var_t* find_lvar(const char* name) {
-	unsigned char h = hash_str(name, 0);
+	unsigned char h = hash_str8(name, 0);
 	for (var_t* it = lvars[h]; it; it = it->next)
 		if (!strcmp(name, it->name))
 			return it;
@@ -198,7 +198,7 @@ GEN_SBLTI_ASYNC(jobs)
 builtin_t* builtins[256] = {NULL};
 
 void add_builtin(builtin_t* b) {
-	unsigned char h = hash_str(b->name, 0);
+	unsigned char h = hash_str8(b->name, 0);
 	b->next         = builtins[h];
 	builtins[h]     = b;
 }
@@ -212,7 +212,7 @@ void init_builtins() {
 }
 
 builtin_t* find_builtin(const char* name) {
-	unsigned char h = hash_str(name, 0);
+	unsigned char h = hash_str8(name, 0);
 	for (builtin_t* it = builtins[h]; it; it = it->next)
 		if (!strcmp(name, it->name))
 			return it;

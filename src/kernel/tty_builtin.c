@@ -186,7 +186,7 @@ void tty_built_in_exec(tty_seq_t* sq, char* cmd) {
             switch_proc(cproc);
     }
 	
-	else if (!strcmp(cmd_name, "ls")) ls(&tokpt);
+	else if (!strcmp(cmd_name, "ls"))     ls(&tokpt);
     else if (!strcmp(cmd_name, "vfiles")) inspect_vfiles();
     else if (!strcmp(cmd_name, "channs")) inspect_channs();
 	else if (!strcmp(cmd_name, "log"))    change_log(&tokpt);

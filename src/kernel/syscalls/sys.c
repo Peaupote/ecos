@@ -211,19 +211,27 @@ void* sys_sbrk(intptr_t inc) {//TODO: protect
     proc_t *p = state.st_proc + state.st_curr_pid;
     uint_ptr nbrk = (uint_ptr)( ((intptr_t)p->p_brk) + inc );
 
-    kmem_paging_alloc_rng(align_to(p->p_brk, PAGE_SIZE), nbrk,
-            PAGING_FLAG_W | PAGING_FLAG_U,
-            PAGING_FLAG_W | PAGING_FLAG_U);
-
-    for (uint_ptr a = align_to(nbrk, PAGE_SIZE); a < p->p_brk;
-            a += PAGE_SIZE) {
-        uint64_t *e = paging_page_entry(a);
-        kAssert(*e & PAGING_FLAG_P);
-        kmem_free_page(*e & PAGE_MASK);
-        *e &= ~(uint64_t)PAGING_FLAG_P;
-    }
+	if (nbrk > p->p_brk) {
+		kmem_paging_alloc_rng(align_to(p->p_brk, PAGE_SIZE), nbrk,
+				PAGING_FLAG_W | PAGING_FLAG_U,
+				PAGING_FLAG_W | PAGING_FLAG_U);
+	} else {
+		uint_ptr rbg = align_to(nbrk, PAGE_SIZE);
+		for (uint_ptr a = rbg; a < p->p_brk; a += PAGE_SIZE) {
+			uint64_t *e = paging_page_entry(a);
+			if (!(*e & (PAGING_FLAG_P | SPAGING_FLAG_P 
+									  | SPAGING_FLAG_V))) {
+				klogf(Log_warn, "sbrk", "trying to free a non allocated page");
+				set_errno(ENOMEM);
+				return (void*)-1;
+			}
+		}
+		for (uint_ptr a = rbg; a < p->p_brk; a += PAGE_SIZE)
+			kmem_free_paging_range(paging_page_entry(a), pgg_pt, 1);
+	}
     void *rt = (void*) p->p_brk;
     p->p_brk = nbrk;
+    set_errno(SUCC);
     return rt;
 }
 

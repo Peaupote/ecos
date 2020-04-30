@@ -31,7 +31,7 @@ int list_files(const char *fname) {
     struct dirp *dirp = opendir(fname);
     struct dirent *dir;
     struct stat st;
-    char buf[256], buf2[1024], bufmode[MODE_LEN + 1] = { 0 };
+    char buf2[1024], bufmode[MODE_LEN + 1] = { 0 };
     int rc = 0;
 
     if (!dirp) {
@@ -41,13 +41,10 @@ int list_files(const char *fname) {
     }
 
     while ((dir = readdir(dirp))) {
-        memcpy(buf, dir->d_name, dir->d_name_len);
-        buf[dir->d_name_len] = 0;
-
-        sprintf(buf2, "%s/%s", fname, buf);
+        sprintf(buf2, "%s/%s", fname, dir->d_name);
         rc = stat(buf2, &st);
         if (rc < 0) {
-            sprintf(buf2, "ls: %s/%s", fname, buf);
+            sprintf(buf2, "ls: '%s/%s'", fname, dir->d_name);
             perror(buf2);
             break;
         }
@@ -61,7 +58,7 @@ int list_files(const char *fname) {
             printf("%s %d %d ", bufmode, st.st_size, st.st_nlink);
         }
 
-        printf("%s\n", buf);
+        printf("%s\n", dir->d_name);
     }
 
     closedir(dirp);

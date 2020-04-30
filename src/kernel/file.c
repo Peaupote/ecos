@@ -9,17 +9,17 @@
 #include <fs/ext2.h>
 #include <fs/proc.h>
 
+extern char root_partition[];
+extern char root_partition_end[];
+
 extern char home_partition[];
 extern char home_partition_end[];
-
-uint32_t home_dev;
 
 void vfs_init() {
     klogf(Log_info, "vfs", "Initialize");
 
     for (size_t i = 0; i < NDEV; i++) {
         devices[i].dev_id = i;
-        devices[i].dev_mnt[0] = 0;
         devices[i].dev_free = 1;
     }
 
@@ -29,7 +29,7 @@ void vfs_init() {
     }
 
     klogf(Log_info, "vfs", "setup proc file system");
-    memcpy(fst[PROC_FS].fs_name, "tprc", 5);
+    memcpy(fst[PROC_FS].fs_name, "proc", 5);
     fst[PROC_FS].fs_mnt            = &fs_proc_mount;
     fst[PROC_FS].fs_lookup         = &fs_proc_lookup;
     fst[PROC_FS].fs_stat           = &fs_proc_stat;
@@ -64,33 +64,113 @@ void vfs_init() {
     fst[EXT2_FS].fs_destroy_dirent = 0;
     fst[EXT2_FS].fs_readsymlink    = 0;
 
+    klogf(Log_info, "ext2", "root_part: %p - %p",
+                    root_partition, root_partition_end);
+    vfs_mount_root(EXT2_FS, root_partition);
+
     vfs_mount(PROC_MOUNT, PROC_FS, 0);
-    klogf(Log_info, "ext2", "home_part: %p - %p",
+    
+	klogf(Log_info, "ext2", "home_part: %p - %p",
                     home_partition, home_partition_end);
-    home_dev = vfs_mount("/home", EXT2_FS, home_partition);
+    vfs_mount("/home", EXT2_FS, home_partition);
+
 }
 
-int vfs_mount(const char *path, uint8_t fs, void *partition) {
-    size_t i;
-    for (i = 0; i < NDEV; i++) {
-        if (devices[i].dev_free) break;
-    }
+bool vfs_find(const char* path, const char* pathend, 
+				dev_t* dev, ino_t* ino) {
+	if (*path == '/') {
+		*dev = ROOT_DEV;
+		*ino = devices[ROOT_DEV].dev_info.root_ino;
+		while(*path == '/') ++path;
+	}
+	struct fs* fs = fst + devices[*dev].dev_fs;
+	while(path < pathend) {
+		const char* end_part = strchrnul(path, '/');
+		size_t len = end_part - path;
+		if (len == 2 && path[0] == '.' && path[1] == '.'
+				&& *ino == devices[*dev].dev_info.root_ino) {
+			*ino = devices[*dev].dev_parent_ino;
+			*dev = devices[*dev].dev_parent_dev;
+			fs   = fst + devices[*dev].dev_fs;
+		} else {
+			if (len > 255) {
+				klogf(Log_error, "vfs", "find: partie de chemin trop longue");
+				return false;
+			}
+			char name[256];
+			memcpy(name, path, len);
+			name[len] = '\0';
+			*ino = fs->fs_lookup(*ino, name, &devices[*dev].dev_info);
+			if (!*ino) {
+				klogf(Log_info, "vfs", "can't find %s", name);
+				return false;
+			}
+		
+			for (size_t d = 0; d < NDEV; ++d) //TODO: opti
+				if (!devices[d].dev_free
+						&& devices[d].dev_parent_dev == *dev
+						&& devices[d].dev_parent_red == *ino) {
+					*ino = devices[d].dev_info.root_ino;
+					*dev = d;
+					fs   = fst + devices[*dev].dev_fs;
+					break;
+				}
+		}
 
-    if (i == NDEV) {
-        return 0;
-    }
+		path = end_part;
+		while(*path == '/') ++path;
+	}
 
-    if (!fst[fs].fs_mnt(partition, &devices[i].dev_info)) {
-        klogf(Log_info, "vfs", "failed to mount %s", path);
+	return true;
+}
+
+int vfs_mount_root(uint8_t fs, void *partition) {
+    
+	if (!devices[ROOT_DEV].dev_free
+			|| !fst[fs].fs_mnt(partition, &devices[ROOT_DEV].dev_info)) {
+        klogf(Log_info, "vfs", "failed to mount root");
         kpanic("Failed mounting");
     }
 
-    strncpy(devices[i].dev_mnt, path, 256);
-    devices[i].dev_fs = fs;
-    devices[i].dev_free = 0;
+    devices[ROOT_DEV].dev_fs         = fs;
+    devices[ROOT_DEV].dev_free       = 0;
+	devices[ROOT_DEV].dev_parent_dev = ROOT_DEV;
+	devices[ROOT_DEV].dev_parent_red = devices[ROOT_DEV].dev_parent_ino
+	                                 = devices[ROOT_DEV].dev_info.root_ino;
 
-    klogf(Log_info, "vfs", "%s sucessfully mounted (device %d)", path, i);
-    return i;
+    klogf(Log_info, "vfs", "root sucessfully mounted");
+    return ROOT_DEV;
+}
+
+int vfs_mount(const char *path, uint8_t m_fst, void *partition) {
+	ino_t red_ino = devices[ROOT_DEV].dev_info.root_ino;
+	dev_t red_dev = ROOT_DEV;
+
+	if (!vfs_find(path, path + strlen(path), &red_dev, &red_ino)) {
+		klogf(Log_error, "vfs", "%s not found", path);
+		kpanic("Failed mounting");
+	}
+	
+	struct fs* p_fs = fst + devices[red_dev].dev_fs;
+	ino_t par_ino = p_fs->fs_lookup(red_ino, "..", &devices[red_dev].dev_info);
+	kAssert(par_ino != 0);
+
+    size_t d;
+    for (d = 0; d < NDEV && !devices[d].dev_free; d++);
+
+    if (d == NDEV || !fst[m_fst].fs_mnt(partition, &devices[d].dev_info)) {
+        klogf(Log_error, "vfs", "failed to mount %s", path);
+        kpanic("Failed mounting");
+    }
+
+    devices[d].dev_fs         = m_fst;
+    devices[d].dev_free       = 0;
+	devices[d].dev_parent_dev = red_dev;
+	devices[d].dev_parent_red = red_ino;
+	devices[d].dev_parent_ino = par_ino;
+
+    klogf(Log_info, "vfs", "%s sucessfully mounted (device %d)", path, d);
+    return d;
 }
 
 uint32_t vfs_pipe(vfile_t* rt[2]) {
@@ -105,95 +185,24 @@ uint32_t vfs_pipe(vfile_t* rt[2]) {
     return pipeid;
 }
 
-struct device *find_device(const char *fname) {
-    // if more than one mount point is prefix of the file name
-    // return the longest of the two prefix
-
-    size_t i, mnt, len = 0;
-    for (i = 0; i < NDEV; i++) {
-        if (!devices[i].dev_free && !is_prefix(fname, devices[i].dev_mnt)) {
-            size_t l = strlen(devices[i].dev_mnt);
-            if (l > len) {
-                mnt = i;
-                len = l;
-            }
-        }
-    }
-
-    return len > 0 ? devices + mnt : 0;
-}
-
-// TODO : follow symlink
-static ino_t vfs_lookup(struct mount_info *info, struct fs *fs,
-                        ino_t ino, const char *full_name, struct stat *st) {
-    klogf(Log_info, "vfs", "lookup for %s", full_name);
-    char name[256] = { 0 };
-    char *start, *end;
-
-    if (!full_name) return ino;
-
-    start = (char*)(*full_name == '/' ? full_name + 1 : full_name);
-    end = strchrnul(start, '/');
-
-    while (*start) {
-        memcpy(name, start, end - start);
-        name[end - start] = 0;
-
-        if (!(ino = fs->fs_lookup(ino, name, info))) {
-            return 0;
-        }
-
-        if (!*end || !*(end+1)) break;
-        start = end+1;
-        end = strchrnul(start, '/');
-    }
-
-    return fs->fs_stat(ino, st, info);
-}
-
-static char *fname_to_ino(const char *fname, ino_t *ino, struct device **dev) {
-    // if fullpath start with / then start at device root
-    // otherwise start at current work directory
-    if (*fname == '/') {
-        *dev = find_device(fname);
-        if (!dev) {
-            klogf(Log_info, "vfs", "no mount point %s", fname);
-            return 0;
-        }
-
-        *ino = (*dev)->dev_info.root_ino;
-        return (char*)fname + strlen((*dev)->dev_mnt);
-    }
-
-    *ino = state.st_proc[state.st_curr_pid].p_cino;
-    *dev = devices + state.st_proc[state.st_curr_pid].p_dev;
-
-    return (char*)fname;
-}
-
 vfile_t *vfs_load(const char *filename, int flags) {
-    if (!filename || !*filename) return 0;
+    if (!filename || !*filename) return NULL;
 
-    ino_t ino;
-    struct device *dev;
-    char *fname;
-
-    if (!(fname = fname_to_ino(filename, &ino, &dev))) return 0;
-
-    klogf(Log_info, "vfs", "load %s from %s (device id %d)",
-          filename, dev->dev_mnt, dev->dev_id);
-
-    struct fs *fs = fst + dev->dev_fs;
-    struct stat st;
-    ino_t rc = vfs_lookup(&dev->dev_info, fs, ino, fname, &st);
-
-    if (!rc) {
+    ino_t ino    = cur_proc()->p_cino;
+	dev_t dev_id = cur_proc()->p_dev; 
+	
+	if (!vfs_find(filename, filename + strlen(filename), &dev_id, &ino)) {
         set_errno(ENOENT);
-        klogf(Log_info, "vfs", "file %s dont exists", filename);
+        klogf(Log_warn, "vfs", "file '%s' dont exists", filename);
         return 0;
-    }
+	}
 
-    // TODO : follow symlink in lookup...
+    struct device *dev = devices + dev_id;
+    struct fs      *fs = fst + dev->dev_fs;
+    struct stat st;
+	fs->fs_stat(ino, &st, &dev->dev_info);
+
+    // TODO : follow symlink in find
     if ((st.st_mode&0xf000) == TYPE_SYM) {
         if (flags&O_NOFOLLOW || flags&O_CREAT)
             return 0;
@@ -208,11 +217,10 @@ vfile_t *vfs_load(const char *filename, int flags) {
     for (size_t i = 0; i < NFILE; i++) {
         v = state.st_files + i;
         if (v->vf_cnt) {
-            if (v->vf_stat.st_ino == st.st_ino &&
-                v->vf_stat.st_dev == dev->dev_id) {
+            if (v->vf_stat.st_ino == ino && v->vf_stat.st_dev == dev_id) {
                 v->vf_cnt++;
                 klogf(Log_info, "vfs", "file %s is open %d times",
-                      fname, state.st_files[i].vf_cnt);
+                      filename, state.st_files[i].vf_cnt);
                 return state.st_files + i;
             }
 
@@ -315,42 +323,37 @@ int vfs_close(vfile_t *vf) {
 }
 
 ino_t vfs_create(const char *fullname, mode_t perm) {
-    ino_t curr_ino;
-    struct device *dev;
-    char *fname;
-
-    if (!(fname=fname_to_ino(fullname, &curr_ino, &dev))) return 0;
-
-    klogf(Log_info, "vfs", "create %s", fname);
-
-    // extract parent name from full name
-    char parent[256] = { 0 };
-    char *filename = strrchr(fname, '/');
-    if (!filename) { // parent is current dir
-        filename = fname;
-        memcpy(parent, ".", 2);
-    } else {
-        memcpy(parent, fname, filename++ - fname);
-    }
-
-    // lookup for parent in fs
-    struct stat st;
-    struct fs *fs = fst + dev->dev_fs;
-    fs_create_t *create = perm&TYPE_DIR ? fs->fs_mkdir : fs->fs_touch;
-
-    ino_t rc = vfs_lookup(&dev->dev_info, fs, curr_ino, parent, &st);
-    if (!rc) {
-        klogf(Log_error, "vfs", "alloc: no file %s", parent);
+    ino_t par_ino = cur_proc()->p_cino;
+	dev_t par_dev = cur_proc()->p_dev; 
+    
+    klogf(Log_info, "vfs", "create %s", fullname);
+	
+	// extract parent name from full name
+    const char *parent_end = strrchr(fullname, '/');
+	const char *filename   = parent_end + 1;
+	if (!parent_end)
+		filename = fullname;
+	else if (!vfs_find(fullname, parent_end, &par_dev, &par_ino)) {
+        set_errno(ENOENT);
+        klogf(Log_error, "vfs", "can't find parent of %s", fullname);
         return 0;
-    }
+	}
 
-    if (!(st.st_mode&TYPE_DIR)) {
-        klogf(Log_error, "vfs", "alloc: %s is not a directory", parent);
+    struct device *dev = devices + par_dev;
+    struct fs      *fs = fst + dev->dev_fs;
+    struct stat     st;
+	fs->fs_stat(par_ino, &st, &dev->dev_info);
+
+    if (!(st.st_mode & TYPE_DIR)) {
+        klogf(Log_error, "vfs", "alloc: %s parent is not a directory",
+				fullname);
         return 0;
+
     }
 
     // create file
-    return create(rc, filename, perm, &dev->dev_info);
+    fs_create_t *create = perm&TYPE_DIR ? fs->fs_mkdir : fs->fs_touch;
+    return create(par_ino, filename, perm, &dev->dev_info);
 }
 
 ino_t vfs_truncate(vfile_t *vf) {

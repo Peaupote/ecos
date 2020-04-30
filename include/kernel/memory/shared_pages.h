@@ -29,6 +29,6 @@ void    kmem_fork_paging(phy_addr new_pml4);
 //les pages référencées et switch sur `new_pml4`
 void    kmem_free_paging(phy_addr old_pml4, phy_addr new_pml4);
 void    kmem_free_paging_range(uint64_t* page_bg,
-				uint8_t lvl, uint16_t lim);
+				enum pgg_level lvl, uint16_t lim);
 
 #endif

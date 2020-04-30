@@ -42,7 +42,7 @@ uint8_t handle_PF(uint_ptr fault_addr) {
 	uint64_t query_addr =
 		(uint64_t) paging_acc_pml4(paging_get_lvl(pgg_pml4, fault_addr));
 
-	for(uint8_t lvl = 4; lvl != 0;) { --lvl;
+	for(enum pgg_level lvl = pgg_pml4; lvl != 0;) { --lvl;
 		uint64_t* query = (uint64_t*) query_addr;
 		uint64_t  qe = *query;
 		if(! (qe & PAGING_FLAG_P) ){
@@ -116,9 +116,9 @@ void kmem_fork_paging(phy_addr new_pml4) {
 	paging_refresh();
 }
 
-void kmem_free_rec(uint64_t* entry, uint8_t lvl);
+void kmem_free_rec(uint64_t* entry, enum pgg_level lvl);
 void kmem_free_paging_range(uint64_t* page_bg,
-			uint8_t lvl, uint16_t lim) {
+			enum pgg_level lvl, uint16_t lim) {
 
 	for (uint16_t i = 0; i < lim; ++i) {
 
@@ -140,9 +140,11 @@ void kmem_free_paging_range(uint64_t* page_bg,
 			} else --hd->count;
 
 		}
+
+		page_bg[i] = 0;
 	}
 }
-void kmem_free_rec(uint64_t* entry, uint8_t lvl) {
+void kmem_free_rec(uint64_t* entry, enum pgg_level lvl) {
 	if (lvl) {
 		uint64_t* page_bg = (uint64_t*) paging_rm_loop((uint_ptr)entry);
 		kmem_free_paging_range(page_bg, lvl, PAGE_ENT);
@@ -150,7 +152,7 @@ void kmem_free_rec(uint64_t* entry, uint8_t lvl) {
 	kmem_free_page((*entry) & PAGE_MASK);
 }
 void kmem_free_paging(phy_addr old_pml4, phy_addr new_pml4) {
-	kmem_free_paging_range(paging_acc_pml4(0), 4, PML4_END_USPACE);
+	kmem_free_paging_range(paging_acc_pml4(0), pgg_pml4, PML4_END_USPACE);
 
 	pml4_to_cr3(new_pml4);
 

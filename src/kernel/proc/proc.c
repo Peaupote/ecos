@@ -77,11 +77,6 @@ void proc_init() {
     p_init->p_shnd.ign = 0;
     p_init->p_shnd.dfl = ~(sigset_t)0;
 
-    // set init's work directory to root of home partition
-    // (defined during vfs_init)
-    p_init->p_dev  = home_dev;
-    p_init->p_cino = devices[home_dev].dev_info.root_ino;
-
     // processus 2: stop, utilisé en cas de panic
     proc_t *p_stop = &state.st_proc[PID_STOP];
     p_stop->p_ppid = PID_STOP;
@@ -109,12 +104,18 @@ void proc_init() {
     for (size_t i = 3; i < NFD; i++) p_init->p_fds[i] = -1;
 
     // set chann to free
-    for (cid_t cid = 3; cid < NCHAN; cid++) {
+    for (cid_t cid = 0; cid < NCHAN; cid++) {
         state.st_chann[cid].chann_id      = cid;
         state.st_chann[cid].chann_mode    = UNUSED;
         state.st_chann[cid].chann_waiting = PID_NONE;
         state.st_chann[cid].chann_nxw     = cid;
     }
+
+	for (pid_t pid = 0; pid < 3; ++pid) {
+		// set work directory to root
+		state.st_proc[pid].p_dev  = ROOT_DEV;
+		state.st_proc[pid].p_cino = devices[ROOT_DEV].dev_info.root_ino;
+	}
 
     // set all remaining slots to free processus
     state.st_free_proc = 3;
@@ -131,8 +132,6 @@ void proc_init() {
     st_curr_reg       = &p_init->p_reg;
 
     kAssert(fs_proc_std_to_tty(p_init));
-    kpanic_is_early = false;
-
 }
 
 void proc_start(void) {

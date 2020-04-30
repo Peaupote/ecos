@@ -42,10 +42,10 @@ struct stat {
     uint32_t st_mtime;
 };
 
-// Attention on utilise dans fs/ext2 le fait que cette structure aie le même
-// format que celui du système ext2
+// Attention on utilise dans fs/ext2 le fait que cette structure aie un
+// format similaire à celui du système ext2
 struct dirent {
-    uint32_t d_ino;
+    uint32_t d_ino;    // ino dans le système de fichier du parent
     uint16_t d_rec_len;
     uint8_t  d_name_len;
     uint8_t  d_file_type;

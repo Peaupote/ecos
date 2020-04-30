@@ -16,9 +16,13 @@ struct mount_info {
 	char space[MIADT_SIZE] __attribute__((aligned(8)));
 };
 
+#define ROOT_DEV 0
+
 struct device {
     dev_t             dev_id;
-    char              dev_mnt[256];
+	dev_t             dev_parent_dev;
+	ino_t             dev_parent_red; // ino du dossier remplacé par le dev
+	ino_t             dev_parent_ino;
     uint8_t           dev_free;
     uint8_t           dev_fs;
     struct mount_info dev_info;

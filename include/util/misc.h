@@ -60,13 +60,27 @@ GEN_ALIGN(align_to_size, size_t, size_t)
 #undef GEN_ALIGN
 
 // hash_str(B, hash_str(A, h)) = hash_str(concat(A,B), h)
-static inline unsigned char hash_str(const char* s, unsigned char h) {
-	while (*s) {
-		h  = (h << 3) | (h >> 5);//rol
-		h ^= *s;
-		++s;
-	}
-	return h;
+#define GEN_HASH_STR(T, S, K) \
+static inline T hash_str##S(const char* s, T h) {\
+	while (*s) {\
+		h  = (h << (K)) | (h >> (S-K));/*rol*/\
+		h ^= *s;\
+		++s;\
+	}\
+	return h;\
+}\
+static inline T hash_strn##S(const char* s, size_t n, T h) {\
+	for (size_t i = 0; i < n; ++i) {\
+		h  = (h << (K)) | (h >> (S-K));\
+		h ^= s[i];\
+		++s;\
+	}\
+	return h;\
 }
+#define EMPTY 
+GEN_HASH_STR(unsigned char,  8,  3)
+GEN_HASH_STR(uint64_t,      64, 23)
+#undef EMPTY
+#undef GEN_HASH_STR
 
 #endif

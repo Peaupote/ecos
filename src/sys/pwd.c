@@ -5,39 +5,42 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
+#include <stdbool.h>
+
+static inline bool stat_eq(struct stat* a, struct stat* b) {
+	return a->st_ino == b->st_ino && a->st_dev == b->st_dev;
+}
 
 int main(int argc __attribute__((unused)),
          char *argv[] __attribute__((unused))) {
     int pos = 1023;
-    struct stat st = { 0 }, p = { 0 };
+	struct stat sts[2] = {0};
+    struct stat *st = sts,
+				*p  = sts + 1;
     char pwd[1024] = { 0 };
 
-    DIR *dirp;
-    struct dirent *dir;
+    stat(".", st);
 
-    stat(".", &st);
+    while (chdir(".."), stat(".", p), !stat_eq(p, st)) {
+		DIR *dirp;
 
-    while (1) {
-        stat("..", &p);
-        if (st.st_ino == p.st_ino && st.st_dev == p.st_dev) {
-            printf("/%s\n", pwd + pos);
-            return 0;
-        }
-
-        dirp = opendir("..");
+        dirp = opendir(".");
         if (!dirp) {
             perror("dirp");
             exit(1);
         }
-
-        while ((dir = readdir(dirp))) {
-            if (dir->d_ino == st.st_ino) break;
-        }
-
-        if (!dir) {
-            fprintf(stderr, "something unexpected just happend\n");
-            exit(1);
-        };
+		
+		struct dirent *dir;
+		struct stat c;
+		do {
+			if (! (dir = readdir(dirp)) ) {
+				fprintf(stderr, "something unexpected just happend\n");
+				closedir(dirp);
+				return 1;
+			}
+		} while (p->st_dev == st->st_dev
+					? dir->d_ino != st->st_ino
+					: (stat(dir->d_name, &c), !stat_eq(&c, st)) );
 
         pos -= dir->d_name_len + 1;
         if (pos <= 0) {
@@ -46,11 +49,16 @@ int main(int argc __attribute__((unused)),
         }
 
         pwd[pos + dir->d_name_len] = '/';
-        for (int i = 0; i < dir->d_name_len; ++i)
-            pwd[pos + i] = dir->d_name[i];
+		memcpy(pwd + pos, dir->d_name, dir->d_name_len);
 
         closedir(dirp);
-        st = p;
-        chdir("..");
+		
+		// swap(p, st)
+		struct stat* tmp = p;
+		p  = st;
+		st = tmp;
     }
+
+	printf("/%s\n", pwd + pos);
+	return 0;
 }

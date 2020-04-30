@@ -7,6 +7,7 @@
  *
  * The filsystem is architectured as follow:
  * /proc (ROOT_INO)
+ *   - /proc/null
  *   - /proc/tty
  *   - /proc/pipes
  *   - /proc/pid

@@ -15,12 +15,17 @@ char        line[513];
 bool        update_cwd = true;
 static char cwd[256] = "";
 
+static inline bool stat_eq(struct stat* a, struct stat* b) {
+	return a->st_ino == b->st_ino && a->st_dev == b->st_dev;
+}
+
 static void do_update_cwd() {
 	struct stat st = { 0 }, p = { 0 };
 	stat(".", &st);
 	stat("..", &p);
-	if (st.st_ino == p.st_ino && st.st_dev == p.st_dev) {
-		cwd[0] = '\0';
+	if (stat_eq(&st, &p)) {
+		cwd[0] = '/';
+		cwd[1] = '\0';
 		return;
 	}
     DIR *dirp = opendir("..");
@@ -30,18 +35,32 @@ static void do_update_cwd() {
 	}
 
     struct dirent *dir;
-	while ((dir = readdir(dirp))) {
-		if (dir->d_ino == st.st_ino) {
-			size_t len = min_size_t(dir->d_name_len, 255);
-			memcpy(cwd, dir->d_name, len);
-			cwd[len] = '\0';
+	while (true) {
+		if (!(dir = readdir(dirp))) {
+			fprintf(stderr, "cwd\n");
+			cwd[0] = '\0';
 			closedir(dirp);
 			return;
 		}
+		if (p.st_dev == st.st_dev) {
+			if (dir->d_ino == st.st_ino) break;
+		} else {
+			char* v = dir->d_name - 3;
+			v[0] = v[1] = '.';
+			v[2] = '/';
+			struct stat c;
+			stat(v, &c);
+			if (stat_eq(&c, &st)) break;
+		}
 	}
 
-	fprintf(stderr, "cwd\n");
-	cwd[0] = '\0';
+	size_t len = min_size_t(dir->d_name_len, 255);
+	memcpy(cwd, dir->d_name, len);
+	cwd[len] = '\0';
+
+	closedir(dirp);
+	update_cwd = false;
+	return;
 }
 
 int main() {

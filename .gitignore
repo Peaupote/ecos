@@ -12,4 +12,5 @@ isodir
 *.a
 *.log
 tests/run/home
+src/sys/root
 vars_local.Makefile

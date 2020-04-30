@@ -4,9 +4,15 @@
 
 #include "keyboard_layout.s"
 
+.global root_partition
+.global root_partition_end
 .global home_partition
 .global home_partition_end
 
+.align 0x20
+root_partition:
+    .incbin "../sys/root.img"
+root_partition_end:
 .align 0x20
 home_partition:
     .incbin "../../tests/run/home.img"

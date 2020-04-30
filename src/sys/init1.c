@@ -13,9 +13,9 @@ int main() {
     const char *args[1] = { 0 };
 
     setenv("HOME", "/home/test", 0);
-    setenv("PATH", "/home/bin", 0);
+    setenv("PATH", "/bin", 0);
 
-    execv("/home/bin/sh", args);
+    execv("/bin/sh", args);
 
     return 0;
 }

@@ -392,23 +392,25 @@ int sys_chdir(const char *fname) {
         return -1;
     }
 
-    vfile_t *vf = vfs_load(fname, 0);
-    if (!vf) {
+	proc_t *p    = cur_proc();
+	ino_t ino    = p->p_cino;
+	dev_t dev_id = p->p_dev;
+
+    if (!vfs_find(fname, fname + strlen(fname), &dev_id, &ino)) {
         set_errno(ENOENT);
-        vfs_close(vf);
         return -1;
     }
 
-    if (!(vf->vf_stat.st_mode&TYPE_DIR)) {
+    struct stat st;
+    struct device *dev = devices + dev_id;
+	fst[dev->dev_fs].fs_stat(ino, &st, &dev->dev_info);
+    if (!(st.st_mode & TYPE_DIR)) {
         set_errno(ENOTDIR);
-        vfs_close(vf);
         return -1;
     }
 
-    proc_t *p = state.st_proc + state.st_curr_pid;
-    p->p_cino = vf->vf_stat.st_ino;
-    p->p_dev  = vf->vf_stat.st_dev;
-    vfs_close(vf);
+    p->p_cino = ino;
+    p->p_dev  = dev_id;
 
     return 0;
 }

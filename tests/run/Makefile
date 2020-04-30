@@ -1,39 +1,38 @@
 ROOT=../..
+STARTO="$(ROOT)/src/sys/start.o"
 
-.PHONY:clean sys home
+.PHONY: clean sys home $(STARTO)
 
-include $(ROOT)/vars.Makefile
 unexport $(VARS_NAME)
+include $(ROOT)/vars.Makefile
 
-home: sys
-	rm   -rf home
+CFILES=test.c test2.c test3.c
+OUT=$(CFILES:.c=.out)
+SRCDEP=$(CFILES)
+INCLUDE_LIBC?=-I $(ROOT)/include/libc
+INCLUDES=-I $(ROOT)/include $(INCLUDE_LIBC)
+
+%.out:%.c libc $(STARTO)
+	$(CC) $(FLAGS_UR) -o $@ $< $(STARTO) \
+		$(ROOT)/src/libc/libc.a $(INCLUDES) -lgcc
+
+home.img: $(OUT)
+	rm -rf home
+	mkdir -p home
 	mkdir -p home/test
-	mkdir -p home/bin
-	cp $(ROOT)/src/sys/init1.out home/bin/init1
-	cp $(ROOT)/src/sys/sh.out    home/bin/sh
-	cp $(ROOT)/src/sys/cat.out   home/bin/cat
-	cp $(ROOT)/src/sys/echo.out  home/bin/echo
-	cp $(ROOT)/src/sys/stat.out  home/bin/stat
-	cp $(ROOT)/src/sys/ls.out    home/bin/ls
-	cp $(ROOT)/src/sys/ps.out    home/bin/ps
-	cp $(ROOT)/src/sys/wc.out    home/bin/wc
-	cp $(ROOT)/src/sys/env.out   home/bin/env
-	cp $(ROOT)/src/sys/mkdir.out home/bin/mkdir
-	cp $(ROOT)/src/sys/head.out  home/bin/head
-	cp $(ROOT)/src/sys/pwd.out   home/bin/pwd
-
-	cp $(ROOT)/src/sys/test.c    home/test/test.c
-	cp $(ROOT)/src/sys/test.out  home/test/test
-	cp $(ROOT)/src/sys/test2.out home/test/test2
-	cp $(ROOT)/src/sys/test3.out home/test/test3
-
-
-home.img: home
+	cp test.c home/test/test.c
+	@$(foreach o,$(OUT),cp "$(o)" "home/test/$(o:.out=)" &&) echo $(OUT)
 	$(ROOT)/tools/build-ext2.sh home home.img
 
-sys:
-	$(MAKE) -C $(ROOT)/src/sys all
+$(STARTO):
+	$(MAKE) -C $(ROOT)/src/sys start.o
+
+libc:
+	$(MAKE) -C $(ROOT)/src/libc libc.a
+
+.depends:
+	../../tools/mkdep.sh "$(CC) $(FLAGS_UR) $(INCLUDES)" \
+		$(SRCDEP) > .depends
 
 clean:
 	rm -rf *.o *.img *.out *.s home
-	$(MAKE) -C prg clean

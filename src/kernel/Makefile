@@ -35,7 +35,7 @@ keyboard_layout.s: ../../data/keyboard_azerty.txt ../../data/keyboard_qwerty.txt
 	echo "keyboard_qwerty_layout:" >> keyboard_layout.s
 	$(KBMAP) ../../data/keyboard_qwerty.txt >> keyboard_layout.s
 
-data.o:data.s tests_home $(ROOT)/data/font.data
+data.o:data.s root_img test_img $(ROOT)/data/font.data
 
 UDEP_FROM_HERE=$(patsubst %,../util/64/%,$(UDEP))
 UDEP_FROM_UTIL=$(patsubst %,64/%,$(UDEP))
@@ -46,8 +46,11 @@ libk:
 util:
 	$(MAKE) -C ../util $(UDEP_FROM_UTIL)
 
-tests_home:
-	$(MAKE) -C ../../tests/run home.img
+root_img:
+	$(MAKE) -C ../sys root.img
+
+test_img:
+	$(MAKE) -C $(ROOT)/tests/run home.img
 
 ext2:
 	$(MAKE) -C ../fs/ext2 ext2.a

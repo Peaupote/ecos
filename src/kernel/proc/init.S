@@ -28,6 +28,6 @@ proc_init_entry:// Ring 1, pas de pile
 
     .section .data
 init1_path:
-    .string "/home/bin/init1"
+    .string "/bin/init1"
 init1_args:
     .quad 0
