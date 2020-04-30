@@ -132,7 +132,7 @@ static ino_t vfs_lookup(struct mount_info *info, struct fs *fs,
 
     if (!full_name) return ino;
 
-    start = (char*)(*full_name == '/' ? full_name + 1 : full_name);
+    for (start = (char*)full_name; *start == '/'; ++start);
     end = strchrnul(start, '/');
 
     while (*start) {
@@ -144,7 +144,7 @@ static ino_t vfs_lookup(struct mount_info *info, struct fs *fs,
         }
 
         if (!*end || !*(end+1)) break;
-        start = end+1;
+        for (start = end+1; *start == '/'; ++start);
         end = strchrnul(start, '/');
     }
 
@@ -156,7 +156,7 @@ static char *fname_to_ino(const char *fname, ino_t *ino, struct device **dev) {
     // otherwise start at current work directory
     if (*fname == '/') {
         *dev = find_device(fname);
-        if (!dev) {
+        if (!*dev) {
             klogf(Log_info, "vfs", "no mount point %s", fname);
             return 0;
         }
