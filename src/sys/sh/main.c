@@ -66,20 +66,40 @@ static void do_update_cwd() {
 int main() {
     printf("ecos-shell version 0.1\n");
 	init_builtins();
-    int rc;
+
+	int   buf_rem = 0;
+	char* buf = NULL;
 
     while(1) {
 		if (update_cwd) do_update_cwd();
-        printf("\033p%s> \033;", cwd); fflush(stdout);
-        rc = read(STDIN_FILENO, line, 512);
-        line[rc] = '\0';//TODO: attendre \n + ne pas aller plus loin
-		
-        if (rc == 0) return 0;
-        if (rc == 1) continue;
-        if (rc < 0) {
-            printf("an error occurred\n");
-            exit(1);
-        }
+	
+		for (int i = 0; i < buf_rem; ++i)//may overlap
+			line[i] = buf[i];
+
+		int rem = 512 - buf_rem;
+		buf = line;
+
+		printf("\033p%s> \033;", cwd); fflush(stdout);
+		while (true) {
+			int rc = read(STDIN_FILENO, buf, rem);
+			if (rc == 0) return 0;
+			if (rc < 0) {
+				perror("sh - input");
+				return 1;
+			}
+			for (int i = 0; i < rc; ++i) {
+				if (*buf == '\n') {
+					*buf = '\0';
+					buf_rem = rc - i - 1;
+					++buf;
+					goto end_input_read;
+				}
+				++buf;
+			}
+			rem -= rc;
+			printf("\033p\033;"); fflush(stdout);
+		}
+end_input_read:;	
 		
 		cmd_3_t* cmd;
 		const char* curs = line;
@@ -87,7 +107,7 @@ int main() {
 		int pst = parse_cmd_3c(&curs, &cmd);
 		
 		//printf("parse_st = %d\n", pst);
-		if (pst > 1) {
+		if (pst > 1 || *curs != '\0') {
 			fprintf(stderr, "Syntax error (%d) near char %d\n", 
 					pst, (int)(curs - line));
 			continue;

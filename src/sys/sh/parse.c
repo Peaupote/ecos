@@ -12,7 +12,8 @@ enum pctype getctype(char c) {
 			return CT_RED;
 
 		case '\n': case '\r': case '\0':
-		case '(': case ')': case ';': case '&': case '|':
+		case '(': case ')':
+		case ';': case '&': case '|':
 			return CT_CNJ;
 
 		case '\\': case '\'': case '"':
@@ -140,9 +141,9 @@ int read_word1(const char** src, cbuf_t* b) {
 int parse_cmd_0(const char** cr, cmd_0_t* rt) {
 	//printf("read_cmd_0 @ line+%d\n", *cr - line);
 	wait_nspace(cr);
-	if (**cr == '$' && (*cr)[1] == '(') {
+	if (**cr == '(') {
 		rt->ty  = C_SUB;
-		*cr    += 2;
+		++*cr;
 
 		int rts = parse_cmd_3c(cr, &rt->sub);
 		if (rts > 1) return rts;
@@ -307,12 +308,12 @@ int parse_cmd_2(const char** cr, cmd_2_t* rt) {
 int parse_cmd_3a(const char** cr, cmd_3_t** rt) {
 	//printf("parse_cmd_3a @ line+%d\n", *cr - line);
 	wait_nspace(cr);
-	if (**cr == '(') {
+	if (**cr == '{') {
 		++*cr;
 		int rts = parse_cmd_3c(cr, rt);
 		if (rts) return rts == 1 ? 2 : rts;
 		wait_nspace(cr);
-		if (**cr != ')') {
+		if (**cr != '}') {
 			destr_cmd_3(*rt);
 			free(*rt);
 			return 2;
@@ -384,8 +385,12 @@ int parse_cmd_3c(const char** cr, cmd_3_t** rt) {
 	goto loop_begin;	
 	do {
 		++*cr;
-		cmd_3_t* c1;
 	loop_begin:
+		wait_nspace(cr);
+		if (**cr == '}')
+			break;
+
+		cmd_3_t* c1;
 		rts = parse_cmd_3b(cr, &c1);
 		if (rts > 1) {
 			if (cm) {

@@ -201,7 +201,7 @@ int fputs(const char *src, FILE *s) {
 int fgetc(FILE *s) {
     if (!s || !(s->flags&READ)) {
         errno = EINVAL;
-        return -1;
+        return EOF;
     }
 
     if (s->read_ptr == s->read_end) {
@@ -225,7 +225,17 @@ char *fgets(char *dst, int size, FILE *s) {
     char *rt = dst;
     int c;
     while(size > 0 && (c = fgetc(s)) != EOF) --size, *dst++ = c;
-    return rt == dst ? 0 : rt;
+    return rt == dst ? NULL : rt;
+}
+
+int ungetc(int c, FILE* s) {
+	if (c == EOF || !s || !(s->flags & READ)) {
+		errno = EINVAL;
+		return EOF;
+	}
+	if (s->read_ptr <= s->read_buf) return EOF;
+	*--s->read_ptr = (unsigned char) c;
+	return c;
 }
 
 ssize_t getdelim(char **lineptr, size_t *n, int delim, FILE *stream) {

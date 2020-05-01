@@ -350,31 +350,53 @@ int sscanf(const char *str, const char *fmt, ...) {
 }
 
 #ifndef __is_kernel
-bool stdin_hunget = false;
-char stdin_last;
 
-ssize_t stdin_read(void *none __attribute__((unused)), char* out,
-					size_t count) {
-	if (stdin_hunget) {
-		stdin_hunget = false;
-		return stdin_last;
+struct file_rddt {
+	unsigned char last_c;
+	FILE* f;
+};
+
+ssize_t file_read(void *p_dt, char* out, size_t count) {
+	struct file_rddt* d = p_dt;
+	size_t rc = 0;
+	int     c;
+	while (rc < count && (c = fgetc(d->f)) != EOF) {
+		*out++ = (unsigned char)c;
+		++rc;
 	}
-	ssize_t rt = read(0, out, count);
-	if (rt > 0)
-		stdin_last = out[rt - 1];
-	return rt;
+	if (rc) d->last_c = *(out - 1);
+	return rc;
 }
-void stdin_unget(void *none __attribute__((unused))) {
-	stdin_hunget = true;
+void file_unget(void *p_dt) {
+	struct file_rddt* d = p_dt;
+	if (ungetc(d->last_c, d->f) == EOF)
+		fprintf(stderr, "error unget %c\n", d->last_c);
+}
+
+int fscanf(FILE* f, const char *fmt, ...) {
+	string_reader rd = {
+		.read = &file_read, .unget = &file_unget
+	};
+	struct file_rddt d = {
+		.last_c = '#', .f = f
+	};
+    va_list params;
+    va_start(params, fmt);
+	int rt = fpscanf(rd, &d, fmt, params);
+	va_end(params);
+	return rt;
 }
 
 int scanf(const char *fmt, ...) {
 	string_reader rd = {
-		.read = &stdin_read, .unget = &stdin_unget
+		.read = &file_read, .unget = &file_unget
+	};
+	struct file_rddt d = {
+		.last_c = '#', .f = stdin
 	};
     va_list params;
     va_start(params, fmt);
-	int rt = fpscanf(rd, NULL, fmt, params);
+	int rt = fpscanf(rd, &d, fmt, params);
 	va_end(params);
 	return rt;
 }

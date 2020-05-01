@@ -20,10 +20,16 @@ struct mount_info {
 
 struct device {
     dev_t             dev_id;
+	
 	dev_t             dev_parent_dev;
 	ino_t             dev_parent_red; // ino du dossier remplacé par le dev
 	ino_t             dev_parent_ino;
-    uint8_t           dev_free;
+	
+	// liste chainée des dev montés comme enfants
+	dev_t             dev_childs;
+	dev_t             dev_sib;
+    
+	uint8_t           dev_free;
     uint8_t           dev_fs;
     struct mount_info dev_info;
 } devices[NDEV];

@@ -53,6 +53,8 @@ int  printf(const char *fmt, ...);
 
 int fgetc(FILE *stream);
 char *fgets(char *s, int size, FILE *stream);
+/** Replace le caractère c, 1 seul ungetc consécutif est garanti */
+int ungetc(int c, FILE* stream);
 
 int fputc(int c, FILE *stream);
 int fputs(const char *s, FILE *stream);
@@ -60,6 +62,7 @@ int fputs(const char *s, FILE *stream);
 ssize_t getline(char **lineptr, size_t *n, FILE *stream);
 ssize_t getdelim(char **lineptr, size_t *n, int delim, FILE *stream);
 
+int  fscanf(FILE* stream, const char *format, ...);
 int  scanf(const char *format, ...);
 
 void perror(const char *str);

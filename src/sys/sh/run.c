@@ -342,13 +342,13 @@ bool expand_var_split(const char** src, pbuf_t* b0, cbuf_t* b1, bool b1w) {
 	return word_split((const char**)&val, b0, b1, b1w);
 }
 
-void expand_escpd_char(const char** src, cbuf_t* b) {
+void expand_escpd_char(char e, const char** src, cbuf_t* b) {
 	char c = *++*src;
-	switch (c) {
-		case 'n':  cbuf_put(b, '\n');
-		case 't':  cbuf_put(b, '\t');
-		case '\\': cbuf_put(b, '\\');
-		default:   cbuf_put(b, c);
+	if (e ? c == e || c == '\\' : getctype(c) != CT_NRM)
+		cbuf_put(b, c);
+	else {
+		char buf[2] = {'\\', c};
+		cbuf_putn(b, buf, 2);
 	}
 }
 
@@ -357,7 +357,7 @@ void expand_escpd_str(const char** src, cbuf_t* b) {
 	char c;
 	while ((c = *++*src) != ty) {
 		if (c == '\\')
-			expand_escpd_char(src, b);
+			expand_escpd_char(ty, src, b);
 		else if (c == '$' && ty == '"')
 			expand_var(src, b);
 		else
@@ -387,7 +387,7 @@ void expand(const char* c, pbuf_t* wds) {
 			case CT_ESC:
 				switch(*c) {
 					case '\\':
-						expand_escpd_char(&c, &buf);
+						expand_escpd_char(0, &c, &buf);
 						break;
 					case '\'': case '"':
 						expand_escpd_str(&c, &buf);
@@ -542,9 +542,11 @@ ecmd_2_t* exec_cmd_2(const cmd_2_t* c2) {
 
 continue_pipe:
 
-		for (char** it = args; *it; ++it)
-			free(*it);
-		free(args);
+		if (args) {
+			for (char** it = args; *it; ++it)
+				free(*it);
+			free(args);
+		}
 
         if (~fd_in)  close(fd_in);
         if (~my_fd_out) close(my_fd_out);

@@ -26,11 +26,5 @@
 // NB_PRIORITY_LVL <= 64
 #define NB_PRIORITY_LVL 41
 
-// maximum number of chars accumulated in a pipe
-#define PIPE_SZ   2048
-#define STREAM_SZ 2048
-
-/**
- * Dont touch too much here
- */
-#define NGDT 4
+// Quantité maximale de mémoire qu'un processus peut allouer avec sbrk
+#define PROC_MAX_BRK 0x100000 //1MB

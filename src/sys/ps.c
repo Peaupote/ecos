@@ -14,38 +14,46 @@ int is_not_pid(const char *s) {
 int main () {
     struct dirp *dirp = opendir("/proc");
     struct dirent *dir;
-    char buf[256];
     int pid, count = 0;
+    char buf[256];
 
     printf("PID\tSTATE\tCMD\n");
     while ((dir = readdir(dirp))) {
-        memcpy(buf, dir->d_name, dir->d_name_len);
-        buf[dir->d_name_len] = 0;
+        if (is_not_pid(dir->d_name)) continue;
 
-        if (is_not_pid(buf)) continue;
-
-        pid = atoi(buf);
+        pid = atoi(dir->d_name);
         sprintf(buf, "/proc/%d/stat", pid);
-        int fd = open(buf, O_RDONLY);
-        if (fd < 0) {
+		FILE* fstat = fopen(buf, "r");
+        if (!fstat) {
             perror("ps: open");
             closedir(dirp);
             exit(1);
         }
 
-        if (read(fd, buf, 1024) < 0) {
-            perror("ps: read");
-            close(fd);
-            closedir(dirp);
-            exit(1);
-        }
-
-        int p; char cmd[256]; char st;
-        sscanf(buf, "%d %s %c", &p, cmd, &st);
-
-        printf("%d\t%c\t\t%s\n", pid, st, cmd);
-
-        close(fd);
+		int p; char cmd[256]; char st;
+		int mc = fscanf(fstat, "%d ", &p);
+		if (fgetc(fstat)!='(') {
+			mc = 1000;
+			goto end_pid;
+		}
+		char *cmdit = cmd;
+		int c;
+		do {
+			c = fgetc(fstat);
+			if (c == EOF) {
+				mc = 1000;
+				goto end_pid;
+			}
+			*cmdit++ = c;
+		} while (c != ')');
+		*(cmdit-1) = '\0';
+		mc += fscanf(fstat, " %c", &st);
+end_pid:
+		fclose(fstat);
+        if (mc != 2)
+			printf("%d\t#ERROR (%d)\n", pid, mc);
+		else
+			printf("%d\t%c\t\t%s\n", pid, st, cmd);
 
         count++;
     }

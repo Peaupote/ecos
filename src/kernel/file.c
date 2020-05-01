@@ -83,15 +83,17 @@ bool vfs_find(const char* path, const char* pathend,
 		*ino = devices[ROOT_DEV].dev_info.root_ino;
 		while(*path == '/') ++path;
 	}
-	struct fs* fs = fst + devices[*dev].dev_fs;
+	struct device* dv = devices + *dev;
+	struct fs*     fs = fst + dv->dev_fs;
 	while(path < pathend) {
 		const char* end_part = strchrnul(path, '/');
 		size_t len = end_part - path;
 		if (len == 2 && path[0] == '.' && path[1] == '.'
-				&& *ino == devices[*dev].dev_info.root_ino) {
-			*ino = devices[*dev].dev_parent_ino;
-			*dev = devices[*dev].dev_parent_dev;
-			fs   = fst + devices[*dev].dev_fs;
+			         && *ino == dv->dev_info.root_ino) {
+			*ino = dv->dev_parent_ino;
+			*dev = dv->dev_parent_dev;
+			dv   = devices + *dev;
+			fs   = fst + dv->dev_fs;
 		} else {
 			if (len > 255) {
 				klogf(Log_error, "vfs", "find: partie de chemin trop longue");
@@ -100,19 +102,18 @@ bool vfs_find(const char* path, const char* pathend,
 			char name[256];
 			memcpy(name, path, len);
 			name[len] = '\0';
-			*ino = fs->fs_lookup(*ino, name, &devices[*dev].dev_info);
+			*ino = fs->fs_lookup(*ino, name, &dv->dev_info);
 			if (!*ino) {
 				klogf(Log_info, "vfs", "can't find %s", name);
 				return false;
 			}
-		
-			for (size_t d = 0; d < NDEV; ++d) //TODO: opti
-				if (!devices[d].dev_free
-						&& devices[d].dev_parent_dev == *dev
-						&& devices[d].dev_parent_red == *ino) {
+
+			for (dev_t d = dv->dev_childs; ~d; d = devices[d].dev_sib)
+				if (devices[d].dev_parent_red == *ino) {
 					*ino = devices[d].dev_info.root_ino;
 					*dev = d;
-					fs   = fst + devices[*dev].dev_fs;
+					dv   = devices + *dev;
+					fs   = fst + dv->dev_fs;
 					break;
 				}
 		}
@@ -125,18 +126,21 @@ bool vfs_find(const char* path, const char* pathend,
 }
 
 int vfs_mount_root(uint8_t fs, void *partition) {
-    
-	if (!devices[ROOT_DEV].dev_free
-			|| !fst[fs].fs_mnt(partition, &devices[ROOT_DEV].dev_info)) {
+	struct device* dv = devices + ROOT_DEV;
+
+	if (!dv->dev_free || !fst[fs].fs_mnt(partition, &dv->dev_info)) {
         klogf(Log_info, "vfs", "failed to mount root");
         kpanic("Failed mounting");
     }
 
-    devices[ROOT_DEV].dev_fs         = fs;
-    devices[ROOT_DEV].dev_free       = 0;
-	devices[ROOT_DEV].dev_parent_dev = ROOT_DEV;
-	devices[ROOT_DEV].dev_parent_red = devices[ROOT_DEV].dev_parent_ino
-	                                 = devices[ROOT_DEV].dev_info.root_ino;
+    dv->dev_fs         = fs;
+    dv->dev_free       = 0;
+
+	dv->dev_parent_dev = ROOT_DEV;
+	dv->dev_parent_red = dv->dev_parent_ino = dv->dev_info.root_ino;
+
+	dv->dev_childs     = ~(dev_t)0;
+	dv->dev_sib        = ~(dev_t)0;
 
     klogf(Log_info, "vfs", "root sucessfully mounted");
     return ROOT_DEV;
@@ -158,16 +162,22 @@ int vfs_mount(const char *path, uint8_t m_fst, void *partition) {
     size_t d;
     for (d = 0; d < NDEV && !devices[d].dev_free; d++);
 
-    if (d == NDEV || !fst[m_fst].fs_mnt(partition, &devices[d].dev_info)) {
+	struct device* dv = devices + d;
+    if (d == NDEV || !fst[m_fst].fs_mnt(partition, &dv->dev_info)) {
         klogf(Log_error, "vfs", "failed to mount %s", path);
         kpanic("Failed mounting");
     }
 
-    devices[d].dev_fs         = m_fst;
-    devices[d].dev_free       = 0;
-	devices[d].dev_parent_dev = red_dev;
-	devices[d].dev_parent_red = red_ino;
-	devices[d].dev_parent_ino = par_ino;
+    dv->dev_fs         = m_fst;
+    dv->dev_free       = 0;
+
+	dv->dev_parent_dev = red_dev;
+	dv->dev_parent_red = red_ino;
+	dv->dev_parent_ino = par_ino;
+	
+	dv->dev_childs     = ~(dev_t)0;
+	dv->dev_sib        = devices[red_dev].dev_childs;
+	devices[red_dev].dev_childs = d;
 
     klogf(Log_info, "vfs", "%s sucessfully mounted (device %d)", path, d);
     return d;

@@ -162,6 +162,7 @@ pid_t sys_fork() {
     fp->p_ring  = pp->p_ring;
     fp->p_prio  = pp->p_prio;
     fp->p_brk   = pp->p_brk;
+	fp->p_brkm  = pp->p_brkm;
     fp->p_spnd  = 0;
     fp->p_shnd  = pp->p_shnd;
     fp->p_errno = pp->p_errno;
@@ -207,9 +208,19 @@ int sys_getpriority() {
     return state.st_proc[state.st_curr_pid].p_prio;
 }
 
-void* sys_sbrk(intptr_t inc) {//TODO: protect
+void* sys_sbrk(intptr_t inc) {
     proc_t *p = state.st_proc + state.st_curr_pid;
     uint_ptr nbrk = (uint_ptr)( ((intptr_t)p->p_brk) + inc );
+
+	if (nbrk < p->p_brkm) {
+		klogf(Log_warn, "sbrk", "trying to go below brkm");
+		set_errno(ENOMEM);
+		return (void*)-1;
+	} else if (nbrk > p->p_brkm + PROC_MAX_BRK) {
+		klogf(Log_warn, "sbrk", "too much memory asked");
+		set_errno(ENOMEM);
+		return (void*)-1;
+	}
 
 	if (nbrk > p->p_brk) {
 		kmem_paging_alloc_rng(align_to(p->p_brk, PAGE_SIZE), nbrk,
@@ -217,15 +228,6 @@ void* sys_sbrk(intptr_t inc) {//TODO: protect
 				PAGING_FLAG_W | PAGING_FLAG_U);
 	} else {
 		uint_ptr rbg = align_to(nbrk, PAGE_SIZE);
-		for (uint_ptr a = rbg; a < p->p_brk; a += PAGE_SIZE) {
-			uint64_t *e = paging_page_entry(a);
-			if (!(*e & (PAGING_FLAG_P | SPAGING_FLAG_P 
-									  | SPAGING_FLAG_V))) {
-				klogf(Log_warn, "sbrk", "trying to free a non allocated page");
-				set_errno(ENOMEM);
-				return (void*)-1;
-			}
-		}
 		for (uint_ptr a = rbg; a < p->p_brk; a += PAGE_SIZE)
 			kmem_free_paging_range(paging_page_entry(a), pgg_pt, 1);
 	}

@@ -66,7 +66,7 @@ void pp_cmd_0(FILE* f, const cmd_0_t* c) {
 			fprintf(f, "%s", c->bas);
 		break;
 		case C_SUB:
-			fwrite("$( ", 1, 3, f);
+			fwrite("( ", 1, 2, f);
 			pp_cmd_3(f, 'c', c->sub);
 			fwrite(" ) ", 1, 3, f);
 		break;
@@ -99,31 +99,31 @@ void pp_cmd_3(FILE* f, char lvl, const cmd_3_t* c) {
 			pp_cmd_2(f, &c->cm2);
 			break;
 		case C_AND:
-			if (lvl < 'b') fwrite("(", 1, 1, f);
+			if (lvl < 'b') fwrite("{", 1, 1, f);
 			pp_cmd_3(f, 'b', c->childs[0]);
 			fwrite(" && ", 1, 4, f);
 			pp_cmd_3(f, 'a', c->childs[1]);
-			if (lvl < 'b') fwrite(")", 1, 1, f);
+			if (lvl < 'b') fwrite(";}", 1, 2, f);
 			break;
 		case C_OR:
-			if (lvl < 'b') fwrite("(", 1, 1, f);
+			if (lvl < 'b') fwrite("{", 1, 1, f);
 			pp_cmd_3(f, 'b', c->childs[0]);
 			fwrite(" || ", 1, 4, f);
 			pp_cmd_3(f, 'a', c->childs[1]);
-			if (lvl < 'b') fwrite(")", 1, 1, f);
+			if (lvl < 'b') fwrite(";}", 1, 2, f);
 			break;
 		case C_SEQ:
-			if (lvl < 'c') fwrite("(", 1, 1, f);
+			if (lvl < 'c') fwrite("{", 1, 1, f);
 			pp_cmd_3(f, 'c', c->childs[0]);
 			fwrite(" ; ", 1, 3, f);
 			pp_cmd_3(f, 'c', c->childs[1]);
-			if (lvl < 'c') fwrite(")", 1, 1, f);
+			if (lvl < 'c') fwrite(";}", 1, 2, f);
 			break;
 		case C_BG:
-			if (lvl < 'c') fwrite("(", 1, 1, f);
+			if (lvl < 'c') fwrite("{", 1, 1, f);
 			pp_cmd_3(f, 'b', c->childs[0]);
 			fwrite(" & ", 1, 3, f);
-			if (lvl < 'c') fwrite(")", 1, 1, f);
+			if (lvl < 'c') fwrite(";}", 1, 2, f);
 			break;
 	}
 }

@@ -417,7 +417,7 @@ void proc_execve_end() {
     pp->p_reg.r.rsi.p = trf()->argv;
     pp->p_reg.r.rdx.p = trf()->envv;
     pp->p_pml4        = mp->p_pml4;
-    pp->p_brk         = align_to(trf()->args_ed, 8);
+    pp->p_brkm = pp->p_brk = align_to(trf()->args_ed, 8);
     pp->p_shnd.usr    = NULL;
     pp->p_shnd.blk    = trf()->sigblk_save;
     //on hérite p_shnd.ign

@@ -415,8 +415,9 @@ static int cmd_read(file_ins* ins, void* d, off_t ofs, size_t sz) {
 
 static int stat_read(file_ins* ins, void* d, off_t ofs, size_t sz) {
     proc_t* p = state.st_proc + ins->pid;
-    return spart_printf(d, ofs, sz, "%d (%s) %c",
-            ins->pid, p->p_cmd, proc_state_char[p->p_stat]);
+    return spart_printf(d, ofs, sz, "%d (%s) %c %p",
+            ins->pid, p->p_cmd, proc_state_char[p->p_stat],
+			p->p_brk - p->p_brkm);
 }
 
 // -- régulier --

@@ -95,6 +95,7 @@ typedef struct proc {
     int              p_fds[NFD]; // table of file descriptors
     phy_addr         p_pml4;     // paging
     uint_ptr         p_brk;      // program break
+	uint_ptr         p_brkm;     // min program break
     struct reg       p_reg;      // saved registers
     char             p_cmd[256]; // cmd to exec the process
 
@@ -145,6 +146,11 @@ struct scheduler {
     size_t      nb_proc;
 };
 
+enum proc_owng {
+	own_tty = 0, 
+	NB_OWNG = 1
+};
+
 /**
  * Global state of the machine
  */
@@ -158,6 +164,7 @@ struct {
     proc_t      st_proc[NPROC];       // table containing all processes
     chann_t     st_chann[NCHAN];      // table containing all channels
     vfile_t     st_files[NFILE];      // table containing all opened files
+	pid_t       st_owng[NB_OWNG];     // processes owners of ressources
 } state;
 
 // pointer to current proc registers

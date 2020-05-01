@@ -51,6 +51,7 @@ static size_t   input_min_height;
 
 static uint8_t  input_color, prompt_color, vprompt_color,
                 buf_color,   err_color;
+static bool     is_buf_bright = false;
 uint8_t         tty_def_color;
 
 static enum tty_mode tty_mode;
@@ -64,8 +65,6 @@ bool            tty_do_kprint = false;
 size_t          tty_width, tty_height, tty_sb_height;
 
 static size_t   cur_ln_x;
-
-static pid_t    tty_owner = PID_NONE;
 
 
 // --Affichage--
@@ -555,21 +554,22 @@ void tty_input(scancode_byte s, key_event ev) {
                 }
                 break;
                 case KEY_C:
-                    if (~tty_owner && proc_alive(state.st_proc + tty_owner)) {
+                    if (~state.st_owng[own_tty]) {
 						on_tty0_action();
                         sq.shift += tty_writestringl("^C", 2, tty_def_color);
-                        send_sig_to_proc(tty_owner, SIGINT - 1);
+                        send_sig_to_proc(state.st_owng[own_tty],
+													SIGINT - 1);
                     }
                 break;
 				case KEY_Z:
-                    if (~tty_owner && proc_alive(state.st_proc + tty_owner)) {
+                    if (~state.st_owng[own_tty]) {
 						on_tty0_action();
                 		sq.shift += tty_writestringl("^Z", 2, tty_def_color);
-                        send_sig_to_proc(tty_owner, SIGTSTP - 1);
+                        send_sig_to_proc(state.st_owng[own_tty],
+													SIGTSTP - 1);
 					}
 				break;
 				case KEY_D:
-					on_tty0_action();
 					if (ib_size) {
 						sq.shift += tty_input_to_buffer();
 						if(fs_proc_write_tty(ibuffer, ib_size) != ib_size)
@@ -579,6 +579,7 @@ void tty_input(scancode_byte s, key_event ev) {
                 		sq.shift += tty_writestringl("^D", 2, tty_def_color);
 						fs_proc_send0_tty();
 					}
+					on_tty0_action();
 				break;
             }
         } else {
@@ -613,7 +614,54 @@ void tty_on_pit() {
 
 void tty_set_owner(pid_t p) {
     klogf(Log_info, "tty", "tty owner is %d", (int)p);
-    tty_owner = p;
+    state.st_owng[own_tty] = p;
+}
+
+static const uint8_t code_to_vga[2][8] = {
+		{
+			VGA_COLOR_BLACK,
+			VGA_COLOR_RED,
+		 	VGA_COLOR_GREEN,
+		 	VGA_COLOR_BROWN,
+		 	VGA_COLOR_BLUE,
+		 	VGA_COLOR_MAGENTA,
+		 	VGA_COLOR_CYAN,
+		 	VGA_COLOR_LIGHT_GREY
+		 },
+		{
+			VGA_COLOR_BLACK,
+			VGA_COLOR_LIGHT_RED,
+		 	VGA_COLOR_LIGHT_GREEN,
+		 	VGA_COLOR_LIGHT_BROWN,
+		 	VGA_COLOR_LIGHT_BLUE,
+		 	VGA_COLOR_LIGHT_MAGENTA,
+		 	VGA_COLOR_LIGHT_CYAN,
+		 	VGA_COLOR_WHITE
+		 }
+	};
+
+static void interpret_color_code(const char* str, size_t len) {
+	if (len == 1) {
+		switch (str[0]) {
+			case '0':
+				is_buf_bright = false;
+				buf_color = tty_def_color;
+			break;
+			case '1': is_buf_bright = true; break;
+		}
+	} else if (len == 2) {
+		if ((str[0] == '3' || str[0] == '4') 
+				&& (str[1] >= '0' || str[1] <= '7')) {
+			uint8_t cl = code_to_vga[is_buf_bright ? 1 : 0][str[1] - '0'];
+			if (str[0] == '3') {
+				buf_color &= 0xf0;
+				buf_color |= cl;
+			} else {
+				buf_color &= 0x0f;
+				buf_color |= cl << 4;
+			}
+		}
+	}
 }
 
 size_t tty_writei(uint8_t num, const char* str, size_t len) {
@@ -647,6 +695,22 @@ size_t tty_writei(uint8_t num, const char* str, size_t len) {
 						tty_set_bmode(ttym_prompt,
 								min_uint16_t(IB_LENGTH, (i - 1) - (t_ed + 2)),
 								str + t_ed + 2);
+					break;
+					case '\n':
+						tty_force_new_line();
+					break;
+					case '[':
+						for (int cbg = ++i; i < len; ++i) {
+							if (str[i] == 'm') {
+								interpret_color_code(str + cbg, i - cbg);
+								goto set_p_mode;
+							} else if (str[i] == ';') {
+								interpret_color_code(str + cbg, i - cbg);
+								cbg = i + 1;
+							}
+						}
+						tty_seq_commit(&sq);
+						return t_ed;
 					break;
 				}
 				t_bg = i + 1;

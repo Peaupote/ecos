@@ -49,7 +49,7 @@ void proc_init() {
     p_idle->p_ring = 0;
     p_idle->p_prio = 0; //priorité minimale
     p_idle->p_pml4 = (phy_addr)NULL;
-    p_idle->p_brk  = 0;
+    p_idle->p_brkm = p_idle->p_brk = 0;
     p_idle->p_reg.rsp.p = kernel_stack_top;
     p_idle->p_reg.rip.p = &proc_idle_entry;
     strcpy(p_idle->p_cmd, "idle");
@@ -68,7 +68,7 @@ void proc_init() {
     p_init->p_ring = 1;
     p_init->p_prio = NB_PRIORITY_LVL - 2; //priorité maximale
     p_init->p_pml4 = (phy_addr)NULL;
-    p_init->p_brk  = 0x1000;
+    p_init->p_brkm = p_init->p_brk = 0x1000;
     p_init->p_reg.rsp.p = NULL;
     p_init->p_reg.rip.p = &proc_init_entry;
     strcpy(p_init->p_cmd, "init");
@@ -89,7 +89,7 @@ void proc_init() {
     p_stop->p_ring = 0;
     p_stop->p_prio = NB_PRIORITY_LVL - 1;
     p_stop->p_pml4 = (phy_addr)NULL;
-    p_stop->p_brk  = 0;
+    p_stop->p_brkm = p_stop->p_brk = 0;
     p_stop->p_reg.rsp.p = kernel_stack_top;
     p_stop->p_reg.rip.p = &proc_idle_entry;
     strcpy(p_stop->p_cmd, "stop");
@@ -125,6 +125,10 @@ void proc_init() {
     }
     state.st_proc[NPROC - 1].p_nxfr = PID_NONE;
     state.st_free_proc_last = NPROC - 1;
+
+	// no process owns ressources
+	for (enum proc_owng o = 0; o < NB_OWNG; ++o)
+		state.st_owng[o] = PID_NONE;
 
     sched_add_proc(PID_IDLE);
 
@@ -318,6 +322,13 @@ void wait_file(pid_t pid, cid_t cid) {
     schedule_proc();
 }
 
+// --kill proc--
+
+static void kill_proc_disown_rsr(pid_t pid) {
+	if (state.st_owng[own_tty] == pid)
+		tty_set_owner(PID_NONE);
+}
+
 static inline bool is_waiting_me(proc_t* pp, pid_t mpid) {
     return pp->p_stat == BLOCK && (
                 pp->p_reg.r.rax.ll == SYS_WAIT
@@ -326,8 +337,9 @@ static inline bool is_waiting_me(proc_t* pp, pid_t mpid) {
             );
 }
 
-static void kill_proc_remove(pid_t pid __attribute__((unused)),
-        proc_t* p, proc_t* pp) {
+static void kill_proc_remove(pid_t pid, proc_t* p, proc_t* pp) {
+	kill_proc_disown_rsr(pid);
+
     if (~p->p_fchd) {
         // Les enfants du processus reçoivent INIT comme nouveau parent
         proc_t* fcp = state.st_proc + p->p_fchd;
