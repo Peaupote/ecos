@@ -1,7 +1,6 @@
 #!/bin/bash
 
 kbin='./src/kernel/kernel.bin'
-bbin='./src/kernel/kernel.bin'
 
 echo -n "Check kernel.bin..."
 end=`./tools/elf_info.out e "$kbin"`

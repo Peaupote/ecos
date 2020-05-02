@@ -1,5 +1,5 @@
-export CC=x86_64-elf-gcc
-export AS=x86_64-elf-as
+export CC?=x86_64-elf-gcc
+export AS?=x86_64-elf-as
 ROOT=../..
 include $(ROOT)/vars.Makefile
 
@@ -22,12 +22,12 @@ INCLUDES=-I ../../include $(INCLUDE_LIBC)
 %.o:%.s
 	$(AS) $< -o $@ $(INCLUDES)
 
-%.out:%.c libc start.o
-	$(CC) $(FLAGS_UR) -o $@ $< start.o ../libc/libc.a $(INCLUDES) -lgcc
+%.out:%.c libc start.o 
+	$(CC) $(FLAGS_UR) -o $@ $< start.o $(LINK_LC) $(INCLUDES) -lgcc
 
 sh.out:sh/sh.h $(CFILES_SH) libc start.o
 	$(CC) $(FLAGS_UR) -o $@ $(CFILES_SH) $< start.o \
-		../libc/libc.a $(INCLUDES) -lgcc
+		$(LINK_LC) $(INCLUDES) -lgcc
 
 root.img:$(OUT)
 	@rm   -rf root
@@ -41,7 +41,7 @@ root.img:$(OUT)
 all:root.img
 
 libc:
-	$(MAKE) -C ../libc libc.a
+	$(MAKE) -C ../libc libc.sym
 
 .depends:
 	../../tools/mkdep.sh "$(CC) $(FLAGS_UR) $(INCLUDES)" \

@@ -15,13 +15,15 @@ FLAGS_K?=$(FLAGS_C) -mcmodel=large -ffreestanding -D__is_kernel
 #Boot
 FLAGS_B?=$(FLAGS_C) -ffreestanding
 #Lib
-FLAGS_L?=$(FLAGS_C) -mcmodel=large -ffreestanding
+FLAGS_L?=$(FLAGS_C) -ffreestanding
 #LibC
 export FLAGS_LC?=$(FLAGS_L)
 #LibK
-export FLAGS_LK?=$(FLAGS_L) -D__is_kernel
+export FLAGS_LK?=$(FLAGS_L) -mcmodel=large -D__is_kernel
 #Userspace
 export FLAGS_UR?=$(FLAGS_C) -fno-builtin -ffreestanding
+
+export LINK_LC=-Xlinker "--just-symbols=$(ROOT)/src/libc/libc.sym"
 
 VARS_NAME=NAME_LC NAME_LK TSFX FLAGS_C FLAGS_K FLAGS_B FLAGS_L FLAGS_LC \
 		  FLAGS_LK FLAGS_UR INCLUDE_LIBC

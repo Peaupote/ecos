@@ -1,12 +1,10 @@
 #include <kernel/kutil.h>
 #include <libc/stdio.h>
 #include <libc/string.h>
-#include <util/string.h>
 #include <util/vga.h>
 #include <kernel/tty.h>
 #include <kernel/int.h>
 #include <kernel/proc.h>
-#include <kernel/memory/kmem.h> //low_addr
 
 // kprintf
 

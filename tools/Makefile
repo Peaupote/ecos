@@ -4,7 +4,7 @@ export FLAGS_T=-O2 -Wall -Wextra -std=gnu99 -fno-builtin -D__use_host_libc
 export FLAGS_U=$(FLAGS_T)
 
 SRCDEP=elf_info.c
-UDEP=elf64.o string.o
+UDEP=elf64.o
 INCLUDES=-I ../include
 
 .PHONY: all util clean

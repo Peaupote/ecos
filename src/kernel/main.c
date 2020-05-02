@@ -7,7 +7,6 @@
 #endif
 
 #include <util/vga.h>
-#include <util/string.h>
 
 #include <kernel/memory/kmem.h>
 #include <kernel/idt.h>

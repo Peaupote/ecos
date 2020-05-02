@@ -19,6 +19,10 @@
 
 #define AUX_STACK_SIZE 0x1000
 
+#define LOAD_SPACE_MIN   0x200000
+//TODO: protect stack
+#define LOAD_SPACE_MAX   (paging_set_lvl(pgg_pml4, PML4_END_USPACE))
+
 // Utilisé pour marquer les pages qui restent écrivables pour l'userspace
 #define PAGING_FLAG_RW PAGING_FLAG_Y1
 
@@ -148,7 +152,8 @@ bool execve_alloc_rng(bool write, uint_ptr bg, size_t sz) {
     uint16_t   f  = PAGING_FLAG_U | PAGING_FLAG_W,
                fp = write ? f | PAGING_FLAG_RW : f;
     return bg + sz >= bg
-        && paging_get_lvl(pgg_pml4, bg + sz) < PML4_END_USPACE
+		&& bg >= LOAD_SPACE_MIN
+        && bg + sz <= LOAD_SPACE_MAX
         && !call_kmem_paging_alloc_rng(bg, bg + sz, f, fp);
 }
 
@@ -430,8 +435,17 @@ void proc_execve_end() {
 
     // Libération de l'ancien paging
     kmem_free_paging_range(paging_acc_pdpt(PML4_COPY_RES, 0),
-            4, PML4_END_USPACE);
+            pgg_pml4, PML4_END_USPACE);
     kmem_free_page(PAGE_MASK & *paging_acc_pml4(PML4_COPY_RES));
+
+	// Ajout de la libc
+	uint64_t* lc_e = kmem_acc_pts_entry(paging_set_lvl(pgg_pd, PD_LIBC),
+								pgg_pd, PAGING_FLAG_W | PAGING_FLAG_U);
+	struct sptr_hd* hd = sptr_at(libc_shared_idx);
+	*lc_e = (libc_shared_idx << SPAGING_INFO_SHIFT)
+			| SPAGING_FLAG_P | SPAGING_FLAG_V
+			| PAGING_FLAG_W  | PAGING_FLAG_U;
+	++hd->count;
 
     free_tr();
     proc_set_curr_pid(mp->p_ppid);

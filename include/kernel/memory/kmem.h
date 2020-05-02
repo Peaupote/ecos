@@ -10,7 +10,6 @@
 #include <def.h>
 #include <util/paging.h>
 
-#define KERNEL_PDPT_LADDR 0x100
 #define KERNEL_PDPT_DSLOT 0x180
 #define KERNEL_PDPT_HEAP  0x181
 #define KERNEL_PDPT_SPTR  0x182
@@ -18,6 +17,7 @@
 #define PML4_PSKD         0xfd
 #define PML4_COPY_RES     0xfe
 #define PML4_END_USPACE   PML4_KERNEL_VIRT_ADDR
+#define PD_LIBC           0
 
 #include <kernel/kutil.h>
 #include <util/multiboot.h>
@@ -26,8 +26,6 @@
 extern phy_addr kernel_pml4;
 extern uint32_t bgn_kernel;
 extern uint32_t end_kernel;
-
-extern uint8_t  low_addr[];
 
 extern struct PageAllocator page_alloc;
 extern struct MemBlockTree  khep_alloc;

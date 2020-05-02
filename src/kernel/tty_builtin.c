@@ -78,7 +78,7 @@ static uint_ptr read_ptr(const char str[]) {
 		sscanf(str + 1, "%p", &rt);
 		rt += paging_add_lvl(pgg_pml4, PML4_KERNEL_VIRT_ADDR);
 	} else
-		sscanf(str + 1, "%p", &rt);
+		sscanf(str, "%p", &rt);
     return rt;
 }
 

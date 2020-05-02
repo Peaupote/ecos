@@ -16,7 +16,7 @@
 #include <libc/stdio.h>
 #include <libc/string.h>
 
-#include <util/elf64.h>
+#include <util/celf.h>
 #include <util/misc.h>
 
 #include <fs/proc.h>
@@ -25,6 +25,8 @@ char proc_state_char[7] = {'f', 'S', 'B', 'L', 'R', 'Z', 'T'};
 
 extern void proc_idle_entry(void);
 extern void proc_init_entry(void);
+
+extern char libc_celf[];
 
 void sched_init() {
     struct scheduler* s = &state.st_sched;
@@ -36,7 +38,50 @@ void sched_init() {
     }
 }
 
+static void libc_ldr_fill0(void* err_pt, 
+		Elf64_Xword flag __attribute__((unused)),
+        Elf64_Addr dst, uint64_t sz) {
+	if (kmem_paging_resv_rng(dst, dst + sz, PAGING_FLAG_W | PAGING_FLAG_U))
+		*((uint8_t*) err_pt) = 1;
+}
+static void libc_ldr_copy(void* err_pt, 
+		Elf64_Xword flag __attribute__((unused)),
+        Elf64_Addr dst, void* src, uint64_t sz) {
+    uint8_t err = kmem_paging_alloc_rng(dst, dst + sz,
+						PAGING_FLAG_U | PAGING_FLAG_W,
+						PAGING_FLAG_U | PAGING_FLAG_W);
+    if (err) {
+        *((uint8_t*)err_pt) = err;
+        return;
+    }
+	memcpy((void*)dst, src, sz);
+	for (uint_ptr it = dst & PAGE_MASK; it < dst + sz; it += PAGE_SIZE)
+		clear_flag_64(paging_page_entry(it), PAGING_FLAG_W);
+}
+
+uint64_t libc_shared_idx;
+
+static uint8_t load_libc() {
+    struct elf_loader libc_ldr = {
+        .fill0 = &libc_ldr_fill0,
+        .copy  = &libc_ldr_copy
+    };
+    uint8_t err = 0;
+    celf_load(libc_ldr, &err, libc_celf);
+    if (err) return err;
+
+	uint64_t* lc_e = paging_acc_pd(0, 0, PD_LIBC);
+	struct sptr_hd* sp_hd;
+	kmem_mk_shared(lc_e, &libc_shared_idx, &sp_hd);
+	sp_hd->count = 2;
+
+	paging_refresh();
+
+    return 0;
+}
+
 void proc_init() {
+	kAssert(!load_libc());
     sched_init();
 
     // processus 0: p_idle
@@ -229,64 +274,6 @@ proc_t *switch_proc(pid_t pid) {
     if (p->p_pml4) pml4_to_cr3(p->p_pml4);
 
     return p;
-}
-
-
-static inline uint8_t proc_ldr_alloc_pages(uint_ptr begin, uint_ptr end) {
-    return kmem_paging_alloc_rng(begin, end,
-                PAGING_FLAG_U | PAGING_FLAG_W,
-                PAGING_FLAG_U | PAGING_FLAG_W);
-}
-
-void proc_ldr_fill0(void* err_pt, Elf64_Xword flag __attribute__((unused)),
-        Elf64_Addr dst, uint64_t sz) {
-    uint8_t err = proc_ldr_alloc_pages(dst, dst + sz);
-    if (err) {
-        *((uint8_t*)err_pt) = err;
-        return;
-    }
-    //TODO: use quad
-    for (size_t i=0; i<sz; ++i)
-        ((uint8_t*) dst)[i] = 0;
-}
-
-void proc_ldr_copy(void* err_pt, Elf64_Xword flag __attribute__((unused)),
-        Elf64_Addr dst, void* src, uint64_t sz) {
-    uint8_t err = proc_ldr_alloc_pages(dst, dst + sz);
-    if (err) {
-        *((uint8_t*)err_pt) = err;
-        return;
-    }
-    for (size_t i=0; i<sz; ++i)
-        ((uint8_t*) dst)[i] = ((uint8_t*) src)[i];
-}
-
-//UNUSED
-uint8_t proc_create_userspace(void* prg_elf, proc_t *proc) {
-    struct elf_loader proc_ldr = {
-        .fill0 = &proc_ldr_fill0,
-        .copy  = &proc_ldr_copy
-    };
-    uint8_t err = 0;
-
-    volatile phy_addr pml4_loc = kmem_alloc_page(); //TODO crash sans volatile
-    kmem_bind_dynamic_slot(0, pml4_loc);
-
-    kmem_init_pml4((uint64_t*)kmem_dynamic_slot(0), pml4_loc);
-    clear_interrupt_flag();
-    pml4_to_cr3(pml4_loc);
-    set_interrupt_flag();
-
-    //On est désormais dans le paging du processus
-    proc->p_reg.rsp.p = make_proc_stack();
-
-    err = 0;
-    proc->p_reg.rip.p = (void*)elf_load(proc_ldr, &err, prg_elf);
-    if (err) return 2;
-
-    proc->p_pml4    = pml4_loc;
-
-    return 0;
 }
 
 void proc_ps() {

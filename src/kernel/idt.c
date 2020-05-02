@@ -16,7 +16,6 @@
 #include <headers/unistd.h>
 
 #include <util/vga.h>
-#include <util/string.h>
 
 #define GATE_INT  (IDT_ATTR_P|IDT_TYPE_INT)
 

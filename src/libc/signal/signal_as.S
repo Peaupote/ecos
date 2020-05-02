@@ -7,8 +7,8 @@
 	.extern sig_handlers
 
 libc_sighandler:// rsp = 0 [16]
-	movq  sig_handlers(, %rdi, 8), %rax
-	incq  %rdi //sigid -> signum
-	callq *%rax
-	movq  $SYS_SIGRT, %rax
-	int   $SYSCALL_VEC
+	movq   sig_handlers(, %rdi, 8), %rax
+	incq   %rdi //sigid -> signum
+	callq  *%rax
+	movq   $SYS_SIGRT, %rax
+	int    $SYSCALL_VEC

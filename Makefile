@@ -1,7 +1,7 @@
 ISO=ecos.iso
 
 .PHONY: all clean tests start re src/kernel/kernel.bin src/boot/boot.bin \
-	depends src/libc/libc.a tools
+	depends tools
 
 all: $(ISO)
 
@@ -11,11 +11,7 @@ src/kernel/kernel.bin:
 src/boot/boot.bin:
 	$(MAKE) -C src/boot boot.bin
 
-src/libc/libc.a:
-	$(MAKE) -C src/libc libc.a
-
-$(ISO): src/grub.cfg src/boot/boot.bin src/kernel/kernel.bin \
-		src/libc/libc.a tools
+$(ISO): src/grub.cfg src/boot/boot.bin src/kernel/kernel.bin
 	mkdir -p isodir/boot/grub
 	cp src/boot/boot.bin isodir/boot/ecos_boot.bin
 	./tools/check_elf.sh

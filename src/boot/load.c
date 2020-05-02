@@ -1,6 +1,5 @@
 #include <util/multiboot.h>
 #include <util/elf64.h>
-#include <util/string.h>
 #include <util/misc.h>
 #include <util/paging.h>
 
@@ -62,6 +61,20 @@ struct VbeInfoBlock {
    uint16_t VideoModePtr[2];         // isa vbeFarPtr
    uint16_t TotalMemory;             // as # of 64KB blocks
 } __attribute__((packed));
+
+static int ustrcmp(const char *lhs, const char *rhs) {
+    while(*lhs && *rhs){
+        if ((unsigned char)*lhs < (unsigned char)*rhs)
+            return -1;
+        if ((unsigned char)*lhs > (unsigned char)*rhs)
+            return 1;
+        ++lhs;
+        ++rhs;
+    }
+    if(*rhs) return -1;
+    if(*lhs) return  1;
+    return 0;
+}
 
 void load_kernel64(void){
     struct elf_loader el_v = {.fill0=&simp_fill0, .copy=&simp_copy};

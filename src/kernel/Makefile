@@ -8,7 +8,7 @@ export FLAGS_U=$(FLAGS_K)
 
 include list.Makefile
 KBMAP=gawk -f ../../tools/keyboard_map.awk
-UDEP=string.o elf64.o
+UDEP=elf64.o celf.o
 INCLUDES=-I ../../include
 
 .PHONY: all re clean util libk tests_prg home_part ext2
@@ -35,13 +35,16 @@ keyboard_layout.s: ../../data/keyboard_azerty.txt ../../data/keyboard_qwerty.txt
 	echo "keyboard_qwerty_layout:" >> keyboard_layout.s
 	$(KBMAP) ../../data/keyboard_qwerty.txt >> keyboard_layout.s
 
-data.o:data.s root_img test_img $(ROOT)/data/font.data
+data.o:data.s libc root_img test_img $(ROOT)/data/font.data
 
 UDEP_FROM_HERE=$(patsubst %,../util/64/%,$(UDEP))
 UDEP_FROM_UTIL=$(patsubst %,64/%,$(UDEP))
 
 libk:
 	$(MAKE) -C ../libc libk.a
+
+libc:
+	$(MAKE) -C ../libc libc.out
 
 util:
 	$(MAKE) -C ../util $(UDEP_FROM_UTIL)

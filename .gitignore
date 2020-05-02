@@ -11,6 +11,7 @@ isodir
 *.img
 *.a
 *.log
+*.sym
 tests/run/home
 src/sys/root
 vars_local.Makefile

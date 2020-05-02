@@ -1,5 +1,25 @@
 #include <util/elf64.h>
 
+static inline char hexa_digit(uint8_t p){
+    return (p<10 ? '0': ('A'-10)) + p;
+}
+
+static void int64_to_str_hexa(char* out, uint64_t v) {
+    for(size_t i=16; i;){
+        --i;
+        out[i] = hexa_digit(v&0xf);
+        v = v >> 4;
+    }
+}
+
+static void int32_to_str_hexa(char* out, uint32_t v) {
+    for(size_t i=8; i;){
+        --i;
+        out[i] = hexa_digit(v&0xf);
+        v = v >> 4;
+    }
+}
+
 void elf_readinfo(string_writer wt, void* wt_i, void* elf_begin){
     Elf64_Ehdr* ehdr = (Elf64_Ehdr*) elf_begin;
     unsigned char* shdrs = NULL;

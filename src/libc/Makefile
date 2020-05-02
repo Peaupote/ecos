@@ -1,6 +1,7 @@
 CC?=x86_64-elf-gcc
 AS?=x86_64-elf-as
 AR?=x86_64-elf-ar
+OBJCP?=x86_64-elf-objcopy
 ROOT=../..
 include $(ROOT)/vars.Makefile
 
@@ -9,9 +10,9 @@ INCLUDES=-I $(ROOT)/include
 
 ##
 
-.PHONY: all re clean clean-depends
+.PHONY: all re clean clean-depends elf_info
 
-all: libc.a libk.a
+all: libc.out libc.sym libk.a
 
 %.o:%.S
 
@@ -28,6 +29,15 @@ all: libc.a libk.a
 
 $(NAME_LC).a: $(LIBC_OBJ)
 	$(AR) rcs $@ $(LIBC_OBJ)
+
+$(NAME_LC).bin: $(NAME_LC).a linker.ld
+	$(CC) $(FLAGS_LC) -T linker.ld -o $@ $(LIBC_OBJ)
+
+$(NAME_LC).out: $(NAME_LC).bin elf_info
+	$(ROOT)/tools/elf_info.out c $(NAME_LC).bin $@
+
+$(NAME_LC).sym: $(NAME_LC).bin
+	$(OBJCP) --extract-symbol $(NAME_LC).bin $@
 
 $(NAME_LC).depends:
 	../../tools/mkdep.sh "$(CC) $(FLAGS_L) $(INCLUDES)" $(LIBC_DEP)\
@@ -54,10 +64,14 @@ include $(NAME_LK).depends
 
 ##
 
+elf_info:
+	$(MAKE) -C $(ROOT)/tools elf_info.out
+
 clean-depends:
 	rm -f *.depends .depends
 
 clean:
-	rm -f $(NAME) $(OBJ) *.o **/*.o *.a *.s sys.h *.depends .depends
+	rm -f $(NAME) $(OBJ) *.out *.bin *.o **/*.o *.a *.s *.sym \
+		sys.h *.depends .depends
 
 re: clean $(NAME)

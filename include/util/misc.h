@@ -26,6 +26,9 @@ static inline void set_bit_##N(T* p, uint8_t i) {\
 }\
 static inline void clear_bit_##N(T* p, uint8_t i) {\
 	*p &= ~(((T)1) << i);\
+}\
+static inline void clear_flag_##N(T* p, T f) {\
+	*p &= ~f;\
 }
 
 GEN_BIT(64, uint64_t)

@@ -9,7 +9,7 @@ CFILES=init.c load.c
 ASFILES=boot.S
 SRCDEP=$(foreach file,$(ASFILES),"-MT $(file:.S=.s) $(file)") $(CFILES)
 OBJ=$(ASFILES:.S=.o) $(CFILES:.c=.o)
-UDEP=string.o elf64.o
+UDEP=elf64.o
 INCLUDES=-I ../../include
 
 .PHONY: clean all util

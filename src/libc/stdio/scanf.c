@@ -5,10 +5,10 @@
 #include <stdint.h>
 #include <stdbool.h>
 
-uint8_t hexa_digit_of_char_tb0[16] =
+const uint8_t hexa_digit_of_char_tb0[16] =
     {0x16,0x16,0x16,0x00, 0x0f,0x16,0x0f,0x16,
      0x16,0x16,0x16,0x16, 0x16,0x16,0x16,0x16};
-uint8_t hexa_digit_of_char_tb1[16 * 3 - 9 - 1] =
+const uint8_t hexa_digit_of_char_tb1[16 * 3 - 9 - 1] =
     {0,1,2,3, 4,5,6,7, 8,9,~0,~0,   ~0,~0,~0,
      ~0,10,11,12, 13,14,15,~0, ~0,~0,~0,~0, ~0,~0,~0,~0,
      ~0,~0,~0,~0, ~0,~0,~0};

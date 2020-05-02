@@ -16,7 +16,6 @@ gdt_desc   = KVA + kba_gdtd;
 bgn_kernel = KVA + kba_bgn_krn;
 end_kernel = KVA + kba_end_krn;
 
-low_addr   = KVA + (0x100 << 30);
 sptr_alct  = KVA + (0x182 << 30);
 
 SECTIONS
@@ -46,10 +45,10 @@ SECTIONS
         *(COMMON)
         *(.bss)
     }
-    /* !: peut ne pas prendre en compte d'éventuelles sections rajoutés
-     * après, vérification complète par tools/check_elf.sh */
+
     kernel_size = . - KVA;
     ASSERT(kernel_size <= 3M, "taille du kernel")
 }
 
+/* vérification suplémentaire par tools/check_elf.sh */
 kernel_uplim = KVA + 3M;

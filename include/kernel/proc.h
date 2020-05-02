@@ -174,6 +174,8 @@ static inline proc_t* cur_proc() {
     return state.st_proc + state.st_curr_pid;
 }
 
+extern uint64_t libc_shared_idx;
+
 /**
  * Initialize state of the machine
  * create process IDLE, INIT and STOP

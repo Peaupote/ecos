@@ -1,12 +1,12 @@
 #ifndef _KUTIL_H
 #define _KUTIL_H
 
+#include <stdint.h>
 #include <stddef.h>
 #include <stdarg.h>
 #include <stdbool.h>
 
 #include <libc/stdio.h>
-#include <util/string.h>
 
 #define STR_HELPER(x) #x
 #define STR(x) STR_HELPER(x)

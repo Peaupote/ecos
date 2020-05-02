@@ -5,7 +5,7 @@ CC?=gcc
 FLAGS_U?=-O2 -Wall -Wextra -std=gnu99
 
 INCLUDES=-I ../../include
-SRCDEP=string.c elf64.c
+SRCDEP=celf.c elf64.c
 
 $(TRG)/%.o:%.c
 	mkdir -p $(TRG)
