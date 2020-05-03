@@ -16,3 +16,4 @@ clwr execve_switch_pml4
 clwr proc_execve_end
 clwr kmem_paging_alloc_rng
 clwr execve_tr_do_alloc_pg
+clwr execve_do_salloc

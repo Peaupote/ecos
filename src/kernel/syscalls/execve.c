@@ -20,11 +20,11 @@
 #define AUX_STACK_SIZE 0x1000
 
 #define LOAD_SPACE_MIN   0x200000
-//TODO: protect stack
-#define LOAD_SPACE_MAX   (paging_set_lvl(pgg_pml4, PML4_END_USPACE))
+#define LOAD_SPACE_MAX   (paging_add_lvl(pgg_pd, \
+							USER_STACK_PD - USER_STACK_PDSZ))
 
 // Utilisé pour marquer les pages qui restent écrivables pour l'userspace
-#define PAGING_FLAG_RW PAGING_FLAG_Y1
+#define PAGING_FLAG_RW PAGING_FLAG_Y3
 
 // Zone de transfert
 // permet de conserver des données lors du changement de paging
@@ -67,6 +67,18 @@ void execve_tr_do_alloc_pg(uint_ptr page_v_addr) {
     *paging_page_entry(page_v_addr) = kmem_alloc_page()
                     | PAGING_FLAG_W | PAGING_FLAG_P;
     invalide_page(page_v_addr);
+}
+
+uint8_t execve_do_salloc(uint_ptr bg, uint_ptr ed,
+		uint16_t flags, uint16_t p_flags) {
+	for (uint_ptr it = bg & PAGE_MASK; it < ed; it += PAGE_SIZE) {
+		uint64_t* query = kmem_acc_pts_entry(it, pgg_pt,
+							flags | PAGING_FLAG_W);
+		if (!query) return ~0;
+		if (!((*query) & PAGING_FLAG_P))
+			*query = SPAGING_FLAG_V | p_flags;//Alloc0
+	}
+	return 0;
 }
 
 static inline void free_tr() {
@@ -122,6 +134,8 @@ extern void call_proc_execve_end(void);
 extern uint8_t call_kmem_paging_alloc_rng(uint_ptr bg, uint_ptr ed,
                     uint16_t flags, uint16_t p_flags);
 extern void call_execve_tr_do_alloc_pg(uint_ptr page_v_addr);
+extern uint8_t call_execve_do_salloc(uint_ptr bg, uint_ptr ed,
+					uint16_t flags, uint16_t p_flags);
 
 // --Ring 1--
 
@@ -155,6 +169,14 @@ bool execve_alloc_rng(bool write, uint_ptr bg, size_t sz) {
 		&& bg >= LOAD_SPACE_MIN
         && bg + sz <= LOAD_SPACE_MAX
         && !call_kmem_paging_alloc_rng(bg, bg + sz, f, fp);
+}
+bool execve_salloc_rng(bool write, uint_ptr bg, size_t sz) {
+    uint16_t   f  = PAGING_FLAG_U | PAGING_FLAG_W,
+               fp = PAGING_FLAG_U | (write ? PAGING_FLAG_W : 0);
+    return bg + sz >= bg
+		&& bg >= LOAD_SPACE_MIN
+        && bg + sz <= LOAD_SPACE_MAX
+		&& !call_execve_do_salloc(bg, bg + sz, f, fp);
 }
 
 static inline void execve_fill0(uint_ptr bg, size_t sz) {
@@ -197,24 +219,44 @@ static inline bool execve_read_sections(int fd) {
 static inline bool execve_load_sections(int fd) {
     for (size_t i_s = 0; i_s < trf()->nb_sections; ++i_s) {
         struct section* s = sections() + i_s;
-        if (!execve_alloc_rng(s->write, s->dst, s->sz)) return false;
-        if (s->copy) {
-            if (!execve_copy(fd, s->dst, s->src, s->sz))
-                return false;
-        } else
-            execve_fill0(s->dst, s->sz);
+        if (!(s->copy
+			?	execve_alloc_rng(s->write, s->dst, s->sz)
+			 &&	execve_copy(fd, s->dst, s->src, s->sz)
+			:	execve_salloc_rng(s->write, s->dst, s->sz) ))
+				return false;
     }
     for (size_t i_s = 0; i_s < trf()->nb_sections; ++i_s) {
         struct section* s = sections() + i_s;
-        if (!s->write) {
+        if (!s->write) { // read only sections
             for (uint_ptr adr = s->dst & PAGE_MASK;
                     adr < s->dst + s->sz; adr += PAGE_SIZE) {
                 uint64_t* e = paging_page_entry(adr);
                 if ( !(PAGING_FLAG_RW & *e) )
-                    *e &= ~(uint64_t)PAGING_FLAG_W;
+					clear_flag_64(e, PAGING_FLAG_W);
             }
         }
+		if (!s->copy) { // allocated bss sections
+            for (uint_ptr adr = s->dst & PAGE_MASK;
+                    adr < s->dst + s->sz; adr += PAGE_SIZE) {
+                uint64_t* e = paging_page_entry(adr);
+                if (PAGING_FLAG_P & *e) {
+					uint_ptr ed = min_uint_ptr(s->dst + s->sz, 
+									           adr + PAGE_SIZE);
+					for (uint_ptr it = max_uint_ptr(s->dst, adr);
+							it < ed; ++it)
+						*(char*)it = 0;
+				}
+            }
+		}
     }
+	// Remove flag Y3
+    for (size_t i_s = 0; i_s < trf()->nb_sections; ++i_s) {
+        struct section* s = sections() + i_s;
+        if (s->write)
+            for (uint_ptr adr = s->dst & PAGE_MASK;
+                    adr < s->dst + s->sz; adr += PAGE_SIZE)
+				clear_flag_64(paging_page_entry(adr), PAGING_FLAG_RW);
+	}
     return true;
 }
 

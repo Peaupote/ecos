@@ -7,3 +7,6 @@ FORMATS
 MODIFICATEURS
 	l	long
 	ll	long long
+	entier décimal: spécifie la taille minimale du champ, complété par ' '
+	0   le champ est complété par des 0
+	-	aligne le champ à gauche (complétion à droite)

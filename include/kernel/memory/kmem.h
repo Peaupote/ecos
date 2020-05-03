@@ -92,6 +92,7 @@ uint64_t* kmem_acc_pts_entry(uint_ptr v_addr, enum pgg_level rlvl,
 		uint16_t flags);
 
 void kmem_print_paging(uint_ptr v_addr);
+void kmem_print_info();
 
 //retourne:
 //	0   si la page a bien été affectée

@@ -29,6 +29,8 @@ struct MemBlockTree  khep_alloc;
 // Allocation des pages physiques
 struct PageAllocator page_alloc;
 
+static size_t total_nb_pages;
+
 
 void kmem_init_paging() {
 	kernel_pml4 = (*paging_acc_pml4(PML4_LOOP)) & PAGE_MASK;
@@ -164,6 +166,7 @@ void kmem_init_alloc(multiboot_info_t* mbi) {
 
 	sort_limits(lims, lims_sz);
 	palloc_add_zones(&page_alloc, lims, lims_sz);
+	total_nb_pages = palloc_nb_free_page(&page_alloc);
 
 	// Gestion de l'allocation pointeurs partagés
 	sptra_init();
@@ -224,6 +227,17 @@ void kmem_print_paging(uint_ptr v_addr) {
 	}
 }
 
+void kmem_print_info() {
+	long unsigned nb_free = kmem_nb_page_free(),
+		 		  nb_tot  = total_nb_pages,
+				  nb_used = nb_tot - nb_free,
+				  prop    = nb_used * 10000 / nb_tot;
+	kprintf("free=%-7lu used=%-7lu total=%-6lu %3u.%02u%%\n",
+			nb_free, nb_used, nb_tot,
+			(unsigned)(prop / 100),
+			(unsigned)(prop % 100));
+}
+
 uint8_t paging_map_to(uint_ptr v_addr, phy_addr p_addr,
 		uint16_t flags, uint16_t p_flags) {
 	uint64_t* query = kmem_acc_pts_entry(v_addr, pgg_pt, 
@@ -256,7 +270,7 @@ uint8_t kmem_paging_alloc_rng(uint_ptr bg, uint_ptr ed,
 }
 
 uint8_t paging_unmap(uint_ptr v_pg_addr) {
-	//TODO
+	//TODO: parents ?
 	*paging_page_entry(v_pg_addr) = 0;
 	return 0;
 }

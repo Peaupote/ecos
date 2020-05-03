@@ -14,8 +14,10 @@
 #include "memory/kmem.h"
 #include "memory/shared_pages.h"
 
-//Emplacement de la pile des processus
-#define USER_STACK_PD 0x7FF
+// Emplacement de la pile des processus
+#define USER_STACK_PD ((((uint_ptr)PML4_END_USPACE)<<(2*9)) - 1)
+// Taille de la pile des processus
+#define USER_STACK_PDSZ (1)
 
 /**
  * Processus

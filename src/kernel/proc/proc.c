@@ -41,8 +41,16 @@ void sched_init() {
 static void libc_ldr_fill0(void* err_pt, 
 		Elf64_Xword flag __attribute__((unused)),
         Elf64_Addr dst, uint64_t sz) {
-	if (kmem_paging_resv_rng(dst, dst + sz, PAGING_FLAG_W | PAGING_FLAG_U))
-		*((uint8_t*) err_pt) = 1;
+	for (uint_ptr it = dst & PAGE_MASK; it < dst + sz; it += PAGE_SIZE) {
+		uint64_t* e = kmem_acc_pts_entry(it, pgg_pt,
+						PAGING_FLAG_W | PAGING_FLAG_U);
+		if (!e) {
+			*((uint8_t*) err_pt) = 1;
+			return;
+		}
+		//Alloc0
+		*e = SPAGING_FLAG_V | PAGING_FLAG_W | PAGING_FLAG_U;
+	}
 }
 static void libc_ldr_copy(void* err_pt, 
 		Elf64_Xword flag __attribute__((unused)),
@@ -55,8 +63,11 @@ static void libc_ldr_copy(void* err_pt,
         return;
     }
 	memcpy((void*)dst, src, sz);
-	for (uint_ptr it = dst & PAGE_MASK; it < dst + sz; it += PAGE_SIZE)
-		clear_flag_64(paging_page_entry(it), PAGING_FLAG_W);
+	for (uint_ptr it = dst & PAGE_MASK; it < dst + sz; it += PAGE_SIZE) {
+		uint64_t* e = paging_page_entry(it);
+		clear_flag_64(e, PAGING_FLAG_W);
+		*e |= SPAGING_FLAG_V;
+	}
 }
 
 uint64_t libc_shared_idx;

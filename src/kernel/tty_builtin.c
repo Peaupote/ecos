@@ -120,6 +120,12 @@ static void change_log(char** tokpt) {
 	}
 }
 
+static void builtin_info(char** tokpt) {
+	char *arg = strtok_rnull(NULL, " ", tokpt);
+	if (!arg) return;
+	if (!strcmp(arg, "mem")) kmem_print_info();
+}
+
 void tty_built_in_exec(tty_seq_t* sq, char* cmd) {
     char* tokpt;
     char* cmd_name = strtok_rnull(cmd, " ", &tokpt);
@@ -190,6 +196,7 @@ void tty_built_in_exec(tty_seq_t* sq, char* cmd) {
     else if (!strcmp(cmd_name, "vfiles")) inspect_vfiles();
     else if (!strcmp(cmd_name, "channs")) inspect_channs();
 	else if (!strcmp(cmd_name, "log"))    change_log(&tokpt);
+	else if (!strcmp(cmd_name, "info"))   builtin_info(&tokpt);
 
     return;
 }

@@ -17,7 +17,7 @@ int main () {
     int pid, count = 0;
     char buf[256];
 
-    printf("PID\tSTATE\tCMD\n");
+    printf("PID STATE CMD\n");
     while ((dir = readdir(dirp))) {
         if (is_not_pid(dir->d_name)) continue;
 
@@ -51,9 +51,9 @@ int main () {
 end_pid:
 		fclose(fstat);
         if (mc != 2)
-			printf("%d\t#ERROR (%d)\n", pid, mc);
+			printf("%-3d #ERROR (%d)\n", pid, mc);
 		else
-			printf("%d\t%c\t\t%s\n", pid, st, cmd);
+			printf("%-3d %c     %s\n", pid, st, cmd);
 
         count++;
     }

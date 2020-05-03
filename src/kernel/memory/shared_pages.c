@@ -3,6 +3,16 @@
 #include <kernel/memory/shared_ptr.h>
 #include <kernel/memory/kmem.h>
 
+static inline bool is_P1_ShRo(uint64_t p) {
+	return (p & (SPAGING_FLAG_P|SPAGING_FLAG_V))
+			== SPAGING_FLAG_V;
+}
+
+static inline bool is_P0_Value(uint64_t p) {
+	return (p & (SPAGING_FLAG_P | SPAGING_FLAG_V)) 
+			== (SPAGING_FLAG_P | SPAGING_FLAG_V);
+}
+
 static inline void 
 bind_and_follow(uint64_t* e, uint64_t* a, phy_addr p) {
 	*e = p | PAGING_FLAG_P | (SPAGING_FLAGS_1 & *e);
@@ -14,13 +24,17 @@ void copy_page(uint64_t* src, uint64_t* dst, uint16_t lim) {
 	for (uint16_t i = 0; i < lim; ++i) {
 
 		if (src[i] & PAGING_FLAG_P) {
-			uint64_t        sp_idx;
-			struct sptr_hd* sp_hd;
-			dst[i] = kmem_mk_shared(src + i, &sp_idx, &sp_hd);
-			sp_hd->count = 2;
 
-		} else if ((src[i] & SPAGING_FLAGS_0) 
-				== (SPAGING_FLAG_P | SPAGING_FLAG_V)) {
+			if (is_P1_ShRo(src[i]))
+				dst[i] = src[i];
+			else {
+				uint64_t        sp_idx;
+				struct sptr_hd* sp_hd;
+				dst[i] = kmem_mk_shared(src + i, &sp_idx, &sp_hd);
+				sp_hd->count = 2;
+			}
+
+		} else if (is_P0_Value(src[i])) { 
 
 			uint64_t idx = src[i] >> SPAGING_INFO_SHIFT;
 			++sptr_at(idx)->count;
@@ -43,13 +57,13 @@ uint8_t handle_PF(uint_ptr fault_addr) {
 		uint64_t* query = (uint64_t*) query_addr;
 		uint64_t  qe = *query;
 		if(! (qe & PAGING_FLAG_P) ){
-			if (! (qe & SPAGING_FLAG_P) ) {
+			if (! (qe & (SPAGING_FLAG_P | SPAGING_FLAG_V)) ) {
 				klogf(Log_error, "#PF", "handling fail @ lvl %d : %p",
 						(int)lvl, qe);
 				return ~(uint8_t)0;
 			}
 
-			if (qe & SPAGING_FLAG_V) {//Page partagée
+			if (is_P0_Value(qe)) {//Page partagée
 				uint64_t idx = qe >> SPAGING_INFO_SHIFT;
 				struct sptr_hd* hd = sptr_at(idx);
 				if (hd->count <= 1) {
@@ -90,6 +104,10 @@ uint8_t handle_PF(uint_ptr fault_addr) {
 					// on recopie les flags
 					for(uint16_t i = 0; i < PAGE_ENT; ++i)
 						((uint64_t*) query_addr)[i] = qe;
+				} else if (qe & SPAGING_FLAG_V) {
+					// Alloc0
+					for(uint16_t i = 0; i < PAGE_ENT; ++i)
+						((uint64_t*) query_addr)[i] = 0;
 				}
 			}
 
@@ -123,11 +141,11 @@ void kmem_free_paging_range(uint64_t* page_bg,
 
 	for (uint16_t i = 0; i < lim; ++i) {
 
-		if (page_bg[i] & PAGING_FLAG_P)
-			kmem_free_rec(page_bg + i, lvl - 1);
+		if (page_bg[i] & PAGING_FLAG_P) {
+			if (!is_P1_ShRo(page_bg[i]))
+				kmem_free_rec(page_bg + i, lvl - 1);
 
-		else if ((page_bg[i] & SPAGING_FLAGS_0)
-				== (SPAGING_FLAG_P | SPAGING_FLAG_V)) {
+		} else if (is_P0_Value(page_bg[i])) {
 
 			uint64_t       idx = page_bg[i] >> SPAGING_INFO_SHIFT;
 			struct sptr_hd* hd = sptr_at(idx);
@@ -161,14 +179,4 @@ void kmem_free_paging(phy_addr old_pml4, phy_addr new_pml4) {
 
 	klogf(Log_verb, "mem", "%lld pages disponibles",
 			(long long int)kmem_nb_page_free());
-}
-
-//TODO: rec
-int kmem_paging_resv_rng(uint_ptr bg, uint_ptr ed, uint16_t flags) {
-	for (uint_ptr it = bg & PAGE_MASK; it < ed; it += PAGE_SIZE) {
-		uint64_t* e = kmem_acc_pts_entry(it, pgg_pt, flags);
-		if (!e) return 1;
-		*e = SPAGING_FLAG_P | flags;
-	}
-	return 0;
 }
