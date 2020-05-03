@@ -167,6 +167,7 @@ struct {
     chann_t     st_chann[NCHAN];      // table containing all channels
     vfile_t     st_files[NFILE];      // table containing all opened files
 	pid_t       st_owng[NB_OWNG];     // processes owners of ressources
+	uint8_t     st_time_slice;
 } state;
 
 // pointer to current proc registers
@@ -189,6 +190,13 @@ void proc_init(void);
 __attribute__ ((noreturn))
 void proc_start(void);
 
+/**
+ * Relance immédiatement un scheduling
+ * Le processus courant doit être IDLE
+ */
+__attribute__((noreturn))
+void sched_from_idle(void);
+
 void  sched_add_proc(pid_t);
 // Le scheduler ne doit pas être vide
 pid_t sched_pop_proc();
@@ -205,6 +213,7 @@ pid_t schedule_proc_ev();
 uint8_t proc_create_userspace(void* prg_elf, proc_t *proc);
 
 // Gestion des signaux en attente pour le processus actuel
+// Les registres du processus doivent être sauvegardés
 // 0 <= sigid < SIG_COUNT
 void proc_hndl_sig_i(int sigid);
 static inline void proc_hndl_sigs() {

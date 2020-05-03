@@ -26,6 +26,7 @@ LIBC_CFILES?=libc_main.c \
 	  stdlib/exit.c \
 	  unistd/brk.c \
 	  unistd/exec.c \
+	  unistd/sleep.c \
 	  stdio/scanf.c \
 	  ctype/ctype.c \
 	  sys/ressource.c \

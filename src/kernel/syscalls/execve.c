@@ -455,7 +455,7 @@ void proc_execve_entry(const char *fname,
 
 // Ring 0
 void proc_execve_end() {
-    proc_t* mp      = state.st_proc + state.st_curr_pid;
+    proc_t* mp      = cur_proc();
     proc_t* pp      = state.st_proc + mp->p_ppid;
     pp->p_reg.rip.p = (void*)trf()->ehdr.e_entry;
 

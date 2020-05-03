@@ -3,9 +3,10 @@
 #include <stdio.h>
 #include <string.h>
 
-#define NB_TEST 2
+#define NB_TEST 4
 
-int test_0() {
+int test_0(int ac __attribute__((unused)),
+		char** av __attribute__((unused)) ) {
     pid_t pid;
     int fds[2];
     int rc = pipe(fds);
@@ -47,25 +48,52 @@ int test_0() {
     return 0;
 }
 
-int test_1() {
+int test_1(int ac __attribute__((unused)),
+			char** av __attribute__((unused)) ) {
 	int* p = NULL;
 	*p = 42;
 	return 1;
 }
 
-typedef int (*test_t)(void);
-test_t tests[NB_TEST] = {test_0, test_1};
-
-int main(int argc, char* argv[]) {
-	for (int i = 1; i < argc; ++i) {
-		int testnum;
-		if (sscanf(argv[i], "%d", &testnum) != 1
-				|| testnum < 0 || testnum >= NB_TEST)
-			printf("Argument incorrect: '%s'\n", argv[i]);
-		else {
-			int rt = tests[testnum]();
-			if (rt) return rt;
+int test_2(int ac, char** av) {
+	long long int itv = 0;
+	if (ac < 4 || sscanf(av[3], "%lld", &itv) != 1
+			   || itv <= 0)
+		return 2;
+	unsigned a = 0, b = 1;
+	long long int r = itv;
+	while (1) {
+		b = a + b;
+		a = b - a;
+		if (!--r) {
+			r = itv;
+			printf("%s: %11d\n", av[2], a);
 		}
 	}
+}
+
+int test_3(int ac, char** av) {
+	int it, max;
+	if (ac < 4 || sscanf(av[2], "%d", &it)  != 1
+			   || sscanf(av[3], "%d", &max) != 1)
+		return 2;
+	for (; it < max; ++it) {
+		printf("%d\n", it);
+		usleep(20000L);
+	}
 	return 0;
+}
+
+typedef int (*test_t)(int argc, char** argv);
+test_t tests[NB_TEST] = {test_0, test_1, test_2, test_3};
+
+int main(int argc, char* argv[]) {
+	if (argc < 2) return 2;
+	int testnum;
+	if (sscanf(argv[1], "%d", &testnum) != 1
+			|| testnum < 0 || testnum >= NB_TEST) {
+		printf("Argument incorrect: '%s'\n", argv[1]);
+		return 2;
+	}
+	return tests[testnum](argc, argv);
 }

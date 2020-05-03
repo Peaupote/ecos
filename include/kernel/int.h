@@ -1,6 +1,8 @@
 #ifndef _H_INT
 #define _H_INT
 
+#include <util/hdw.h>
+
 // number of IDT vector numbers
 #define IDT_ENTRIES 256
 
@@ -30,7 +32,7 @@
 #define PIT_DATA_PORT1 0x41
 #define PIT_DATA_PORT2 0x42
 #define PIT_CONF_PORT  0x43
-#define PIT_MODE       0b00110110
+#define PIT_MODE       (PIT_SQRGEN|PIT_LOBYTE|PIT_HIBYTE|PIT_CHAN(0))
 
 #ifndef ASM_FILE
 

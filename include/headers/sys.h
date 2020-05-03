@@ -3,7 +3,7 @@
 
 #define NSYSCALL 28
 
-#define SYS_SLEEP        0
+#define SYS_USLEEP       0
 #define SYS_FORK         1
 #define SYS_EXIT         2
 #define SYS_WAIT         3

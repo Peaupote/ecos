@@ -362,7 +362,7 @@ err_einval:
 }
 
 int sys_fstat(int fd, struct stat *st) {
-    proc_t *p = state.st_proc + state.st_curr_pid;
+    proc_t *p = cur_proc();
 
     if (fd < 0 || fd > NFD || p->p_fds[fd] == -1) goto err_badf;
 

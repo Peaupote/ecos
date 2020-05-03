@@ -43,6 +43,7 @@ void sys_sigreturn() {
 	p->p_reg.rip = sv->rip;
 	p->p_reg.rsp = sv->rsp;
 	p->p_reg.r   = sv->r;
+	proc_hndl_sigs();
 	iret_to_proc(p);
 }
 

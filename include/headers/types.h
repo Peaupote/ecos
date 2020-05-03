@@ -5,6 +5,7 @@
 #include <stdio.h>
 #else
 typedef int ssize_t;
+typedef long long unsigned usecond_t;
 #endif
 
 #endif

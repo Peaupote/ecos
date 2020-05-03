@@ -25,7 +25,7 @@
     retq
 .endm
 
-mksc sleep        SYS_SLEEP
+mksc usleep       SYS_USLEEP
 mksc fork         SYS_FORK
 mksc _exit        SYS_EXIT
 mksc wait         SYS_WAIT

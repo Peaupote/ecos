@@ -19,7 +19,7 @@ static inline void set_errno(int e) {
     set_proc_errno(state.st_proc + state.st_curr_pid, e);
 }
 
-uint64_t sys_sleep(uint64_t);
+int      sys_usleep(usecond_t tm);
 void     lookup_end_sleep(void);
 
 pid_t    sys_wait(int* status);

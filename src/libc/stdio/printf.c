@@ -57,19 +57,18 @@ static size_t complete_buf(size_t clen, size_t objlen, char c) {
 }
 
 static int print_complete(stringl_writer w, void* wi,
-							size_t clen, char c,
+							ssize_t clen, char c,
 							size_t buf_lim) {
+	if (clen <= 0) return 0;
 	int rt = (int)clen;
 	--buf_lim;
-	if (clen) {
-		buf[buf_lim] = '\0';
-		size_t p = min_size_t(buf_lim, clen);
-		for (size_t i = buf_lim - p; i < buf_lim; ++i)
-			buf[i] = c;
-		(*w)(wi, buf + buf_lim - p, p);
-		clen -= p;
-	}
-	while (clen) {
+	buf[buf_lim] = '\0';
+	size_t p = min_size_t(buf_lim, clen);
+	for (size_t i = buf_lim - p; i < buf_lim; ++i)
+		buf[i] = c;
+	(*w)(wi, buf + buf_lim - p, p);
+	clen -= p;
+	while (clen > 0) {
 		size_t p = min_size_t(buf_lim, clen);
 		(*w)(wi, buf + buf_lim - p, p);
 		clen -= p;
@@ -119,7 +118,7 @@ int fpprintf(stringl_writer w, void* wi, const char* fmt, va_list ps) {
         //Modifiers
 		char    compl_char = 0;
 		bool    align_left = false;
-		size_t  compl_len  = 0;
+		ssize_t  compl_len  = 0;
         uint8_t mod   = 0;
 		while(true) {
 			switch(* ++fmt) {
@@ -127,7 +126,6 @@ int fpprintf(stringl_writer w, void* wi, const char* fmt, va_list ps) {
 					switch(* ++fmt) {
 						case 'l':
 							mod = 2;
-							++fmt;
 							continue;
 						default:
 							mod = 1;

@@ -39,7 +39,12 @@ void keyboard_hdl(void){
     if (status & 0x01) {
         scancode_byte ks = inb(KEYBOARD_DATA_PORT);
         ev = keyboard_update_state(ks);
-        tty_input(ks, ev);
+		if (tty_input(ks, ev) && state.st_curr_pid == PID_IDLE) {
+			// Si le système était idle,
+			// on relance immédiatement un scheduling
+			write_eoi();
+			sched_from_idle();
+		}
     }
     write_eoi();
 }
@@ -106,25 +111,29 @@ void common_hdl(uint8_t num, uint64_t errcode) {
 
 
 // Processus partiellent sauvegardé
-bool pit_hdl(void) {
-    static uint8_t clock = 0;
+int pit_hdl(void) {
     tty_on_pit();
+
     lookup_end_sleep();
-    if ((clock++ & SCHED_FREQ) == 0) {
+
+    if (!--state.st_time_slice) {
         pid_t pid = schedule_proc_ev();
         if (pid != state.st_curr_pid) {
-            state.st_curr_pid = pid;
-            return true;
+            state.st_curr_pid = pid;//cur reg sera set dans pit_hdl_switch
+            return 2;
         }
-    }
+	}
+	
+	proc_t* p = cur_proc();
+	if (p->p_spnd & p->p_shnd.blk)
+		return 1;
 
     write_eoi();
-    proc_hndl_sigs();
-    return false;
+    return 0;
 }
 
-void pit_hdl_switch(void) {
-    proc_t *p = switch_proc(state.st_curr_pid);
+void pit_hdl_switch(int ty) {
+    proc_t *p = ty == 1 ? cur_proc() : switch_proc(state.st_curr_pid);
     klogf(Log_verb, "sched",
           "pit switch, nb R %d, run proc %d :\n"
           "   rip %p, rsp %p",
@@ -191,9 +200,11 @@ void idt_init(void) {
     outb(PIC2_DATA, 0x01);
 
     // -- PIT init --
-    outb(PIT_CONF_PORT,  PIT_MODE);
-    outb(PIT_DATA_PORT0, 0);
-    outb(PIT_DATA_PORT0, 0);
+    outb(PIT_CONF_PORT,  PIT_CHAN(0) | PIT_SQRGEN | PIT_LOBYTE | PIT_HIBYTE);
+	// low byte
+    outb(PIT_DATA_PORT0, (PIT_FREQ0 / PIT_FREQ) & 0xff);
+	// high byte
+    outb(PIT_DATA_PORT0, ((PIT_FREQ0 / PIT_FREQ) >> 8) & 0xff);
 
     // -- masks --
     outb(PIC1_DATA,0xfc);

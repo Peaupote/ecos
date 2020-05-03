@@ -66,7 +66,7 @@ static void libc_ldr_copy(void* err_pt,
 	for (uint_ptr it = dst & PAGE_MASK; it < dst + sz; it += PAGE_SIZE) {
 		uint64_t* e = paging_page_entry(it);
 		clear_flag_64(e, PAGING_FLAG_W);
-		*e |= SPAGING_FLAG_V;
+		*e |= SPAGING_FLAG_V; // Shared
 	}
 }
 
@@ -188,10 +188,19 @@ void proc_init() {
 
     sched_add_proc(PID_IDLE);
 
-    state.st_curr_pid = PID_INIT;
-    st_curr_reg       = &p_init->p_reg;
+    state.st_curr_pid   = PID_INIT;
+    st_curr_reg         = &p_init->p_reg;
+	state.st_time_slice = SCHED_TIME_SLICE;
 
     kAssert(fs_proc_std_to_tty(p_init));
+}
+
+void sched_from_idle() {
+    proc_t *p_idle = &state.st_proc[PID_IDLE];
+    p_idle->p_reg.rsp.p = kernel_stack_top;
+    p_idle->p_reg.rip.p = &proc_idle_entry;
+    sched_add_proc(PID_IDLE);
+	schedule_proc();
 }
 
 void proc_start(void) {
@@ -259,6 +268,7 @@ void _schedule_proc() {
               p->p_reg.rip.p,
               p->p_reg.rsp.p);
 
+		state.st_time_slice = SCHED_TIME_SLICE;
         proc_hndl_sigs();
         run_proc(p);
     }
@@ -270,6 +280,7 @@ void _schedule_proc() {
 pid_t schedule_proc_ev() {
     sched_add_proc(state.st_curr_pid);
     pid_t rt = sched_pop_proc();
+	state.st_time_slice = SCHED_TIME_SLICE;
     klogf(Log_vverb, "sched",
           "nb waiting %d choose proc %d",
           state.st_sched.nb_proc + 1,

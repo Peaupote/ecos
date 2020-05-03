@@ -467,7 +467,8 @@ static void on_tty0_action() {
 
 
 
-void tty_input(scancode_byte s, key_event ev) {
+bool tty_input(scancode_byte s, key_event ev) {
+	bool rt = false;
     tty_seq_t sq;
     tty_seq_init(&sq);
 
@@ -485,10 +486,11 @@ void tty_input(scancode_byte s, key_event ev) {
             switch(tty_mode) {
             case ttym_def:
             case ttym_prompt:
-				on_tty0_action();
                 ibuffer[ib_size] = '\n';
                 if(fs_proc_write_tty(ibuffer, ib_size + 1) != ib_size + 1)
                     klogf(Log_error, "tty", "in_buffer saturated");
+				on_tty0_action();
+				rt = true;
                 break;
             default:
                 ibuffer[ib_size] = '\0';
@@ -555,18 +557,18 @@ void tty_input(scancode_byte s, key_event ev) {
                 break;
                 case KEY_C:
                     if (~state.st_owng[own_tty]) {
-						on_tty0_action();
                         sq.shift += tty_writestringl("^C", 2, tty_def_color);
-                        send_sig_to_proc(state.st_owng[own_tty],
-													SIGINT - 1);
+                        send_sig_to_proc(state.st_owng[own_tty], SIGINT - 1);
+						on_tty0_action();
+						rt = true;
                     }
                 break;
 				case KEY_Z:
                     if (~state.st_owng[own_tty]) {
-						on_tty0_action();
                 		sq.shift += tty_writestringl("^Z", 2, tty_def_color);
-                        send_sig_to_proc(state.st_owng[own_tty],
-													SIGTSTP - 1);
+                        send_sig_to_proc(state.st_owng[own_tty], SIGTSTP - 1);
+						on_tty0_action();
+						rt = true;
 					}
 				break;
 				case KEY_D:
@@ -580,6 +582,7 @@ void tty_input(scancode_byte s, key_event ev) {
 						fs_proc_send0_tty();
 					}
 					on_tty0_action();
+					rt = true;
 				break;
             }
         } else {
@@ -597,6 +600,7 @@ void tty_input(scancode_byte s, key_event ev) {
 		}
     }
     tty_seq_commit(&sq);
+	return rt;
 }
 
 void tty_on_pit() {

@@ -4,46 +4,49 @@
 #include <kernel/kutil.h>
 #include <kernel/tty.h>
 
-struct {
-    uint32_t sleep_counter;
+static struct {
+    uint64_t sleep_counter;
     pid_t    pid;
 } sleeps[NSLEEP];
 
-uint64_t sys_sleep(uint64_t time) {
-    proc_t *p = &state.st_proc[state.st_curr_pid];
-    size_t i = 0;
+static size_t nb_sleep = 0;
 
-    if (p->p_stat == SLEEP)
-        kpanic("try to make sleep a sleeping process");
+int sys_usleep(usecond_t time) {
+    proc_t *p = &state.st_proc[state.st_curr_pid];
+
+    kAssert(p->p_stat != SLEEP);
+	
+	uint64_t count = time * PIT_FREQ / 1000000;
+	if (!count) return 0;
 
     // look for first empty spot
-    while(i < NSLEEP && state.st_proc[sleeps[i].pid].p_stat == SLEEP) i++;
-    if (i == NSLEEP) {
-        // TODO handle error
+	if (nb_sleep >= NSLEEP) {
         klogf(Log_error, "syscall",
               "can't have more than %d processus sleeping", NSLEEP);
-        return ~(uint64_t)0;
-    }
-
-    p->p_stat = SLEEP;
+		set_errno(ENOMEM);
+        return -1;
+	}
+    
+	p->p_stat = SLEEP;
+	size_t i = nb_sleep++;
     sleeps[i].pid = state.st_curr_pid;
 
-    // probably not correct here
-    sleeps[i].sleep_counter = time * (1193180 / (1L << 16));
-    klogf(Log_info, "syscall", "process %d sleep for %d sec",
+    sleeps[i].sleep_counter = count;
+    klogf(Log_info, "syscall", "process %d sleep for %lld sec",
             state.st_curr_pid, time);
 
     schedule_proc();
-    never_reached return 0;
 }
 
 void lookup_end_sleep(void) {
-    for (size_t i = 0; i < NSLEEP; i++) {
+    for (size_t i = 0; i < nb_sleep; ) {
         pid_t pid = sleeps[i].pid;
         if (state.st_proc[pid].p_stat == SLEEP &&
-            --sleeps[i].sleep_counter == 0) {
+				--sleeps[i].sleep_counter == 0) {
+			sleeps[i] = sleeps[--nb_sleep];
             state.st_proc[pid].p_stat = RUN;
+			state.st_proc[pid].p_reg.r.rax.i = 0;
             sched_add_proc(pid);
-        }
+        } else ++i;
     }
 }

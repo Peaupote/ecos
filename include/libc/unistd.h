@@ -12,7 +12,8 @@
 int      brk(void* addr);
 void*    sbrk(intptr_t increment);
 
-uint64_t sleep(uint64_t);
+int      usleep(usecond_t usec);
+unsigned int sleep(unsigned int sec);
 
 ssize_t  write(int fd, const void *s, size_t len);
 ssize_t  read(int fd, void *buf, size_t len);

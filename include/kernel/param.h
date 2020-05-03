@@ -14,11 +14,10 @@
 
 #define NSLEEP 128 // number of parralled sleep allowed
 
-// how often the scheduler kicks in
-// careful ! it's a modulo implemented with a bitwise &
-#define SCHED_FREQ 0x3
+#define PIT_FREQ         100
+#define SCHED_TIME_SLICE 2
 
-#define TTY_CURSOR_T 24
+#define TTY_CURSOR_T     100
 
 // Nombre de priorités (nice) dans le scheduler
 // Au sein du kernel la meilleure priorité est NB_PRIORITY_LVL-1, la pire 0

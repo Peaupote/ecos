@@ -12,7 +12,7 @@ int_handlers:
 #include "int_handlers_tab.s"
 
 syscall_tab:
-    .quad sys_sleep
+    .quad sys_usleep
     .quad sys_fork
     .quad sys_exit
     .quad sys_wait
@@ -80,9 +80,9 @@ syscall_ring1c_tab:
 
 // Sauvegarde des registres associés au processus courant (st_curr_reg)
 // Utilise la valeur actuelle des registres ainsi qu'une structure d'iret
-// placée sur la pile en %rsp+0x10
+// placée sur la pile en %rsp+ofs
 // Les registres autres que %r10 et %r11 ne sont pas modifiés
-.macro save_curr_proc_reg
+.macro save_curr_proc_reg ofs
     pushq  %r15
     movabs $st_curr_reg, %r15
     movq   (%r15), %r15
@@ -103,13 +103,14 @@ syscall_ring1c_tab:
     movq   %r15, %r10
     popq   %r15
     movq   %r15, 0x88(%r10)
-
-    // Sauvegarde des données présentes dans la structure d'iret
-    movq   0x20(%rsp), %r11
+    
+	// Sauvegarde des données présentes dans la structure d'iret
+	// en %rsp+ofs
+    movq   (IRETQ_RFLAGS + \ofs)(%rsp), %r11
     movq   %r11,  0x00(%r10) // reg.rflags
-    movq   0x10(%rsp), %r11
+    movq   (IRETQ_RIP + \ofs)(%rsp),    %r11
     movq   %r11,  0x08(%r10) // reg.rip
-    movq   0x28(%rsp), %r11
+    movq   (IRETQ_RSP + \ofs)(%rsp),    %r11
     movq   %r11,  0x10(%r10) // reg.rsp
 .endm
 
@@ -259,7 +260,8 @@ irq_keyboard:
     movw  $SEG_SEL(GDT_RING0_DATA,0), %r10w
     set_data_segments
 
-    call keyboard_hdl
+	movabs $keyboard_hdl, %r10
+    callq *%r10
 
     restore_data_segments
     restore_c_reg
@@ -271,14 +273,18 @@ irq_pit:
     movw  $SEG_SEL(GDT_RING0_DATA,0), %r10w
     set_data_segments
 
-    call  pit_hdl
-    testb %al, %al
-    je    irq_pit_remain
+	movabs $pit_hdl, %r10
+    callq  *%r10
+    testl  %eax, %eax
+    je     irq_pit_remain
 
-    leaq  -8(%rsp), %rsp
+	movq   %rax, (%rsp)
+    leaq   8(%rsp), %rsp
     restore_c_reg
-    save_curr_proc_reg
-    call  pit_hdl_switch
+    save_curr_proc_reg 0
+	movq   -0x50(%rsp), %rdi //retour de pid_hdl
+    movabs $pit_hdl_switch, %r10
+	callq  *%r10
 
 irq_pit_remain:
     restore_data_segments
@@ -290,14 +296,14 @@ irq_sys:
     movw  $SEG_SEL(GDT_RING0_DATA,0), %r10w
     set_data_segments
 
-    save_curr_proc_reg
+    save_curr_proc_reg 0x10
 
     cmpq   $NSYSCALL, %rax
-    jns    incorrect_rax
+    jae    incorrect_rax
 
     movabs $syscall_tab, %r10
-    movq   (%r10, %rax, 8), %rax
-    callq  *%rax
+    movq   (%r10, %rax, 8), %r10
+    callq  *%r10
 
 func_end:
     restore_curr_proc_reg_exc_rax
@@ -305,14 +311,15 @@ func_end:
     iretq
 
 incorrect_rax:
-    call invalid_syscall
-    jmp  func_end
+	movabs $invalid_syscall, %r10
+    callq  *%r10
+    jmp    func_end
 
 continue_syscall:
     load_curr_prog_regp
     movabs $syscall_tab, %r10
-    movq   (%r10, %rax, 8), %rax
-    jmpq   *%rax //Appel terminal
+    movq   (%r10, %rax, 8), %r10
+    jmpq   *%r10 //Appel terminal
 
 irq_sys_ring1_call:
     callq  *%rax
@@ -327,13 +334,13 @@ irq_sys_ring1:
     testq  $0x100, %rax
     jne    irq_sys_ring1c
     movabs $syscall_ring1j_tab, %r10
-    movq   (%r10,  %rax, 8), %rax
-    jmpq   *%rax
+    movq   (%r10,  %rax, 8), %r10
+    jmpq   *%r10
 irq_sys_ring1c:
     movabs $syscall_ring1c_tab, %r10
     andq   $0xff,  %rax
-    movq   (%r10,  %rax, 8), %rax
-    callq  *%rax
+    movq   (%r10,  %rax, 8), %r10
+    callq  *%r10
 
 irq_sys_ring1_end:
     restore_data_segments

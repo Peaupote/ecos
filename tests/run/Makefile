@@ -9,10 +9,16 @@ export CC?=x86_64-elf-gcc
 export AS?=x86_64-elf-as
 
 CFILES=test.c test2.c test3.c
-OUT=$(CFILES:.c=.out)
+OUT=$(CFILES:.c=.out) test_reg.out
 SRCDEP=$(CFILES)
 INCLUDE_LIBC?=-I $(ROOT)/include/libc
 INCLUDES=-I $(ROOT)/include $(INCLUDE_LIBC)
+
+%.s:%.S
+	$(CC) -E $< -o $@ $(INCLUDES)
+
+%.out:%.s
+	$(CC) $(FLAGS_UR) -o $@ $< $(INCLUDES) -lgcc
 
 %.out:%.c libc $(STARTO)
 	$(CC) $(FLAGS_UR) -o $@ $< $(STARTO) $(LINK_LC) $(INCLUDES) -lgcc

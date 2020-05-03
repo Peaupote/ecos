@@ -29,4 +29,18 @@
 
 #define VGA_BUFFER 0xB8000
 
+// IRETQ structure
+#define IRETQ_SS     0x20
+#define IRETQ_RSP    0x18
+#define IRETQ_RFLAGS 0x10
+#define IRETQ_CS     0x08
+#define IRETQ_RIP    0x00
+
+// PIT
+#define PIT_CHAN(I)  ((I)<< 6)
+#define PIT_LOBYTE   (1 << 4)
+#define PIT_HIBYTE   (1 << 5)
+#define PIT_SQRGEN   (3 << 1)
+#define PIT_FREQ0    1193182 
+
 #endif

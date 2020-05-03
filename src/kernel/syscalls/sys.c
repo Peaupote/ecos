@@ -73,7 +73,6 @@ pid_t sys_wait(int* rt_st) {
             klogf(Log_info, "syscall", "process %d wait %d childs",
                     state.st_curr_pid, p->p_nchd);
             schedule_proc();
-            never_reached return 0;
         }
 
     } else {

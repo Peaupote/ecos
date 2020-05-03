@@ -31,7 +31,7 @@ extern uint8_t tty_def_color;
 void   tty_init(enum tty_mode);
 void   tty_set_mode(enum tty_mode);
 void   tty_set_owner(pid_t p);
-void   tty_input(scancode_byte scb, key_event ev);
+bool   tty_input(scancode_byte scb, key_event ev);
 void   tty_on_pit();
 
 //L'affichage du prompt doit être mis à jour (tty_update_prompt)

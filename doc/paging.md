@@ -14,8 +14,13 @@ Chaque processus possède un *PML4*. Celui-ci est divisé en deux parties:
 	- `PSKD` qui permet de stocker des données spécifique au processus lors de l'exécution `execve`
 	- `COPY_RES` est utilisé ponctuellement pour accéder à des pages n'appartenant pas au paging actuel
 
-Dans le but d'éviter des écritures accidentelles sur les parties du kernel en lecture seule (notamment le code), on active la fonction `Write Protect` dans `CR0` qui lève une *Page Fault* si le kernel essaie d'écrire à une adresse dont l'un des niveau de translation ne contient pas le drapeau `W` (écriture).
-Afin de pouvoir accéder aux structures de paging, on fait en sorte que le drapeau `W` ne puisse être absent que dans le dernier niveau de paging (*PT*).
+Dans le but d'éviter des écritures accidentelles sur les parties du kernel en lecture seule (notamment le code), on active la fonction `Write Protect`
+dans `CR0` qui lève une *Page Fault* si le kernel essaie d'écrire à une
+adresse dont l'un des niveau de translation ne contient pas le drapeau `W`
+(écriture).
+Afin de pouvoir accéder aux structures de paging, on fait en sorte que le
+drapeau `W` ne puisse être absent que dans le dernier niveau de paging
+(*PT*).
 
 Afin de limiter les copies lors de *fork* et l'allocation de pages lors du
 lancement des processus on utilise les drapeaux réservés au système des
@@ -30,10 +35,10 @@ allouer des pages lors d'un accès détecté par l'interruption *page fault*.
 | Alloc0  |    1    |    0    |    0    |
 | Value   |    1    |    1    |    0    |
 
-Les parties *Shared RO* sont des parties en lecture seules partagées entre
-plusieurs processus.
-Elles sont utilisés pour la *libc* et ne sont pas dupliqués lors d'un 
-*fork* ni libérés lors de la mort du processus.
+Les parties *Shared* sont des parties partagées entre plusieurs processus.
+Elles sont utilisés pour les parties en lecture seule de la *libc* et ne
+sont pas dupliqués lors d'un *fork* ni libérés lors de la mort du
+processus.
 Les parties *Alloc* sont alloués lors de l'accès.
 Les parties *Alloc0* sont de plus remplies par des zéros.
 Les parties *Value* sont partagés entre plusieurs processus via un
