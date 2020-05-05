@@ -203,7 +203,7 @@ vfile_t *vfs_load(const char *filename, int flags) {
 	
 	if (!vfs_find(filename, filename + strlen(filename), &dev_id, &ino)) {
         set_errno(ENOENT);
-        klogf(Log_warn, "vfs", "file '%s' dont exists", filename);
+        klogf(Log_info, "vfs", "file '%s' dont exists", filename);
         return 0;
 	}
 

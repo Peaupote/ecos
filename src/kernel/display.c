@@ -174,6 +174,7 @@ void display_echar_at(size_t x, size_t y, uint16_t e) {
 }
 
 void display_cursor_at(size_t x, size_t y) {
+	if (is_egat()) return;
 	unsigned left = x * char_width,
 	          top = y * char_height;
 	display_draw_rect(left, top + 2, 1, char_height - 4, 0xeeeeee);

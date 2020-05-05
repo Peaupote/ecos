@@ -2,12 +2,40 @@
 #include <libc/stdlib.h>
 #include <libc/unistd.h>
 //#define MALLOC_PRINT
+#define MALLOC_CHECK
 #endif
 
 #include <libc/string.h>
 #include <util/test.h>
 #include <util/paging.h>
 #include <util/misc.h>
+
+#ifdef MALLOC_PRINT
+#include <libc/stdio.h>
+#endif
+
+#ifdef MALLOC_CHECK
+#include <libc/stdio.h>
+#define MALLOC_CHECK_SZ 1000
+size_t malloc_check_nb;
+uint_ptr malloc_check[MALLOC_CHECK_SZ];
+
+static void check_malloc(uint_ptr ptr) {
+	if (malloc_check_nb >= MALLOC_CHECK_SZ)
+		fprintf(stderr, "malloc_check size\n");
+	else
+		malloc_check[malloc_check_nb++] = ptr;
+}
+static void check_free(uint_ptr ptr) {
+	if (!ptr) return;
+	for (size_t i = 0; i < malloc_check_nb; ++i)
+		if (malloc_check[i] == ptr) {
+			malloc_check[i] = malloc_check[--malloc_check_nb];
+			return;
+		}
+	fprintf(stderr, "malloc_check free\n");
+}
+#endif
 
 #define MBLOC_FREE      0x1
 #define MBLOC_PREV_FREE 0x2
@@ -41,6 +69,9 @@ static uint_ptr    up_lim;
 static free_bloc_t root;
 
 void _malloc_init() {
+#ifdef MALLOC_CHECK
+	malloc_check_nb = 0;
+#endif
     up_lim    = (uint_ptr) sbrk(0);
     if (up_lim % MALLOC_ALIGN != 0) {
         uint_ptr  add = MALLOC_ALIGN - (up_lim % MALLOC_ALIGN);
@@ -79,10 +110,6 @@ static inline void llist_insert_before(struct free_bloc* ref,
     b->next   = ref;
 }
 
-#ifdef MALLOC_PRINT
-#include <libc/stdio.h>
-#endif
-
 void* TEST_U(malloc)(size_t dsize) {
 	if (!dsize) return NULL;
 
@@ -115,7 +142,10 @@ void* TEST_U(malloc)(size_t dsize) {
                 *hd &= ~(uint32_t)MBLOC_FREE;
             }
 #ifdef MALLOC_PRINT
-			fprintf(stderr, "malloc rt(0)=%p\n", it);
+			fprintf(stderr, "%d: malloc rt(0)=%p\n", getpid(), it);
+#endif
+#ifdef MALLOC_CHECK
+			check_malloc((uint_ptr)it);
 #endif
 			return it;
         }
@@ -125,14 +155,21 @@ void* TEST_U(malloc)(size_t dsize) {
     *(uint32_t*)rt_hd = size;
     up_lim            = (uint_ptr)rt_hd + size;
 #ifdef MALLOC_PRINT
-	fprintf(stderr, "malloc rt(1)=%p\n", (void*)(MALLOC_HD_SZ + (uint_ptr)rt_hd));
+	fprintf(stderr, "%d: malloc rt(1)=%p\n", getpid(),
+			(void*)(MALLOC_HD_SZ + (uint_ptr)rt_hd));
+#endif
+#ifdef MALLOC_CHECK
+	check_malloc(MALLOC_HD_SZ + (uint_ptr)rt_hd);
 #endif
     return (void*)(MALLOC_HD_SZ + (uint_ptr)rt_hd);
 }
 
 void TEST_U(free)(void* ptr) {
 #ifdef MALLOC_PRINT
-	fprintf(stderr, "free %p\n", ptr);
+	fprintf(stderr, "%d: free %p\n", getpid(), ptr);
+#endif
+#ifdef MALLOC_CHECK
+	check_free((uint_ptr)ptr);
 #endif
     if (!ptr) return;
 
@@ -191,8 +228,10 @@ void* realloc(void* ptr, size_t size) {
 		return NULL;
 	}
 	void *rt = malloc(size);
-	if (rt) {
-		memcpy(rt, ptr, size);
+	if (rt && ptr) {
+		size_t sz = (*bloc_head(ptr)) & MBLOC_SIZE_MASK;
+		mina_size_t(&sz, size);
+		memcpy(rt, ptr, sz);
 		free(ptr);
 	}
 	return rt;

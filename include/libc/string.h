@@ -55,7 +55,7 @@ char *strcpy(char *dest, const char *src);
 /**
  * Return a duplicate of the string s in memory allocated using malloc.
  */
-//char *strdup(const char *s);
+char *strdup(const char *s);
 
 /**
  * Randomly swap the characters in string.

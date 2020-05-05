@@ -25,6 +25,7 @@ int main () {
         sprintf(buf, "/proc/%d/stat", pid);
 		FILE* fstat = fopen(buf, "r");
         if (!fstat) {
+			fprintf(stderr, "%s -> %d\n", dir->d_name, pid);
             perror("ps: open");
             closedir(dirp);
             exit(1);

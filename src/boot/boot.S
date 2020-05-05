@@ -32,12 +32,15 @@ forced to be within the first 8 KiB of the kernel file.
 /* graphic mode */
 #ifdef GRAPHIC_MODE_LIN
 .long GRAPHIC_LIN
+.long 0    /* width:  no preference   */
+.long 0    /* height: no preference   */
+.long 24   /* depth 24 bits per pixel */
 #else
 .long GRAPHIC_TEXT
+.long 0    /* width:  no preference   */
+.long 0    /* height: no preference   */
+.long 0    /* depth:  no preference   */
 #endif
-.long 0    /* width:  no preference */
-.long 0    /* height: no preference */
-.long 0    /* depth:  no preference */
 
     .section .bss
 
