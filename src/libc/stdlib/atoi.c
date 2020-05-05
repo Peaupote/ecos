@@ -13,7 +13,7 @@ int atoi(const char *s) {
 		neg = true;
 	}
     int n = 0;
-    for(; '0' <= *s && *s < '9'; s++)
+    for(; '0' <= *s && *s <= '9'; s++)
         n = n * 10 + (*s - '0');
 
     return neg ? -n : n;

@@ -15,6 +15,7 @@ LIBC_CFILES?=libc_main.c \
 	  string/strchr.c \
 	  string/strrchr.c \
 	  string/strchrnul.c \
+	  string/strdup.c \
 	  stdio/printf.c \
 	  stdio/putchar.c \
 	  stdio/puts.c \

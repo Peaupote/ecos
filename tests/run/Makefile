@@ -11,6 +11,7 @@ export AS?=x86_64-elf-as
 CFILES=test.c test2.c test3.c
 OUT=$(CFILES:.c=.out) test_reg.out
 SRCDEP=$(CFILES)
+CPFILES=test.c demo.sh
 INCLUDE_LIBC?=-I $(ROOT)/include/libc
 INCLUDES=-I $(ROOT)/include $(INCLUDE_LIBC)
 
@@ -27,7 +28,7 @@ home.img: $(OUT)
 	rm -rf home
 	mkdir -p home
 	mkdir -p home/test
-	cp test.c home/test/test.c
+	@$(foreach f,$(CPFILES),cp "$(f)" "home/test/$(f)" &&) echo $(CPFILES)
 	@$(foreach o,$(OUT),cp "$(o)" "home/test/$(o:.out=)" &&) echo $(OUT)
 	$(ROOT)/tools/build-ext2.sh home home.img
 

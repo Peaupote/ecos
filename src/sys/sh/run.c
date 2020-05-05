@@ -6,6 +6,7 @@
 #include <sys/wait.h>
 #include <string.h>
 #include <util/misc.h>
+#include <assert.h>
 
 // --Variables--
 var_t* lvars[256] = {NULL};
@@ -91,12 +92,12 @@ ecmd_2_t** on_child_end(pid_t pid, int st) {
 
 // --Builtins--
 
-int blti_exit(int argc, char** argv) {
+int blti_exit(int argc, char** argv, int fd_in __attribute__((unused))) {
 	int st = argc > 1 ? atoi(argv[1]) : 0;
 	exit(st);
 }
 
-int blti_cd(int argc, char **argv) {
+int blti_cd(int argc, char **argv, int fd_in __attribute__((unused))) {
 	char *dst;
 	if (argc == 1) {
 		dst = get_var("HOME");
@@ -120,7 +121,8 @@ int blti_cd(int argc, char **argv) {
 	return 0;
 }
 
-int blti_export(int argc __attribute__((unused)), char **args) {
+int blti_export(int argc __attribute__((unused)), char **args,
+		int fd_in __attribute__((unused)) ) {
 	int rts = 0;
 	for (char** arg = args + 1; *arg; ++arg) {
 		var_t* v = arg_var_assign(*arg);
@@ -135,6 +137,38 @@ int blti_export(int argc __attribute__((unused)), char **args) {
 		}
 	}
 	return rts;
+}
+
+int blti_read(int argc, char **args, int fd_in) {
+	cbuf_t buf;
+	cbuf_init(&buf, 256);
+	char* seg = cbuf_mkn(&buf, 256);
+	int rc;
+	while ((rc = read(fd_in, seg, 256)) > 0) {
+		buf.sz -= 256 - rc;
+		for (int i = 0; i < rc; ++i) {
+			if (seg[i] == '\n') {
+				lseek(fd_in, -rc+i+1, SEEK_CUR);
+				seg[i] = '\0';
+
+				char* sv;
+				char* word = strtok_rnull(buf.c, " ", &sv);
+				for(int argi = 1; argi < argc; ++argi) {
+					if (word) {
+						char* v = malloc((strlen(word) + 1) * sizeof(char));
+						strcpy(v, word);
+						var_set(args[argi], v);
+					} else break;
+					word = strtok_rnull(NULL, " ", &sv);
+				}
+				cbuf_destr(&buf);
+				return 0;
+			}
+		}
+		seg = cbuf_mkn(&buf, 256);
+	}
+	cbuf_destr(&buf);
+	return 1;
 }
 
 bool blti_fg(int argc, char** args, int* st) {
@@ -189,6 +223,7 @@ static builtin_t sblti_##N = {.name = sblti_n_##N, .ty = T, .F = (Y)&blti_##N};
 GEN_SBLTI_SYNC(exit)
 GEN_SBLTI_SYNC(cd)
 GEN_SBLTI_SYNC(export)
+GEN_SBLTI_SYNC(read)
 GEN_SBLTI_TOP(fg)
 GEN_SBLTI_ASYNC(jobs)
 #undef GEN_SBLTI_SYNC
@@ -207,6 +242,7 @@ void init_builtins() {
 	add_builtin(&sblti_exit);
 	add_builtin(&sblti_cd);
 	add_builtin(&sblti_export);
+	add_builtin(&sblti_read);
 	add_builtin(&sblti_fg);
 	add_builtin(&sblti_jobs);
 }
@@ -250,7 +286,12 @@ void bg_int_handler(int signum __attribute__((unused))) {
 
 // --Exécution--
 
-int exec_redir_file(const redir_t* r, int flag) {
+static int red_file_flag[5] = {
+	0, O_RDONLY,
+	0, O_WRONLY | O_CREAT | O_TRUNC, O_WRONLY | O_CREAT | O_APPEND
+};
+
+static int redir_file_open(const redir_t* r) {
 	pbuf_t buf;
 	pbuf_init(&buf, 1);
 	expand(r->filewd, &buf);
@@ -258,41 +299,165 @@ int exec_redir_file(const redir_t* r, int flag) {
 		fprintf(stderr, "|%s| = %d != 1", r->filewd, (int)buf.sz);
 		for (size_t i = 0; i < buf.sz; ++i)
 			free(buf.c[i]);
-		free(buf.c);
-		return 1;
+		pbuf_destr(&buf);
+		return -1;
 	}
 	char* file = *buf.c;
-	free(buf.c);
 
-	int ffd = open(file, flag, 0640); // TODO: umask
+	int ffd = open(file, red_file_flag[r->type], 0640); // TODO: umask
 	if (ffd < 0) {
-        char buf[256];
-        sprintf(buf, "sh rdf: %s", file);// TODO size check
-        perror(buf);
+        char buf2[256];
+		if (buf.sz > 200) file[200] = '\0';
+        sprintf(buf2, "sh rdf: %s", file);
+        perror(buf2);
 		free(file);
-		return 1;
+		return -1;
 	}
 	free(file);
+	return ffd;
+}
+
+static int exec_redir_file(const redir_t* r) {
+	int ffd = redir_file_open(r);
+	if (ffd < 0) return 1;
+	if (ffd == r->fd) return 0;
 	if (!~dup2(ffd, r->fd)) return 1;
 	close(ffd);
 	return 0;
 }
-int exec_redir_dup(const redir_t* r) {
+static int exec_redir_dup(const redir_t* r) {
 	return ~dup2(r->src_fd, r->fd) ? 0 : 1;
 }
-int exec_redir(const redir_t* r) {
+static int exec_redir(const redir_t* r) {
 	switch (r->type) {
 		case IN_DUP: case OUT_DUP:
 			return exec_redir_dup(r);
-		case IN_FILE: 
-			return exec_redir_file(r, O_RDONLY);
-		case OUT_TRUNC:
-			return exec_redir_file(r, O_WRONLY | O_CREAT | O_TRUNC);
-		case OUT_APPEND:
-			return exec_redir_file(r, O_WRONLY | O_CREAT | O_APPEND);
+		case IN_FILE: case OUT_TRUNC: case OUT_APPEND:
+			return exec_redir_file(r);
 	}
 	return 2;//never reached
 }
+
+
+static int apply_reds3(ecmd_st* st) {
+	// DFS pour repérere les interdépendances
+	int sv_dup[3] = {-1, -1, -1};
+	char  t[3] = {0};
+	int stk[9] = {0, 1, 2};
+	int stki = 3;
+	while (stki) {
+		int i = stk[stki - 1];
+		if (t[i] == 0) {
+			if (st->fds[i] == i) {
+				t[i] = 2;
+				--stki;
+			} else {
+				for (int j = 0; j < 3; ++j)
+					if (st->fds[j] == i && t[j] == 1) {
+						sv_dup[i] = dup(i);
+						break;
+					}
+				if (~sv_dup[i]) {
+					t[i] = 2;
+					dup2(st->fds[i], i);
+					--stki;
+				} else {
+					for (int j = 0; j < 3; ++j)
+						if (st->fds[j] == i && t[j] == 0)
+							stk[stki++] = j;
+					t[i] = 1;
+				}
+			}
+		} else {
+			if (t[i] == 1) {
+				if (st->fds[i] < 3 && ~sv_dup[st->fds[i]])
+					dup2(sv_dup[st->fds[i]], i);
+				else
+					dup2(st->fds[i], i);
+				t[i] = 2;
+			}
+			--stki;
+		}
+	}
+	for (int i = 0; i < 3; ++i)
+		if (~sv_dup[i])
+			close(sv_dup[i]);
+
+	// fermeture des fichiers ouverts par sh
+	for (ecmd_stack_red_t* oit = st->reds; oit; oit = oit->up)
+		for (size_t i = 0; i < oit->nb_files; ++i)
+			close(oit->files[i]);
+	return 0;
+}
+
+static int reg_reds3(ecmd_st* st, const red_list_t* rs) {
+	int nb_f = 0;
+	for (size_t i = 0; i < rs->redc; ++i) {
+		if (rs->reds[i].fd < 0 || rs->reds[i].fd > 2) {
+			fprintf(stderr, "reds3 fd=%d\n", rs->reds[i].fd);
+			return 2;
+		}
+		switch (rs->reds[i].type) {
+			case IN_FILE: case OUT_TRUNC: case OUT_APPEND:
+				++nb_f;
+				break;
+			case IN_DUP: case OUT_DUP: break;
+		}
+	}
+
+	ecmd_stack_t* sk = malloc(offsetof(ecmd_stack_t, red.files)
+						+ nb_f * sizeof(int));
+	for (int i = 0; i < 3; ++i)
+		sk->red.sv_fds[i] = st->fds[i];
+
+	size_t itf = 0;
+	int rts    = 0;
+	for (size_t i = 0; i < rs->redc; ++i) {
+		switch(rs->reds[i].type) {
+			case IN_FILE: case OUT_TRUNC: case OUT_APPEND:
+				st->fds[rs->reds[i].fd] = sk->red.files[itf]
+					= redir_file_open(rs->reds + i);
+				if (sk->red.files[itf] < 0) {
+					rts = 1;
+					goto err;
+				}
+				++itf;
+				break;
+			case IN_DUP: case OUT_DUP:
+				if (rs->reds[i].src_fd < 0 || rs->reds[i].src_fd > 2) {
+					fprintf(stderr, "reds3 sfd=%d\n", rs->reds[i].src_fd);
+					rts = 2;
+					goto err;
+				}
+				st->fds[rs->reds[i].fd] = st->fds[rs->reds[i].src_fd];
+				break;
+		}
+	}
+
+	sk->red.nb_files = itf;
+	sk->up           = st->stack;
+	st->stack        = sk;
+	sk->red.up       = st->reds;
+	st->reds         = &sk->red;
+	return 0;
+err:
+	for (size_t i = 0; i < itf; ++i)
+		close(sk->red.files[itf]);
+	free(sk);
+	return rts;
+}
+
+static void unreg_reds3(ecmd_st* st) {
+	ecmd_stack_t* sk = st->stack;
+	for (size_t i = 0; i < sk->red.nb_files; ++i)
+		close(sk->red.files[i]);
+	for (int i = 0; i < 3; ++i)
+		st->fds[i] = sk->red.sv_fds[i];
+	st->stack = sk->up;
+	st->reds  = sk->red.up;
+	free(sk);
+}
+
 
 char* expand_find_var(const char** src) {
 	*src += 2;
@@ -380,7 +545,7 @@ void expand(const char* c, pbuf_t* wds) {
 				cbuf_init(&buf, 256);
 				b1w = false;
 				break;
-			case CT_RED: case CT_NRM:
+			case CT_RED: case CT_NRM: case CT_COM:
 				cbuf_put(&buf, *c);
 				b1w = true;
 				break;
@@ -413,11 +578,12 @@ void expand(const char* c, pbuf_t* wds) {
 	}
 }
 
-ecmd_2_t* exec_cmd_2(const cmd_2_t* c2) {
+ecmd_2_t* exec_cmd_2(const cmd_2_t* c2, ecmd_st* st) {
 	size_t cmdc = c2->cmdc;
 	ecmd_2_t* ecmd = malloc(offsetof(ecmd_2_t, procs) 
 								+ cmdc * sizeof(ecmdp_t));
 	ecmd->nb_alive = 0;
+	ecmd->st       = st;
 
     int fd_in = -1;
     for (size_t ic = 0; ic < cmdc; ++ic) {
@@ -446,9 +612,9 @@ ecmd_2_t* exec_cmd_2(const cmd_2_t* c2) {
 		builtin_t* blti = NULL;
 		var_t* loc_vars = NULL;
 
-		if (c->cmd.ty == C_BAS) {
+		if (c->c.ty == C_BAS) {
 			pbuf_init(&argsb, 8);
-			expand(c->cmd.bas, &argsb);
+			expand(c->c.bas, &argsb);
 			pbuf_put(&argsb, NULL);
 			pbuf_shrink(&argsb);
 			args = argsb.c;
@@ -491,9 +657,13 @@ ecmd_2_t* exec_cmd_2(const cmd_2_t* c2) {
 						blti = NULL;
 						break;
 					case BLTI_ASYNC: break;
-					case BLTI_SYNC:
-						ecmd->procs[ic].st = blti->sfun(argc, args);
+					case BLTI_SYNC: {
+						int mfd_in = ~fd_in ? fd_in : STDIN_FILENO;
+						if (0 <= mfd_in && mfd_in < 3)
+							mfd_in = st->fds[mfd_in];
+						ecmd->procs[ic].st = blti->sfun(argc, args, mfd_in);
 						goto continue_pipe;
+					}
 				}
 			}
 		}
@@ -502,11 +672,26 @@ ecmd_2_t* exec_cmd_2(const cmd_2_t* c2) {
         if (rf < 0) perror("sh fork\n");
 
         else if (rf == 0) {// enfant
+			// redirections hérités
+			apply_reds3(st);
+
 			// on ferme les pipes inutiles
-            if (~fd_in)       dup2(fd_in, STDIN_FILENO);
-            if (~my_fd_out)   dup2(my_fd_out, STDOUT_FILENO);
+            if (~fd_in && fd_in != STDIN_FILENO) {
+				dup2(fd_in, STDIN_FILENO);
+				close(fd_in);
+			}
+            if (~my_fd_out && my_fd_out != STDOUT_FILENO) {
+				dup2(my_fd_out, STDOUT_FILENO);
+				close(my_fd_out);
+			}
             if (~next_fd_in)  close(next_fd_in);
 
+            // redirections
+			for (size_t ir = 0; ir < c->r.redc; ++ir) {
+				int rds = exec_redir(c->r.reds + ir);
+				if (rds) exit(rds);
+			}
+			
 			// exports locaux
 			for (var_t* v = loc_vars; v;) {
 				setenv(v->name, v->val, 1);
@@ -515,22 +700,18 @@ ecmd_2_t* exec_cmd_2(const cmd_2_t* c2) {
 				v = vn;
 			}
 
-            // redirections
-			for (size_t ir = 0; ir < c->redc; ++ir) {
-				int rds = exec_redir(c->reds + ir);
-				if (rds) exit(rds);
-			}
 	
 			if (blti)
 				exit(blti->fun(argc, args));
 
-			switch (c->cmd.ty) {
+			switch (c->c.ty) {
 			case C_BAS:
 				execvp(args[0], (const char**)args);
 				perror(args[0]);
 				exit(1);
 			case C_SUB:
-				start_sub(c->cmd.sub);
+				if (!c->c.sub) exit(0);
+				start_sub(c->c.sub, true);
 				break;
 			}
 			exit(2);
@@ -556,17 +737,28 @@ continue_pipe:
 	return ecmd;
 }
 
-void start_sub(const cmd_3_t* c3) {
-	int nfd = open("/proc/null", O_RDONLY, 0640);
-	if (nfd < 0) {
-		perror("sh /proc/null");
-		exit(1);
+ecmd_st* mk_ecmd_st() {
+	ecmd_st* rt = malloc(sizeof(ecmd_st));
+	for (int i = 0; i < 3; ++i)
+		rt->fds[i] = i;
+	rt->stack = NULL;
+	rt->reds  = NULL;
+	return rt;
+}
+
+void start_sub(const cmd_3_t* c3, bool keep_stdin) {
+	if (!keep_stdin) {
+		int nfd = open("/proc/null", O_RDONLY, 0640);
+		if (nfd < 0) {
+			perror("sh /proc/null");
+			exit(1);
+		}
+		if (!~dup2(nfd, STDIN_FILENO)) exit(1);
+		close(nfd);
 	}
-	if (!~dup2(nfd, STDIN_FILENO)) exit(1);
-	close(nfd);
 
 	int st;
-	ecmd_2_t* ecmd = exec_cmd_3_down(c3, &st);
+	ecmd_2_t* ecmd = exec_cmd_3_down(c3, mk_ecmd_st(), &st);
 	if (ecmd) exit(run_sub(ecmd));
 	else      exit(st);
 }
@@ -594,51 +786,78 @@ int exec_cmd_3_bg(const cmd_3_t* c3) {
 		exit(0);
 
 	// enfant 1: sous-shell
-	start_sub(c3);
+	start_sub(c3, false);
 }
 
-ecmd_2_t* exec_cmd_3_up(const cmd_3_t* c3, int* r_st, int c_st) {
+ecmd_2_t* exec_cmd_3_up(const cmd_3_t* c3, ecmd_st* st,
+							int* r_st, int c_st) {
 	uint8_t sibnum = c3->sibnum;
 	while (c3->parent) {
 		c3 = c3->parent;
-		if (!sibnum)
-			switch (c3->ty) {
-				case C_CM2:
-					fprintf(stderr, "Erreur de structure cmd3\n");
-					break;
-				case C_BG: goto cmd_complete;
-				case C_SEQ:
-					return exec_cmd_3_down(c3->childs[1], r_st);
-				case C_AND:
+		switch (c3->ty) {
+			case C_CM2:
+				fprintf(stderr, "Erreur de structure cmd3\n");
+				break;
+			case C_BG: return NULL;
+			case C_SEQ:
+				if (sibnum) break;
+				return exec_cmd_3_down(c3->childs[1], st, r_st);
+			case C_AND:
+				if (sibnum || c_st) break;
+				return exec_cmd_3_down(c3->childs[1], st, r_st);
+			case C_OR:
+				if (sibnum || !c_st) break;
+				return exec_cmd_3_down(c3->childs[1], st, r_st);
+			case C_RED:
+				unreg_reds3(st);
+				break;
+			case C_WHL:
+				if (sibnum == 0) {
 					if (c_st) break;
-					return exec_cmd_3_down(c3->childs[1], r_st);
-				case C_OR:
-					if (!c_st) break;
-					return exec_cmd_3_down(c3->childs[1], r_st);
-			}
+					else if (c3->whl.bdy)
+						return exec_cmd_3_down(c3->whl.bdy, st, r_st);
+				}
+				return exec_cmd_3_down(c3, st, r_st);
+		}
 		sibnum = c3->sibnum;
 	}
 
-cmd_complete:;
+	free(st);
 	cmd_3_t* d3 = (cmd_3_t*)c3;
 	destr_cmd_3(d3);
 	free(d3);
 	return NULL;
 }
 
-ecmd_2_t* exec_cmd_3_down(const cmd_3_t* c3, int* r_st) {
+ecmd_2_t* exec_cmd_3_down(const cmd_3_t* c3, ecmd_st* st,
+							int* r_st) {
+	int rts;
 	while (true) {
 		switch (c3->ty) {
 			case C_CM2: {
-				ecmd_2_t* ecmd = exec_cmd_2(&c3->cm2);
+				ecmd_2_t* ecmd = exec_cmd_2(&c3->cm2, st);
 				ecmd->c        = c3;
 				return ecmd;
 			}
 			case C_BG:
-				return exec_cmd_3_up(c3, r_st,
-						exec_cmd_3_bg(c3->childs[0]));
+				return exec_cmd_3_up(c3, st, r_st,
+							exec_cmd_3_bg(c3->childs[0]));
 			case C_SEQ: case C_AND: case C_OR:
 				c3 = c3->childs[0];
+				break;
+			case C_RED:
+				rts = reg_reds3(st, &c3->red.r);
+				if (rts)
+					return exec_cmd_3_up(c3, st, r_st, rts);
+				c3 = c3->red.c;
+				break;
+			case C_WHL:
+				if (c3->whl.cnd)      c3 = c3->whl.cnd;
+				else if (c3->whl.bdy) c3 = c3->whl.bdy;
+				else {
+					fprintf(stderr, "null loop\n");
+					return exec_cmd_3_up(c3, st, r_st, 2);
+				}
 				break;
 		}
 	}
@@ -653,7 +872,7 @@ ecmd_2_t* continue_job(ecmd_2_t* e, int* st) {
 			*st = e->procs[ic].st;
 			break;
 		}
-	return exec_cmd_3_up(c3, st, *st);
+	return exec_cmd_3_up(c3, e->st, st, *st);
 }
 
 bool run_fg(int* st) {
