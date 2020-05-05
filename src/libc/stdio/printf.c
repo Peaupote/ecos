@@ -8,9 +8,9 @@
 #include <libc/ctype.h>
 #include <util/misc.h>
 
-static char buf[256];
-static const char *decimal_digits = "0123456789";
-static const char *hex_digits     = "0123456789ABCDEF";
+static char buf[256] = { 0 };
+static const char * const decimal_digits = "0123456789";
+static const char * const hex_digits = "0123456789ABCDEF";
 
 static size_t
 itoa(long long int x, const char *digits, size_t base) {
@@ -57,23 +57,23 @@ static size_t complete_buf(size_t clen, size_t objlen, char c) {
 }
 
 static int print_complete(stringl_writer w, void* wi,
-							ssize_t clen, char c,
-							size_t buf_lim) {
-	if (clen <= 0) return 0;
-	int rt = (int)clen;
-	--buf_lim;
-	buf[buf_lim] = '\0';
-	size_t p = min_size_t(buf_lim, clen);
-	for (size_t i = buf_lim - p; i < buf_lim; ++i)
-		buf[i] = c;
-	(*w)(wi, buf + buf_lim - p, p);
-	clen -= p;
-	while (clen > 0) {
-		size_t p = min_size_t(buf_lim, clen);
-		(*w)(wi, buf + buf_lim - p, p);
-		clen -= p;
-	}
-	return rt;
+                            ssize_t clen, char c,
+                            size_t buf_lim) {
+    if (clen <= 0) return 0;
+    int rt = (int)clen;
+    --buf_lim;
+    buf[buf_lim] = '\0';
+    size_t p = min_size_t(buf_lim, clen);
+    for (size_t i = buf_lim - p; i < buf_lim; ++i)
+        buf[i] = c;
+    (*w)(wi, buf + buf_lim - p, p);
+    clen -= p;
+    while (clen > 0) {
+        size_t p = min_size_t(buf_lim, clen);
+        (*w)(wi, buf + buf_lim - p, p);
+        clen -= p;
+    }
+    return rt;
 }
 
 static inline
@@ -116,60 +116,60 @@ int fpprintf(stringl_writer w, void* wi, const char* fmt, va_list ps) {
         }
 
         //Modifiers
-		char    compl_char = 0;
-		bool    align_left = false;
-		ssize_t  compl_len  = 0;
+        char    compl_char = 0;
+        bool    align_left = false;
+        ssize_t  compl_len  = 0;
         uint8_t mod   = 0;
-		while(true) {
-			switch(* ++fmt) {
-				case 'l':
-					switch(* ++fmt) {
-						case 'l':
-							mod = 2;
-							continue;
-						default:
-							mod = 1;
-							--fmt;
-							continue;
-					}
-				case '-':
-					align_left = true;
-					continue;
-				case '0':
-					compl_char = '0';
-					continue;
-				default:
-					if (isdigit(*fmt)) {
-						if (!compl_char) compl_char = ' ';
-						compl_len = *fmt - '0';
-						while (isdigit(*++fmt))
-							compl_len = compl_len * 10 + *fmt - '0';
-						--fmt;
-						continue;
-					}
-					break;
-			}
-			break;
-		}
+        while(true) {
+            switch(* ++fmt) {
+                case 'l':
+                    switch(* ++fmt) {
+                        case 'l':
+                            mod = 2;
+                            continue;
+                        default:
+                            mod = 1;
+                            --fmt;
+                            continue;
+                    }
+                case '-':
+                    align_left = true;
+                    continue;
+                case '0':
+                    compl_char = '0';
+                    continue;
+                default:
+                    if (isdigit(*fmt)) {
+                        if (!compl_char) compl_char = ' ';
+                        compl_len = *fmt - '0';
+                        while (isdigit(*++fmt))
+                            compl_len = compl_len * 10 + *fmt - '0';
+                        --fmt;
+                        continue;
+                    }
+                    break;
+            }
+            break;
+        }
 
         size_t len;
         switch(*fmt) {
             case 'c':
                 buf[0] = (char)va_arg(ps, int);
                 buf[1] = 0;
-				len    = 1;
-				if (compl_char && !align_left)
-					count += print_complete(w, wi,
-								compl_len - 1, compl_char, 256);
+                len    = 1;
+                if (compl_char && !align_left)
+                    count += print_complete(w, wi,
+                                compl_len - 1, compl_char, 256);
                 (*w)(wi, buf, 1);
                 count += 1;
-			goto print_comp;
+            goto print_comp;
             case 's':{
                 const char *s = va_arg(ps, const char*);
                 len = strlen(s);
-				if (compl_char && !align_left)
-					count += print_complete(w, wi,
-								compl_len - len, compl_char, 256);
+                if (compl_char && !align_left)
+                    count += print_complete(w, wi,
+                                compl_len - len, compl_char, 256);
                 (*w)(wi, s, len);
                 count += len;
             }goto print_comp;
@@ -187,16 +187,16 @@ int fpprintf(stringl_writer w, void* wi, const char* fmt, va_list ps) {
                         utoa(va_arg(ps, uint64_t), hex_digits, 16),
                         16, '0');
             print_buf:
-				if (compl_char && !align_left)
-					count += print_complete(w, wi,
-								compl_len - len, compl_char,
-								255 - len);
+                if (compl_char && !align_left)
+                    count += print_complete(w, wi,
+                                compl_len - len, compl_char,
+                                255 - len);
                 (*w)(wi, buf + 255 - len, len);
                 count += len;
-			print_comp:
-				if (compl_char && align_left)
-					count += print_complete(w, wi, compl_len - len,
-								compl_char, 256);
+            print_comp:
+                if (compl_char && align_left)
+                    count += print_complete(w, wi, compl_len - len,
+                                compl_char, 256);
             break;
             default:
                 return -1;
