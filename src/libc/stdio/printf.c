@@ -8,12 +8,11 @@
 #include <libc/ctype.h>
 #include <util/misc.h>
 
-static char buf[256];
-static const char *decimal_digits = "0123456789";
-static const char *hex_digits     = "0123456789ABCDEF";
+static const char * const decimal_digits = "0123456789";
+static const char * const hex_digits = "0123456789ABCDEF";
 
 static size_t
-itoa(long long int x, const char *digits, size_t base) {
+itoa(char *buf, long long int x, const char *digits, size_t base) {
     if (x == 0) {
         buf[254] = digits[0];
         buf[255] = 0;
@@ -35,7 +34,7 @@ itoa(long long int x, const char *digits, size_t base) {
 }
 
 static size_t
-utoa(uint64_t x, const char *digits, size_t base) {
+utoa(char *buf, uint64_t x, const char *digits, size_t base) {
     if (x == 0) {
         buf[254] = digits[0];
         buf[255] = 0;
@@ -50,30 +49,29 @@ utoa(uint64_t x, const char *digits, size_t base) {
     return i;
 }
 
-static size_t complete_buf(size_t clen, size_t objlen, char c) {
+static size_t complete_buf(char *buf, size_t clen, size_t objlen, char c) {
     for(;clen < objlen; ++clen)
         buf[255 - clen - 1] = c;
     return clen;
 }
 
-static int print_complete(stringl_writer w, void* wi,
-							ssize_t clen, char c,
-							size_t buf_lim) {
-	if (clen <= 0) return 0;
-	int rt = (int)clen;
-	--buf_lim;
-	buf[buf_lim] = '\0';
-	size_t p = min_size_t(buf_lim, clen);
-	for (size_t i = buf_lim - p; i < buf_lim; ++i)
-		buf[i] = c;
-	(*w)(wi, buf + buf_lim - p, p);
-	clen -= p;
-	while (clen > 0) {
-		size_t p = min_size_t(buf_lim, clen);
-		(*w)(wi, buf + buf_lim - p, p);
-		clen -= p;
-	}
-	return rt;
+static int print_complete(char *buf, stringl_writer w, void* wi,
+                          ssize_t clen, char c, size_t buf_lim) {
+    if (clen <= 0) return 0;
+    int rt = (int)clen;
+    --buf_lim;
+    buf[buf_lim] = '\0';
+    size_t p = min_size_t(buf_lim, clen);
+    for (size_t i = buf_lim - p; i < buf_lim; ++i)
+        buf[i] = c;
+    (*w)(wi, buf + buf_lim - p, p);
+    clen -= p;
+    while (clen > 0) {
+        size_t p = min_size_t(buf_lim, clen);
+        (*w)(wi, buf + buf_lim - p, p);
+        clen -= p;
+    }
+    return rt;
 }
 
 static inline
@@ -103,6 +101,7 @@ uint64_t arg_uint(uint8_t mod, va_list ps) {
 }
 
 int fpprintf(stringl_writer w, void* wi, const char* fmt, va_list ps) {
+    char buf[256] = { 0 };
     int count = 0;
     while (*fmt) {
         if (fmt[0] != '%' || fmt[1] == '%') {
@@ -116,87 +115,87 @@ int fpprintf(stringl_writer w, void* wi, const char* fmt, va_list ps) {
         }
 
         //Modifiers
-		char    compl_char = 0;
-		bool    align_left = false;
-		ssize_t  compl_len  = 0;
+        char    compl_char = 0;
+        bool    align_left = false;
+        ssize_t  compl_len  = 0;
         uint8_t mod   = 0;
-		while(true) {
-			switch(* ++fmt) {
-				case 'l':
-					switch(* ++fmt) {
-						case 'l':
-							mod = 2;
-							continue;
-						default:
-							mod = 1;
-							--fmt;
-							continue;
-					}
-				case '-':
-					align_left = true;
-					continue;
-				case '0':
-					compl_char = '0';
-					continue;
-				default:
-					if (isdigit(*fmt)) {
-						if (!compl_char) compl_char = ' ';
-						compl_len = *fmt - '0';
-						while (isdigit(*++fmt))
-							compl_len = compl_len * 10 + *fmt - '0';
-						--fmt;
-						continue;
-					}
-					break;
-			}
-			break;
-		}
+        while(true) {
+            switch(* ++fmt) {
+                case 'l':
+                    switch(* ++fmt) {
+                        case 'l':
+                            mod = 2;
+                            continue;
+                        default:
+                            mod = 1;
+                            --fmt;
+                            continue;
+                    }
+                case '-':
+                    align_left = true;
+                    continue;
+                case '0':
+                    compl_char = '0';
+                    continue;
+                default:
+                    if (isdigit(*fmt)) {
+                        if (!compl_char) compl_char = ' ';
+                        compl_len = *fmt - '0';
+                        while (isdigit(*++fmt))
+                            compl_len = compl_len * 10 + *fmt - '0';
+                        --fmt;
+                        continue;
+                    }
+                    break;
+            }
+            break;
+        }
 
         size_t len;
         switch(*fmt) {
             case 'c':
                 buf[0] = (char)va_arg(ps, int);
                 buf[1] = 0;
-				len    = 1;
-				if (compl_char && !align_left)
-					count += print_complete(w, wi,
-								compl_len - 1, compl_char, 256);
+                len    = 1;
+                if (compl_char && !align_left)
+                    count += print_complete(buf, w, wi,
+                                compl_len - 1, compl_char, 256);
                 (*w)(wi, buf, 1);
                 count += 1;
-			goto print_comp;
+            goto print_comp;
             case 's':{
                 const char *s = va_arg(ps, const char*);
                 len = strlen(s);
-				if (compl_char && !align_left)
-					count += print_complete(w, wi,
-								compl_len - len, compl_char, 256);
+                if (compl_char && !align_left)
+                    count += print_complete(buf, w, wi,
+                                compl_len - len, compl_char, 256);
                 (*w)(wi, s, len);
                 count += len;
             }goto print_comp;
             case 'd':
-                len = itoa(arg_int(mod, ps), decimal_digits, 10);
+                len = itoa(buf, arg_int(mod, ps), decimal_digits, 10);
             goto print_buf;
             case 'u':
-                len = utoa(arg_int(mod, ps), decimal_digits, 10);
+                len = utoa(buf, arg_int(mod, ps), decimal_digits, 10);
             goto print_buf;
             case 'x':
-                len = utoa(arg_uint(mod, ps), hex_digits, 16);
+                len = utoa(buf, arg_uint(mod, ps), hex_digits, 16);
             goto print_buf;
             case 'p':
-                len = complete_buf(
-                        utoa(va_arg(ps, uint64_t), hex_digits, 16),
-                        16, '0');
+                len = complete_buf(buf,
+                    utoa(buf, va_arg(ps, uint64_t), hex_digits, 16),
+                    16, '0');
             print_buf:
-				if (compl_char && !align_left)
-					count += print_complete(w, wi,
-								compl_len - len, compl_char,
-								255 - len);
+                if (compl_char && !align_left)
+                    count += print_complete(buf, w, wi,
+                                compl_len - len, compl_char,
+                                255 - len);
                 (*w)(wi, buf + 255 - len, len);
                 count += len;
-			print_comp:
-				if (compl_char && align_left)
-					count += print_complete(w, wi, compl_len - len,
-								compl_char, 256);
+            print_comp:
+                if (compl_char && align_left)
+                    count += print_complete(buf, w, wi, compl_len - len,
+                                compl_char, 256);
             break;
             default:
                 return -1;
