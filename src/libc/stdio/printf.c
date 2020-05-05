@@ -8,12 +8,11 @@
 #include <libc/ctype.h>
 #include <util/misc.h>
 
-static char buf[256] = { 0 };
 static const char * const decimal_digits = "0123456789";
 static const char * const hex_digits = "0123456789ABCDEF";
 
 static size_t
-itoa(long long int x, const char *digits, size_t base) {
+itoa(char *buf, long long int x, const char *digits, size_t base) {
     if (x == 0) {
         buf[254] = digits[0];
         buf[255] = 0;
@@ -35,7 +34,7 @@ itoa(long long int x, const char *digits, size_t base) {
 }
 
 static size_t
-utoa(uint64_t x, const char *digits, size_t base) {
+utoa(char *buf, uint64_t x, const char *digits, size_t base) {
     if (x == 0) {
         buf[254] = digits[0];
         buf[255] = 0;
@@ -50,15 +49,14 @@ utoa(uint64_t x, const char *digits, size_t base) {
     return i;
 }
 
-static size_t complete_buf(size_t clen, size_t objlen, char c) {
+static size_t complete_buf(char *buf, size_t clen, size_t objlen, char c) {
     for(;clen < objlen; ++clen)
         buf[255 - clen - 1] = c;
     return clen;
 }
 
-static int print_complete(stringl_writer w, void* wi,
-                            ssize_t clen, char c,
-                            size_t buf_lim) {
+static int print_complete(char *buf, stringl_writer w, void* wi,
+                          ssize_t clen, char c, size_t buf_lim) {
     if (clen <= 0) return 0;
     int rt = (int)clen;
     --buf_lim;
@@ -103,6 +101,7 @@ uint64_t arg_uint(uint8_t mod, va_list ps) {
 }
 
 int fpprintf(stringl_writer w, void* wi, const char* fmt, va_list ps) {
+    char buf[256] = { 0 };
     int count = 0;
     while (*fmt) {
         if (fmt[0] != '%' || fmt[1] == '%') {
@@ -159,7 +158,7 @@ int fpprintf(stringl_writer w, void* wi, const char* fmt, va_list ps) {
                 buf[1] = 0;
                 len    = 1;
                 if (compl_char && !align_left)
-                    count += print_complete(w, wi,
+                    count += print_complete(buf, w, wi,
                                 compl_len - 1, compl_char, 256);
                 (*w)(wi, buf, 1);
                 count += 1;
@@ -168,34 +167,34 @@ int fpprintf(stringl_writer w, void* wi, const char* fmt, va_list ps) {
                 const char *s = va_arg(ps, const char*);
                 len = strlen(s);
                 if (compl_char && !align_left)
-                    count += print_complete(w, wi,
+                    count += print_complete(buf, w, wi,
                                 compl_len - len, compl_char, 256);
                 (*w)(wi, s, len);
                 count += len;
             }goto print_comp;
             case 'd':
-                len = itoa(arg_int(mod, ps), decimal_digits, 10);
+                len = itoa(buf, arg_int(mod, ps), decimal_digits, 10);
             goto print_buf;
             case 'u':
-                len = utoa(arg_int(mod, ps), decimal_digits, 10);
+                len = utoa(buf, arg_int(mod, ps), decimal_digits, 10);
             goto print_buf;
             case 'x':
-                len = utoa(arg_uint(mod, ps), hex_digits, 16);
+                len = utoa(buf, arg_uint(mod, ps), hex_digits, 16);
             goto print_buf;
             case 'p':
-                len = complete_buf(
-                        utoa(va_arg(ps, uint64_t), hex_digits, 16),
-                        16, '0');
+                len = complete_buf(buf,
+                    utoa(buf, va_arg(ps, uint64_t), hex_digits, 16),
+                    16, '0');
             print_buf:
                 if (compl_char && !align_left)
-                    count += print_complete(w, wi,
+                    count += print_complete(buf, w, wi,
                                 compl_len - len, compl_char,
                                 255 - len);
                 (*w)(wi, buf + 255 - len, len);
                 count += len;
             print_comp:
                 if (compl_char && align_left)
-                    count += print_complete(w, wi, compl_len - len,
+                    count += print_complete(buf, w, wi, compl_len - len,
                                 compl_char, 256);
             break;
             default:
