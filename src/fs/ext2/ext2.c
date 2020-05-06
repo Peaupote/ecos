@@ -128,7 +128,7 @@ int ext2_write(ino_t ino, const void *buf, off_t pos, size_t len,
     for (i = 0; i < len; i++) {
         block[pos++ % info->block_size] = *src++;
         if (pos % info->block_size == 0) {
-            if (++block_nb > blk_size) { // alloc a new block at end of file
+            if (++block_nb >= blk_size) { // alloc a new block at end of file
                 uint32_t b = ext2_block_alloc(info); // TODO : fail
                 ext2_set_inode_block(block_nb, b, inode, info);
                 ++blk_size;

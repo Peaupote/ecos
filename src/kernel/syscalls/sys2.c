@@ -392,9 +392,9 @@ int sys_chdir(const char *fname) {
         return -1;
     }
 
-	proc_t *p    = cur_proc();
-	ino_t ino    = p->p_cino;
-	dev_t dev_id = p->p_dev;
+    proc_t *p    = cur_proc();
+    ino_t ino    = p->p_cino;
+    dev_t dev_id = p->p_dev;
 
     if (!vfs_find(fname, fname + strlen(fname), &dev_id, &ino)) {
         set_errno(ENOENT);
@@ -403,7 +403,7 @@ int sys_chdir(const char *fname) {
 
     struct stat st;
     struct device *dev = devices + dev_id;
-	fst[dev->dev_fs].fs_stat(ino, &st, &dev->dev_info);
+    fst[dev->dev_fs].fs_stat(ino, &st, &dev->dev_info);
     if (!(st.st_mode & TYPE_DIR)) {
         set_errno(ENOTDIR);
         return -1;

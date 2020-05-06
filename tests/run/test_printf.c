@@ -13,5 +13,10 @@ int main() {
     rc = printf("%12", 1);
     assert(rc < 0);
     perror("printf");
-	return 0;
+
+    for (int i = 0; i < 100; ++i) {
+        printf("bonjour");
+    }
+
+    return 0;
 }

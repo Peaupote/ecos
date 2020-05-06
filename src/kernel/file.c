@@ -69,66 +69,66 @@ void vfs_init() {
     vfs_mount_root(EXT2_FS, root_partition);
 
     vfs_mount(PROC_MOUNT, PROC_FS, 0);
-    
-	klogf(Log_info, "ext2", "home_part: %p - %p",
+
+    klogf(Log_info, "ext2", "home_part: %p - %p",
                     home_partition, home_partition_end);
     vfs_mount("/home", EXT2_FS, home_partition);
 
 }
 
-bool vfs_find(const char* path, const char* pathend, 
-				dev_t* dev, ino_t* ino) {
-	if (*path == '/') {
-		*dev = ROOT_DEV;
-		*ino = devices[ROOT_DEV].dev_info.root_ino;
-		while(*path == '/') ++path;
-	}
-	struct device* dv = devices + *dev;
-	struct fs*     fs = fst + dv->dev_fs;
-	while(path < pathend) {
-		const char* end_part = strchrnul(path, '/');
-		size_t len = end_part - path;
-		if (len == 2 && path[0] == '.' && path[1] == '.'
-			         && *ino == dv->dev_info.root_ino) {
-			*ino = dv->dev_parent_ino;
-			*dev = dv->dev_parent_dev;
-			dv   = devices + *dev;
-			fs   = fst + dv->dev_fs;
-		} else {
-			if (len > 255) {
-				klogf(Log_error, "vfs", "find: partie de chemin trop longue");
-				return false;
-			}
-			char name[256];
-			memcpy(name, path, len);
-			name[len] = '\0';
-			*ino = fs->fs_lookup(*ino, name, &dv->dev_info);
-			if (!*ino) {
-				klogf(Log_info, "vfs", "can't find %s", name);
-				return false;
-			}
+bool vfs_find(const char* path, const char* pathend,
+                dev_t* dev, ino_t* ino) {
+    if (*path == '/') {
+        *dev = ROOT_DEV;
+        *ino = devices[ROOT_DEV].dev_info.root_ino;
+        while(*path == '/') ++path;
+    }
+    struct device* dv = devices + *dev;
+    struct fs*     fs = fst + dv->dev_fs;
+    while(path < pathend) {
+        const char* end_part = strchrnul(path, '/');
+        size_t len = end_part - path;
+        if (len == 2 && path[0] == '.' && path[1] == '.'
+                     && *ino == dv->dev_info.root_ino) {
+            *ino = dv->dev_parent_ino;
+            *dev = dv->dev_parent_dev;
+            dv   = devices + *dev;
+            fs   = fst + dv->dev_fs;
+        } else {
+            if (len > 255) {
+                klogf(Log_error, "vfs", "find: partie de chemin trop longue");
+                return false;
+            }
+            char name[256];
+            memcpy(name, path, len);
+            name[len] = '\0';
+            *ino = fs->fs_lookup(*ino, name, &dv->dev_info);
+            if (!*ino) {
+                klogf(Log_info, "vfs", "can't find %s", name);
+                return false;
+            }
 
-			for (dev_t d = dv->dev_childs; ~d; d = devices[d].dev_sib)
-				if (devices[d].dev_parent_red == *ino) {
-					*ino = devices[d].dev_info.root_ino;
-					*dev = d;
-					dv   = devices + *dev;
-					fs   = fst + dv->dev_fs;
-					break;
-				}
-		}
+            for (dev_t d = dv->dev_childs; ~d; d = devices[d].dev_sib)
+                if (devices[d].dev_parent_red == *ino) {
+                    *ino = devices[d].dev_info.root_ino;
+                    *dev = d;
+                    dv   = devices + *dev;
+                    fs   = fst + dv->dev_fs;
+                    break;
+                }
+        }
 
-		path = end_part;
-		while(*path == '/') ++path;
-	}
+        path = end_part;
+        while(*path == '/') ++path;
+    }
 
-	return true;
+    return true;
 }
 
 int vfs_mount_root(uint8_t fs, void *partition) {
-	struct device* dv = devices + ROOT_DEV;
+    struct device* dv = devices + ROOT_DEV;
 
-	if (!dv->dev_free || !fst[fs].fs_mnt(partition, &dv->dev_info)) {
+    if (!dv->dev_free || !fst[fs].fs_mnt(partition, &dv->dev_info)) {
         klogf(Log_info, "vfs", "failed to mount root");
         kpanic("Failed mounting");
     }
@@ -136,33 +136,33 @@ int vfs_mount_root(uint8_t fs, void *partition) {
     dv->dev_fs         = fs;
     dv->dev_free       = 0;
 
-	dv->dev_parent_dev = ROOT_DEV;
-	dv->dev_parent_red = dv->dev_parent_ino = dv->dev_info.root_ino;
+    dv->dev_parent_dev = ROOT_DEV;
+    dv->dev_parent_red = dv->dev_parent_ino = dv->dev_info.root_ino;
 
-	dv->dev_childs     = ~(dev_t)0;
-	dv->dev_sib        = ~(dev_t)0;
+    dv->dev_childs     = ~(dev_t)0;
+    dv->dev_sib        = ~(dev_t)0;
 
     klogf(Log_info, "vfs", "root sucessfully mounted");
     return ROOT_DEV;
 }
 
 int vfs_mount(const char *path, uint8_t m_fst, void *partition) {
-	ino_t red_ino = devices[ROOT_DEV].dev_info.root_ino;
-	dev_t red_dev = ROOT_DEV;
+    ino_t red_ino = devices[ROOT_DEV].dev_info.root_ino;
+    dev_t red_dev = ROOT_DEV;
 
-	if (!vfs_find(path, path + strlen(path), &red_dev, &red_ino)) {
-		klogf(Log_error, "vfs", "%s not found", path);
-		kpanic("Failed mounting");
-	}
-	
-	struct fs* p_fs = fst + devices[red_dev].dev_fs;
-	ino_t par_ino = p_fs->fs_lookup(red_ino, "..", &devices[red_dev].dev_info);
-	kAssert(par_ino != 0);
+    if (!vfs_find(path, path + strlen(path), &red_dev, &red_ino)) {
+        klogf(Log_error, "vfs", "%s not found", path);
+        kpanic("Failed mounting");
+    }
+
+    struct fs* p_fs = fst + devices[red_dev].dev_fs;
+    ino_t par_ino = p_fs->fs_lookup(red_ino, "..", &devices[red_dev].dev_info);
+    kAssert(par_ino != 0);
 
     size_t d;
     for (d = 0; d < NDEV && !devices[d].dev_free; d++);
 
-	struct device* dv = devices + d;
+    struct device* dv = devices + d;
     if (d == NDEV || !fst[m_fst].fs_mnt(partition, &dv->dev_info)) {
         klogf(Log_error, "vfs", "failed to mount %s", path);
         kpanic("Failed mounting");
@@ -171,13 +171,13 @@ int vfs_mount(const char *path, uint8_t m_fst, void *partition) {
     dv->dev_fs         = m_fst;
     dv->dev_free       = 0;
 
-	dv->dev_parent_dev = red_dev;
-	dv->dev_parent_red = red_ino;
-	dv->dev_parent_ino = par_ino;
-	
-	dv->dev_childs     = ~(dev_t)0;
-	dv->dev_sib        = devices[red_dev].dev_childs;
-	devices[red_dev].dev_childs = d;
+    dv->dev_parent_dev = red_dev;
+    dv->dev_parent_red = red_ino;
+    dv->dev_parent_ino = par_ino;
+
+    dv->dev_childs     = ~(dev_t)0;
+    dv->dev_sib        = devices[red_dev].dev_childs;
+    devices[red_dev].dev_childs = d;
 
     klogf(Log_info, "vfs", "%s sucessfully mounted (device %d)", path, d);
     return d;
@@ -199,18 +199,18 @@ vfile_t *vfs_load(const char *filename, int flags) {
     if (!filename || !*filename) return NULL;
 
     ino_t ino    = cur_proc()->p_cino;
-	dev_t dev_id = cur_proc()->p_dev; 
-	
-	if (!vfs_find(filename, filename + strlen(filename), &dev_id, &ino)) {
+    dev_t dev_id = cur_proc()->p_dev;
+
+    if (!vfs_find(filename, filename + strlen(filename), &dev_id, &ino)) {
         set_errno(ENOENT);
         klogf(Log_info, "vfs", "file '%s' dont exists", filename);
         return 0;
-	}
+    }
 
     struct device *dev = devices + dev_id;
     struct fs      *fs = fst + dev->dev_fs;
     struct stat st;
-	fs->fs_stat(ino, &st, &dev->dev_info);
+    fs->fs_stat(ino, &st, &dev->dev_info);
 
     // TODO : follow symlink in find
     if ((st.st_mode&0xf000) == TYPE_SYM) {
@@ -334,29 +334,29 @@ int vfs_close(vfile_t *vf) {
 
 ino_t vfs_create(const char *fullname, mode_t perm) {
     ino_t par_ino = cur_proc()->p_cino;
-	dev_t par_dev = cur_proc()->p_dev; 
-    
+    dev_t par_dev = cur_proc()->p_dev;
+
     klogf(Log_info, "vfs", "create %s", fullname);
-	
-	// extract parent name from full name
+
+    // extract parent name from full name
     const char *parent_end = strrchr(fullname, '/');
-	const char *filename   = parent_end + 1;
-	if (!parent_end)
-		filename = fullname;
-	else if (!vfs_find(fullname, parent_end, &par_dev, &par_ino)) {
+    const char *filename   = parent_end + 1;
+    if (!parent_end)
+        filename = fullname;
+    else if (!vfs_find(fullname, parent_end, &par_dev, &par_ino)) {
         set_errno(ENOENT);
         klogf(Log_error, "vfs", "can't find parent of %s", fullname);
         return 0;
-	}
+    }
 
     struct device *dev = devices + par_dev;
     struct fs      *fs = fst + dev->dev_fs;
     struct stat     st;
-	fs->fs_stat(par_ino, &st, &dev->dev_info);
+    fs->fs_stat(par_ino, &st, &dev->dev_info);
 
     if (!(st.st_mode & TYPE_DIR)) {
         klogf(Log_error, "vfs", "alloc: %s parent is not a directory",
-				fullname);
+                fullname);
         return 0;
 
     }
