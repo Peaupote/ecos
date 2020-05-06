@@ -65,8 +65,6 @@ static void do_update_cwd() {
 }
 
 int run_prompt() {
-    printf("ecos-shell version 0.1\n");
-
 	int   buf_rem = 0;
 	char* buf = NULL;
 
@@ -211,22 +209,13 @@ int run_file(int argc, char* argv[]) {
 		var_set(name, strdup(argv[i]));
 	}
 
-	int st = 0;
-	ecmd_2_t* ecmd = exec_cmd_3_down(cmd, mk_ecmd_st(), &st);
-	if (ecmd) {
-		ecmd->num  = next_cmd_num++;
-		ecmd->next = ecmd_llist;
-		ecmd_llist = ecmd;
-		if (!run_fg(&st)) {
-			return 0;//TODO
-		}
-	}
-	return st;
+	return start_sub(cmd, true);
 }
 
 int main(int argc, char* argv[]) {
 	init_builtins();
 	int argi = 1;
+	bool display_msg = true;
 	while (argi < argc) {
 		char* arg = argv[argi];
 		if (arg[0] != '-') break;
@@ -255,6 +244,9 @@ int main(int argc, char* argv[]) {
 									argv + argi + 1);
 						}
 						return 2;
+					case 't':
+						display_msg = false;
+						continue;
 				}
 				fprintf(stderr, "sh: option non reconnue: %c\n", *c);
 				return 2;
@@ -262,8 +254,9 @@ int main(int argc, char* argv[]) {
 		}
 	}
 	init_parse();
-	if (argi >= argc)
+	if (argi >= argc) {
+		if (display_msg) printf("ecos-shell\n");
 		return run_prompt();
-	else
+	} else
 		return run_file(argc - argi, argv + argi);
 }

@@ -258,6 +258,12 @@ int printf(const char *fmt, ...) {
 #endif
 
 static void
+nprint(void* none __attribute__((unused)),
+	const char *s __attribute__((unused)),
+	size_t    len __attribute__((unused))) {
+	return;
+}
+static void
 sprint(void *ptr, const char *s, size_t len) {
     char **str = (char**)ptr;
     while (len--) {
@@ -266,11 +272,17 @@ sprint(void *ptr, const char *s, size_t len) {
 }
 
 int sprintf(char *str, const char *fmt, ...) {
-    if (!str) return 0;
+    if (!str) {
+		va_list params;
+		va_start(params, fmt);
+		int cnt = fpprintf(&nprint, NULL, fmt, params);
+		va_end(params);
+		return cnt;
+	}
 
     va_list params;
     va_start(params, fmt);
-    int cnt = fpprintf(&sprint, &str, fmt, params);
+	int cnt = fpprintf(&sprint, &str, fmt, params);
     *str = 0;
     va_end(params);
 

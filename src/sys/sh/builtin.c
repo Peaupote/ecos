@@ -64,7 +64,7 @@ int blti_read(int argc, char **args, int fd_in) {
 		buf.sz -= 256 - rc;
 		for (int i = 0; i < rc; ++i) {
 			if (seg[i] == '\n') {
-				lseek(fd_in, -rc+i+1, SEEK_CUR);
+				lseek(fd_in, -rc + i+1, SEEK_CUR);
 				seg[i] = '\0';
 
 				char* sv;

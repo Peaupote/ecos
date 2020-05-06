@@ -15,7 +15,7 @@ struct kwent {
 #define KEYWORD_MAX_LEN 5
 #define KEYWORD_HT_MOD  32
 #define G(K) static struct kwent kw_##K ={.next=0,.kw=KW_##K,.name=#K};
-G(while)G(do)G(done)G(if)G(then)G(elif)G(else)G(fi)
+G(while)G(do)G(done)G(if)G(then)G(elif)G(else)G(fi)G(for)G(in)
 #undef G
 static struct kwent* kw_ht[KEYWORD_HT_MOD] = {0};
 static void add_kw(struct kwent* e) {
@@ -32,6 +32,8 @@ void init_parse() {
 	add_kw(&kw_elif);
 	add_kw(&kw_else);
 	add_kw(&kw_fi);
+	add_kw(&kw_for);
+	add_kw(&kw_in);
 }
 static int find_kw(const char* k) {
 	unsigned char h = hash_str8(k, 0) % KEYWORD_HT_MOD;
@@ -183,6 +185,38 @@ static inline bool is_varname_char(char c) {
 		case '{': case '}': return false;
 		default:
 			return c > ' ' && c <= '~';
+	}
+}
+
+static inline char* read_varname(src_t* s) {
+	cbuf_t buf;
+	cbuf_init(&buf, 32);
+	switch(s->pkty) {
+		case PEEK_WDR: return NULL;
+		case PEEK_KW: {
+			cbuf_init(&buf, 32);
+			size_t len = strlen(s->peekw);
+			cbuf_putn(&buf, s->peekw, len);
+			free(s->peekw);
+			s->peekw = NULL;
+			s->pkty  = PEEK_W0;
+		} break;
+		case PEEK_W0:
+			cbuf_init(&buf, 32);
+			wait_nspace(s);
+		break;
+	}
+	char c;
+	while (is_varname_char(c = peek_1(s))) {
+		peek_vald(s, 1);
+		cbuf_put(&buf, c);
+	}
+	if (buf.sz) {
+		cbuf_put(&buf, '\0');
+		return cbuf_shrink(&buf);
+	} else {
+		cbuf_destr(&buf);
+		return NULL;
 	}
 }
 
@@ -371,6 +405,29 @@ static void keyw_vald(src_t* s) {
 	}
 }
 
+static int read_words(src_t* s, char** rt) {
+	cbuf_t buf;
+	cbuf_init(&buf, 256);
+	int rts = read_word1(s, &buf, false);
+	if (rts) {
+		cbuf_destr(&buf);
+		return rts;
+	}
+
+	do {
+		cbuf_put(&buf, ' ');
+	} while (!(rts = read_word1(s, &buf, false)));
+	
+	if (rts > 1) {
+		cbuf_destr(&buf);
+		return rts;
+	}
+
+	buf.c[buf.sz - 1] = '\0';
+	*rt = cbuf_shrink(&buf);
+	return 0;
+}
+
 int parse_cmd_0(src_t* s, cmd_0_t* rt) {
 	wait_nspace(s);
 	if (!s->pkty && peek_1(s) == '(') {
@@ -398,24 +455,7 @@ int parse_cmd_0(src_t* s, cmd_0_t* rt) {
 	}
 
 	rt->ty = C_BAS;
-	cbuf_t buf;
-	cbuf_init(&buf, 256);
-	int rts = read_word1(s, &buf, false);
-	if (rts) {
-		cbuf_destr(&buf);
-		return rts;
-	}
-
-	do {
-		cbuf_put(&buf, ' ');
-	} while (!(rts = read_word1(s, &buf, false)));
-	if (rts > 1) {
-		cbuf_destr(&buf);
-		return rts;
-	}
-	buf.c[buf.sz - 1] = '\0';
-	rt->bas = cbuf_shrink(&buf);
-	return 0;
+	return read_words(s, &rt->bas);
 }
 
 bool parse_fd(const char* wd, int* rt) {
@@ -680,6 +720,34 @@ int parse_cmd_3a(src_t* s, cmd_3_t** rt) {
 						return ERR(s);
 				}
 			}
+		}
+		case KW_for: {
+			keyw_vald(s);
+			cmd_3_t *bdy;
+			char *var = NULL, *wds = NULL;
+			char c;
+			if (!(var = read_varname(s))
+			||  read_keyw(s) != KW_in
+			||  (keyw_vald(s), read_words(s, &wds) > 1)
+			||  !wait_conj(s) 
+			||  (c = peek_1(s), c != '\n' && c != ';')
+			||  (peek_vald(s, 1), read_keyw(s) != KW_do)
+			||  (keyw_vald(s), parse_cmd_3c(s, &bdy) > 1)
+			||  read_keyw(s) != KW_done) {
+				if (var) free(var);
+				if (wds) free(wds);
+				destr_cmd_3nl(&bdy);
+				return ERR(s);
+			}
+			keyw_vald(s);
+
+			cmd_3_t* r  = *rt = malloc(sizeof(cmd_3_t));
+			r->ty       = C_FOR;
+			r->cfor.var = var;
+			r->cfor.wds = wds;
+			r->cfor.bdy = set_child_i(r, bdy, 0);
+
+			return ev_reds3(s, rt);
 		}
 	}
 

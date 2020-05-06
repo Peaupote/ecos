@@ -20,8 +20,7 @@ var_t* var_set(const char* name, char* val) {
 			return it;
 		}
 	var_t* v = malloc(sizeof(var_t));
-	v->name  = malloc(strlen(name) + 1);
-	strcpy(v->name, name);
+	v->name  = strdup(name);
 	v->val   = val;
 	v->next  = lvars[h];
 	return lvars[h] = v;
@@ -94,29 +93,31 @@ ecmd_2_t** on_child_end(pid_t pid, int st) {
 
 static bool int_tstp;
 
-void int_handler(int signum __attribute__((unused))) {
+static void broadcast(int signum) {
 	ecmd_2_t* fgc = ecmd_llist;
 	size_t   cmdc = fgc->c->cm2.cmdc;
     for (size_t i = 0; i < cmdc; ++i)
-        if (~fgc->procs[i].pid && kill(fgc->procs[i].pid, SIGINT))
-            perror("error sending SIGINT");
+        if (~fgc->procs[i].pid && kill(fgc->procs[i].pid, signum))
+            perror("error broadcasting signal");
+}
+
+void int_handler(int signum __attribute__((unused))) {
+	broadcast(SIGINT);
 }
 void tstp_handler(int signum __attribute__((unused))) {
-	ecmd_2_t* fgc = ecmd_llist;
-	size_t   cmdc = fgc->c->cm2.cmdc;
-    for (size_t i = 0; i < cmdc; ++i)
-        if (~fgc->procs[i].pid && kill(fgc->procs[i].pid, SIGTSTP))
-            perror("error sending SIGSTP");
+	broadcast(SIGTSTP);
     int_tstp = true;
 }
 
-void bg_int_handler(int signum __attribute__((unused))) {
-	ecmd_2_t* fgc = ecmd_llist;
-	size_t   cmdc = fgc->c->cm2.cmdc;
-    for (size_t i = 0; i < cmdc; ++i)
-        if (~fgc->procs[i].pid && kill(fgc->procs[i].pid, SIGINT))
-            perror("error sending SIGINT");
+void sub_int_handler(int signum __attribute__((unused))) {
+	broadcast(SIGINT);
 	exit(1);
+}
+void sub_tstp_handler(int signum __attribute__((unused))) {
+	broadcast(SIGTSTP);
+}
+void sub_cont_handler(int signum __attribute__((unused))) {
+	broadcast(SIGCONT);
 }
 
 // --Exécution--
@@ -540,14 +541,13 @@ ecmd_2_t* exec_cmd_2(const cmd_2_t* c2, ecmd_st* st) {
 				exit(blti->fun(argc, args));
 
 			switch (c->c.ty) {
-			case C_BAS:
-				execvp(args[0], (const char**)args);
-				perror(args[0]);
-				exit(1);
-			case C_SUB:
-				if (!c->c.sub) exit(0);
-				start_sub(c->c.sub, true);
-				break;
+				case C_BAS:
+					execvp(args[0], (const char**)args);
+					perror(args[0]);
+					exit(1);
+				case C_SUB:
+					if (!c->c.sub) exit(0);
+					exit(start_sub(c->c.sub, true));
 			}
 			exit(2);
 
@@ -581,12 +581,12 @@ ecmd_st* mk_ecmd_st() {
 	return rt;
 }
 
-void start_sub(const cmd_3_t* c3, bool keep_stdin) {
+int start_sub(const cmd_3_t* c3, bool keep_stdin) {
 	if (!keep_stdin) {
 		int nfd = open("/proc/null", O_RDONLY, 0640);
 		if (nfd < 0) {
 			perror("sh /proc/null");
-			exit(1);
+			return 1;
 		}
 		if (!~dup2(nfd, STDIN_FILENO)) exit(1);
 		close(nfd);
@@ -594,8 +594,7 @@ void start_sub(const cmd_3_t* c3, bool keep_stdin) {
 
 	int st;
 	ecmd_2_t* ecmd = exec_cmd_3_down(c3, mk_ecmd_st(), &st);
-	if (ecmd) exit(run_sub(ecmd));
-	else      exit(st);
+	return ecmd ? run_sub(ecmd) : st;
 }
 
 int exec_cmd_3_bg(const cmd_3_t* c3) {
@@ -621,7 +620,7 @@ int exec_cmd_3_bg(const cmd_3_t* c3) {
 		exit(0);
 
 	// enfant 1: sous-shell
-	start_sub(c3, false);
+	exit(start_sub(c3, false));
 }
 
 ecmd_2_t* exec_cmd_3_up(const cmd_3_t* c3, ecmd_st* st,
@@ -651,7 +650,7 @@ ecmd_2_t* exec_cmd_3_up(const cmd_3_t* c3, ecmd_st* st,
 					if (c_st) {
 						ecmd_stack_t* stk = st->stack;
 						st->stack = stk->up;
-						c_st = stk->loop_last_st;
+						c_st = stk->loop.last_st;
 						free(stk);
 						break;
 					}
@@ -659,7 +658,7 @@ ecmd_2_t* exec_cmd_3_up(const cmd_3_t* c3, ecmd_st* st,
 							c3->whl.bdy ? c3->whl.bdy : c3->whl.cnd,
 							st, r_st);
 				} else {
-					st->stack->loop_last_st = c_st;
+					st->stack->loop.last_st = c_st;
 					return exec_cmd_3_down(
 							c3->whl.cnd ? c3->whl.cnd : c3->whl.bdy,
 							st, r_st);
@@ -672,6 +671,20 @@ ecmd_2_t* exec_cmd_3_up(const cmd_3_t* c3, ecmd_st* st,
 					else c_st = 0;
 				}
 			break;
+			case C_FOR: {
+				ecmd_stack_t* stk = st->stack;
+				stk->loop.last_st = c_st;
+				++stk->loop.it;
+				if (stk->loop.it < stk->loop.nbw) {
+					var_set(c3->cfor.var, stk->loop.wds[stk->loop.it]);
+					return exec_cmd_3_down(c3->cfor.bdy, st, r_st);
+				} else {
+					st->stack = stk->up;
+					// on ne free pas chaque mot a cause de var_set
+					free(stk->loop.wds);
+					free(stk);
+				}
+			}
 		}
 		sibnum = c3->sibnum;
 	}
@@ -714,7 +727,7 @@ ecmd_2_t* exec_cmd_3_down(const cmd_3_t* c3, ecmd_st* st,
 					ecmd_stack_t* stk = malloc(sizeof(ecmd_stack_t));
 					stk->up   = st->stack;
 					st->stack = stk;
-					stk->loop_last_st = 0;
+					stk->loop.last_st = 0;
 					c3 = c3->whl.cnd ? c3->whl.cnd : c3->whl.bdy;
 					break;
 				}
@@ -725,6 +738,28 @@ ecmd_2_t* exec_cmd_3_down(const cmd_3_t* c3, ecmd_st* st,
 					c3 = c3->cif.brs[0];
 				else return exec_cmd_3_up(c3, st, r_st, 0);
 			break;
+			case C_FOR:
+				if (!c3->cfor.bdy)
+					return exec_cmd_3_up(c3, st, r_st, 0);
+				else {
+					pbuf_t buf;
+					pbuf_init(&buf, 8);
+					expand(c3->cfor.wds, &buf);
+					if (!buf.sz) {
+						pbuf_destr(&buf);
+						return exec_cmd_3_up(c3, st, r_st, 0);
+					}
+					ecmd_stack_t* stk = malloc(sizeof(ecmd_stack_t));
+					stk->up   = st->stack;
+					st->stack = stk;
+					stk->loop.last_st = 0;
+					stk->loop.it  = 0;
+					stk->loop.nbw = buf.sz;
+					stk->loop.wds = pbuf_shrink(&buf);
+
+					var_set(c3->cfor.var, stk->loop.wds[0]);
+					c3 = c3->cfor.bdy;
+				}
 		}
 	}
 }
@@ -788,7 +823,10 @@ int run_sub(ecmd_2_t* ecmd) {
 		ecmd_llist = ecmd;
 		int_tstp = false;
 		sighandler_t
-			prev_hnd_int  = signal(SIGINT,  &bg_int_handler);
+			prev_hnd_int  = signal(SIGINT,  &sub_int_handler),
+			prev_hnd_tstp = signal(SIGTSTP, &sub_int_handler),
+			prev_hnd_cont = signal(SIGCONT, &sub_int_handler);
+
 
 		int rs;
 		pid_t wpid;
@@ -798,6 +836,8 @@ int run_sub(ecmd_2_t* ecmd) {
 		}
 
 		signal(SIGINT,  prev_hnd_int);
+		signal(SIGTSTP, prev_hnd_tstp);
+		signal(SIGCONT, prev_hnd_cont);
 
 		int st;
 		ecmd_2_t* ccm = continue_job(ecmd, &st);

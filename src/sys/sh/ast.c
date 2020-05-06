@@ -69,18 +69,22 @@ void destr_cmd_3(cmd_3_t* c) {
 				destr_cmd_3_r(c->childs + i);
 		break;
 		case C_RED:
-			if (c->red.c) destr_cmd_3_r(&c->red.c);
+			destr_cmd_3nl(&c->red.c);
 			destr_red_list(&c->red.r);
 		break;
 		case C_WHL:
-			if (c->whl.cnd) destr_cmd_3_r(&c->whl.cnd);
-			if (c->whl.bdy) destr_cmd_3_r(&c->whl.bdy);
+			destr_cmd_3nl(&c->whl.cnd);
+			destr_cmd_3nl(&c->whl.bdy);
 		break;
 		case C_IF:
-			if (c->cif.cnd) destr_cmd_3_r(&c->cif.cnd);
+			destr_cmd_3nl(&c->cif.cnd);
 			for (uint8_t i = 0; i < 2; ++i)
-				if (c->cif.brs[i])
-					destr_cmd_3_r(c->cif.brs + i);
+				destr_cmd_3nl(c->cif.brs + i);
+		break;
+		case C_FOR:
+			destr_cmd_3nl(&c->cfor.bdy);
+			free(c->cfor.wds);
+			free(c->cfor.var);
 		break;
 	}
 }
@@ -185,6 +189,12 @@ void pp_cmd_3(FILE* f, char lvl, const cmd_3_t* c) {
 			fwrite(";else ", 1, 6, f);
 			if (c->cif.brs[1]) pp_cmd_3(f, 'c', c->cif.brs[1]);
 			fwrite(";fi ", 1, 4, f);
+			break;
+		case C_FOR:
+			fprintf(f, "for %s in %s", c->cfor.var, c->cfor.wds);
+			fwrite(";do ", 1, 4, f);
+			if (c->cfor.bdy) pp_cmd_3(f, 'c', c->cfor.bdy);
+			fwrite(";done ", 1, 6, f);
 			break;
 	}
 }

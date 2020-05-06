@@ -14,6 +14,7 @@ enum keywords {
 	KW_group_bg, // {
 	KW_while,
 	KW_if,
+	KW_for,
 	// KW provoquant une montée
 	KW_group_ed, // }
 	KW_do,
@@ -21,7 +22,8 @@ enum keywords {
 	KW_then,
 	KW_elif,
 	KW_else,
-	KW_fi
+	KW_fi,
+	KW_in
 };
 
 enum redir_ty {
@@ -66,7 +68,7 @@ typedef struct {
 } cmd_2_t;
 
 enum cmd_3_ty {
-	C_CM2, C_SEQ, C_AND, C_OR, C_BG, C_RED, C_WHL, C_IF
+	C_CM2, C_SEQ, C_AND, C_OR, C_BG, C_RED, C_WHL, C_IF, C_FOR
 };
 typedef struct cmd_3{
 	enum cmd_3_ty ty;
@@ -87,6 +89,11 @@ typedef struct cmd_3{
 			struct cmd_3* cnd;    // may be NULL
 			struct cmd_3* brs[2]; // may be NULL
 		} cif;
+		struct {
+			struct cmd_3* bdy; // may be NULL
+			char*         var;
+			char*         wds;
+		} cfor;
 	};
 } cmd_3_t;
 
@@ -101,7 +108,12 @@ typedef struct ecmd_stack {
 	struct ecmd_stack* up;
 	union {
 		ecmd_stack_red_t red;
-		int     loop_last_st;
+		struct {
+			int    last_st;
+			int    it;
+			int    nbw;
+			char** wds;
+		} loop;
 	};
 } ecmd_stack_t;
 typedef struct {
@@ -280,8 +292,7 @@ var_t*     find_lvar(const char* name);
 char*      get_var(const char* name);
 var_t*     arg_var_assign(char* arg);
 ecmd_2_t*  exec_cmd_2(const cmd_2_t* c2, ecmd_st* st);
-__attribute__((noreturn))
-void       start_sub(const cmd_3_t* c3, bool keep_stdin);
+int        start_sub(const cmd_3_t* c3, bool keep_stdin);
 int        exec_cmd_3_bg(const cmd_3_t* c3);
 ecmd_2_t*  exec_cmd_3_down(const cmd_3_t* c3, ecmd_st* st, int* r_st);
 ecmd_2_t*  exec_cmd_3_up(const cmd_3_t* c3, ecmd_st* st,

@@ -15,6 +15,7 @@ cmd_3a = <cmd_2>
 	     ( elif <cmd_3c> ; then <cmd_3c> ; )*
 		 ( else <cmd_3c> ; )?
 		 fi <redirections>
+	   | for var in words ; do <cmd_3c> ; done
 
 
 cmd_3b = <cmd_3a>

@@ -21,8 +21,10 @@ int main() {
 			//On est désormais en ring 3
 			setpriority(-15);
 
-			const char *args[1] = { 0 };
-			execv("/bin/sh", args);
+			const char arg0[] = "/bin/sh";
+			const char arg1[] = "-t";
+			const char *args[2] = { arg0, arg1 };
+			execv(arg0, args);
 			perror("init1 - exec sh");
 			return 1;
 		}
