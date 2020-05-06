@@ -46,40 +46,41 @@ void destr_cmd_2(cmd_2_t* ptr) {
 	ptr->cmds = NULL;
 }
 
+static void destr_cmd_3_r(cmd_3_t** c) {
+	destr_cmd_3(*c);
+	free(*c);
+	*c = NULL;
+}
+
+void destr_cmd_3nl(cmd_3_t** c) {
+	if (*c) {
+		destr_cmd_3(*c);
+		free(*c);
+		*c = NULL;
+	}
+}
+
 void destr_cmd_3(cmd_3_t* c) {
 	switch (c->ty) {
-		case C_CM2: destr_cmd_2(&c->cm2); break;
-		case C_BG:
-			destr_cmd_3(c->childs[0]);
-			free(c->childs[0]);
-			c->childs[0] = NULL;
-		break;
+		case C_CM2: destr_cmd_2(&c->cm2);    break;
+		case C_BG: destr_cmd_3_r(c->childs); break;
 		case C_SEQ: case C_AND: case C_OR:
-			for (uint8_t i=0; i < 2; ++i) {
-				destr_cmd_3(c->childs[i]);
-				free(c->childs[i]);
-				c->childs[i] = NULL;
-			}
+			for (uint8_t i = 0; i < 2; ++i)
+				destr_cmd_3_r(c->childs + i);
 		break;
 		case C_RED:
-			if (c->red.c) {
-				destr_cmd_3(c->red.c);
-				free(c->red.c);
-				c->red.c = NULL;
-			}
+			if (c->red.c) destr_cmd_3_r(&c->red.c);
 			destr_red_list(&c->red.r);
 		break;
 		case C_WHL:
-			if (c->whl.cnd) {
-				destr_cmd_3(c->whl.cnd);
-				free(c->whl.cnd);
-				c->whl.cnd = NULL;
-			}
-			if (c->whl.bdy) {
-				destr_cmd_3(c->whl.bdy);
-				free(c->whl.bdy);
-				c->whl.bdy = NULL;
-			}
+			if (c->whl.cnd) destr_cmd_3_r(&c->whl.cnd);
+			if (c->whl.bdy) destr_cmd_3_r(&c->whl.bdy);
+		break;
+		case C_IF:
+			if (c->cif.cnd) destr_cmd_3_r(&c->cif.cnd);
+			for (uint8_t i = 0; i < 2; ++i)
+				if (c->cif.brs[i])
+					destr_cmd_3_r(c->cif.brs + i);
 		break;
 	}
 }
@@ -129,6 +130,7 @@ void pp_cmd_3(FILE* f, char lvl, const cmd_3_t* c) {
 		case C_CM2:
 			pp_cmd_2(f, &c->cm2);
 			break;
+
 		case C_AND:
 			if (lvl < 'b') fwrite("{", 1, 1, f);
 			pp_cmd_3(f, 'b', c->childs[0]);
@@ -136,6 +138,7 @@ void pp_cmd_3(FILE* f, char lvl, const cmd_3_t* c) {
 			pp_cmd_3(f, 'a', c->childs[1]);
 			if (lvl < 'b') fwrite(";}", 1, 2, f);
 			break;
+
 		case C_OR:
 			if (lvl < 'b') fwrite("{", 1, 1, f);
 			pp_cmd_3(f, 'b', c->childs[0]);
@@ -143,6 +146,7 @@ void pp_cmd_3(FILE* f, char lvl, const cmd_3_t* c) {
 			pp_cmd_3(f, 'a', c->childs[1]);
 			if (lvl < 'b') fwrite(";}", 1, 2, f);
 			break;
+
 		case C_SEQ:
 			if (lvl < 'c') fwrite("{", 1, 1, f);
 			pp_cmd_3(f, 'c', c->childs[0]);
@@ -150,24 +154,37 @@ void pp_cmd_3(FILE* f, char lvl, const cmd_3_t* c) {
 			pp_cmd_3(f, 'c', c->childs[1]);
 			if (lvl < 'c') fwrite(";}", 1, 2, f);
 			break;
+
 		case C_BG:
 			if (lvl < 'c') fwrite("{", 1, 1, f);
 			pp_cmd_3(f, 'b', c->childs[0]);
 			fwrite(" & ", 1, 3, f);
 			if (lvl < 'c') fwrite(";}", 1, 2, f);
 			break;
+
 		case C_RED:
 			fwrite("{", 1, 1, f);
 			if (c->red.c) pp_cmd_3(f, 'c', c->red.c);
 			fwrite(";}", 1, 2, f);
 			pp_red_list(f, &c->red.r);
 			break;
+
 		case C_WHL:
 			fwrite("while ", 1, 6, f);
 			if (c->whl.cnd) pp_cmd_3(f, 'c', c->whl.cnd);
 			fwrite(";do ", 1, 4, f);
 			if (c->whl.bdy) pp_cmd_3(f, 'c', c->whl.bdy);
 			fwrite(";done ", 1, 6, f);
+			break;
+
+		case C_IF:
+			fwrite("if ", 1, 3, f);
+			if (c->cif.cnd) pp_cmd_3(f, 'c', c->cif.cnd);
+			fwrite(";then ", 1, 6, f);
+			if (c->cif.brs[0]) pp_cmd_3(f, 'c', c->cif.brs[0]);
+			fwrite(";else ", 1, 6, f);
+			if (c->cif.brs[1]) pp_cmd_3(f, 'c', c->cif.brs[1]);
+			fwrite(";fi ", 1, 4, f);
 			break;
 	}
 }

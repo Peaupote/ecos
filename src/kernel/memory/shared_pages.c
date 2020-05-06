@@ -30,7 +30,7 @@ void copy_page(uint64_t* src, uint64_t* dst, uint16_t lim) {
 			else {
 				uint64_t        sp_idx;
 				struct sptr_hd* sp_hd;
-				dst[i] = kmem_mk_shared(src + i, &sp_idx, &sp_hd);
+				dst[i] = kmem_mk_svalue(src + i, &sp_idx, &sp_hd);
 				sp_hd->count = 2;
 			}
 

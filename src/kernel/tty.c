@@ -707,7 +707,7 @@ size_t tty_writei(uint8_t num, const char* str, size_t len) {
 						for (int cbg = ++i; i < len; ++i) {
 							if (str[i] == 'm') {
 								interpret_color_code(str + cbg, i - cbg);
-								goto set_p_mode;
+								goto end_eseq;
 							} else if (str[i] == ';') {
 								interpret_color_code(str + cbg, i - cbg);
 								cbg = i + 1;
@@ -717,6 +717,7 @@ size_t tty_writei(uint8_t num, const char* str, size_t len) {
 						return t_ed;
 					break;
 				}
+				end_eseq:
 				t_bg = i + 1;
 			}
 		}

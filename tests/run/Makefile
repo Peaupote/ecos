@@ -8,10 +8,11 @@ include $(ROOT)/vars.Makefile
 export CC?=x86_64-elf-gcc
 export AS?=x86_64-elf-as
 
-CFILES=test.c test2.c test3.c test_printf.c
+CFILES=test.c test2.c test3.c test_printf.c test_args.c
 OUT=$(CFILES:.c=.out) test_reg.out
 SRCDEP=$(CFILES)
-CPFILES=test.c demo.sh
+CPFILES=test.c
+CPDIRS=sh
 INCLUDE_LIBC?=-I $(ROOT)/include/libc
 INCLUDES=-I $(ROOT)/include $(INCLUDE_LIBC)
 
@@ -24,11 +25,12 @@ INCLUDES=-I $(ROOT)/include $(INCLUDE_LIBC)
 %.out:%.c libc $(STARTO)
 	$(CC) $(FLAGS_UR) -o $@ $< $(STARTO) $(LINK_LC) $(INCLUDES) -lgcc
 
-home.img: $(OUT)
+home.img: $(OUT) $(CPFILES)
 	rm -rf home
 	mkdir -p home
 	mkdir -p home/test
 	@$(foreach f,$(CPFILES),cp "$(f)" "home/test/$(f)" &&) echo $(CPFILES)
+	@$(foreach d,$(CPDIRS),cp -r "$(d)" "home/test/$(d)" &&) echo $(CPDIRS)
 	@$(foreach o,$(OUT),cp "$(o)" "home/test/$(o:.out=)" &&) echo $(OUT)
 	$(ROOT)/tools/build-ext2.sh home home.img
 

@@ -90,171 +90,6 @@ ecmd_2_t** on_child_end(pid_t pid, int st) {
     return rf.cmd;
 }
 
-// --Builtins--
-
-int blti_exit(int argc, char** argv, int fd_in __attribute__((unused))) {
-	int st = argc > 1 ? atoi(argv[1]) : 0;
-	exit(st);
-}
-
-int blti_cd(int argc, char **argv, int fd_in __attribute__((unused))) {
-	char *dst;
-	if (argc == 1) {
-		dst = get_var("HOME");
-		if (!dst) {
-			fprintf(stderr, "HOME undefined\n");
-			return 1;
-		}
-	} else if (argc == 2)
-		dst = argv[1];
-	else {
-        fprintf(stderr, "usage: cd [dir]\n");
-        return 2;
-    }
-   
-	update_cwd = true;
-	int    rts = chdir(dst);
-	if (rts) {
-		perror("cd");
-		return 1;
-	}
-	return 0;
-}
-
-int blti_export(int argc __attribute__((unused)), char **args,
-		int fd_in __attribute__((unused)) ) {
-	int rts = 0;
-	for (char** arg = args + 1; *arg; ++arg) {
-		var_t* v = arg_var_assign(*arg);
-		if (!v && !(v=find_lvar(*arg))) {
-			if (!rts) rts = 2;
-			fprintf(stderr, "undefined: %s\n", *arg);
-			continue;
-		}
-		if (setenv(v->name, v->val, 1)) {
-			perror("export");
-			if (!rts) rts = 1;
-		}
-	}
-	return rts;
-}
-
-int blti_read(int argc, char **args, int fd_in) {
-	cbuf_t buf;
-	cbuf_init(&buf, 256);
-	char* seg = cbuf_mkn(&buf, 256);
-	int rc;
-	while ((rc = read(fd_in, seg, 256)) > 0) {
-		buf.sz -= 256 - rc;
-		for (int i = 0; i < rc; ++i) {
-			if (seg[i] == '\n') {
-				lseek(fd_in, -rc+i+1, SEEK_CUR);
-				seg[i] = '\0';
-
-				char* sv;
-				char* word = strtok_rnull(buf.c, " ", &sv);
-				for(int argi = 1; argi < argc; ++argi) {
-					if (word) {
-						char* v = malloc((strlen(word) + 1) * sizeof(char));
-						strcpy(v, word);
-						var_set(args[argi], v);
-					} else break;
-					word = strtok_rnull(NULL, " ", &sv);
-				}
-				cbuf_destr(&buf);
-				return 0;
-			}
-		}
-		seg = cbuf_mkn(&buf, 256);
-	}
-	cbuf_destr(&buf);
-	return 1;
-}
-
-bool blti_fg(int argc, char** args, int* st) {
-	int num;
-    if (argc != 2 || sscanf(args[1], "%d", &num) != 1) {
-		fprintf(stderr, "usage: fg cmd_num\n");
-		*st = 2;
-		return true;
-	}
-    ecmd_2_t** er = find_exd_num(num);
-    if (!er) {
-        fprintf(stderr, "Aucune commande corespondante: %d\n", num);
-        *st = 1;
-		return true;
-    }
-
-    ecmd_2_t* e = *er;
-    *er         = e->next;
-    e->next     = ecmd_llist;
-    ecmd_llist  = e;
-
-	printf("[%d]\t", e->num);
-	pp_cmd_3(stdout, 'c', cmd_top(e->c));
-	printf("\n");
-
-	size_t cmdc = e->c->cm2.cmdc;
-    for (size_t i = 0; i < cmdc; ++i)
-        if (~e->procs[i].pid && kill(e->procs[i].pid, SIGCONT))
-            perror("error sending SIGCONT");
-
-    return run_fg(st);
-}
-
-int blti_jobs(int argc __attribute__((unused)),
-		char** args __attribute__((unused))) {
-	
-	for (ecmd_2_t* e = ecmd_llist; e; e = e->next) {
-		printf("[%d]\t", e->num);
-		pp_cmd_3(stdout, 'c', cmd_top(e->c));
-		printf("\n");
-	}
-
-	return 0;
-}
-
-#define GEN_SBLTI(N, T, F, Y) \
-static char sblti_n_##N[] = #N;\
-static builtin_t sblti_##N = {.name = sblti_n_##N, .ty = T, .F = (Y)&blti_##N};
-#define GEN_SBLTI_ASYNC(N) GEN_SBLTI(N,BLTI_ASYNC,fun,builtin_f)
-#define GEN_SBLTI_SYNC(N) GEN_SBLTI(N,BLTI_SYNC,sfun,builtin_syf)
-#define GEN_SBLTI_TOP(N) GEN_SBLTI(N,BLTI_TOP,tfun,builtin_top)
-GEN_SBLTI_SYNC(exit)
-GEN_SBLTI_SYNC(cd)
-GEN_SBLTI_SYNC(export)
-GEN_SBLTI_SYNC(read)
-GEN_SBLTI_TOP(fg)
-GEN_SBLTI_ASYNC(jobs)
-#undef GEN_SBLTI_SYNC
-#undef GEN_SBLTI_TOP
-#undef GEN_SBLTI
-
-builtin_t* builtins[256] = {NULL};
-
-void add_builtin(builtin_t* b) {
-	unsigned char h = hash_str8(b->name, 0);
-	b->next         = builtins[h];
-	builtins[h]     = b;
-}
-
-void init_builtins() {
-	add_builtin(&sblti_exit);
-	add_builtin(&sblti_cd);
-	add_builtin(&sblti_export);
-	add_builtin(&sblti_read);
-	add_builtin(&sblti_fg);
-	add_builtin(&sblti_jobs);
-}
-
-builtin_t* find_builtin(const char* name) {
-	unsigned char h = hash_str8(name, 0);
-	for (builtin_t* it = builtins[h]; it; it = it->next)
-		if (!strcmp(name, it->name))
-			return it;
-	return NULL;
-}
-
 // --Gestion des interruptions--
 
 static bool int_tstp;
@@ -798,7 +633,7 @@ ecmd_2_t* exec_cmd_3_up(const cmd_3_t* c3, ecmd_st* st,
 			case C_CM2:
 				fprintf(stderr, "Erreur de structure cmd3\n");
 				break;
-			case C_BG: return NULL;
+			case C_BG: *r_st = c_st; return NULL;
 			case C_SEQ:
 				if (sibnum) break;
 				return exec_cmd_3_down(c3->childs[1], st, r_st);
@@ -813,11 +648,30 @@ ecmd_2_t* exec_cmd_3_up(const cmd_3_t* c3, ecmd_st* st,
 				break;
 			case C_WHL:
 				if (sibnum == 0) {
-					if (c_st) break;
-					else if (c3->whl.bdy)
-						return exec_cmd_3_down(c3->whl.bdy, st, r_st);
+					if (c_st) {
+						ecmd_stack_t* stk = st->stack;
+						st->stack = stk->up;
+						c_st = stk->loop_last_st;
+						free(stk);
+						break;
+					}
+					return exec_cmd_3_down(
+							c3->whl.bdy ? c3->whl.bdy : c3->whl.cnd,
+							st, r_st);
+				} else {
+					st->stack->loop_last_st = c_st;
+					return exec_cmd_3_down(
+							c3->whl.cnd ? c3->whl.cnd : c3->whl.bdy,
+							st, r_st);
 				}
-				return exec_cmd_3_down(c3, st, r_st);
+			case C_IF:
+				if (sibnum == 0) {
+					uint8_t b = c_st ? 1 : 0;
+					if (c3->cif.brs[b])
+						return exec_cmd_3_down(c3->cif.brs[b], st, r_st);
+					else c_st = 0;
+				}
+			break;
 		}
 		sibnum = c3->sibnum;
 	}
@@ -826,6 +680,7 @@ ecmd_2_t* exec_cmd_3_up(const cmd_3_t* c3, ecmd_st* st,
 	cmd_3_t* d3 = (cmd_3_t*)c3;
 	destr_cmd_3(d3);
 	free(d3);
+	*r_st = c_st;
 	return NULL;
 }
 
@@ -852,13 +707,24 @@ ecmd_2_t* exec_cmd_3_down(const cmd_3_t* c3, ecmd_st* st,
 				c3 = c3->red.c;
 				break;
 			case C_WHL:
-				if (c3->whl.cnd)      c3 = c3->whl.cnd;
-				else if (c3->whl.bdy) c3 = c3->whl.bdy;
-				else {
+				if (!c3->whl.cnd && !c3->whl.bdy) {
 					fprintf(stderr, "null loop\n");
 					return exec_cmd_3_up(c3, st, r_st, 2);
+				} else {
+					ecmd_stack_t* stk = malloc(sizeof(ecmd_stack_t));
+					stk->up   = st->stack;
+					st->stack = stk;
+					stk->loop_last_st = 0;
+					c3 = c3->whl.cnd ? c3->whl.cnd : c3->whl.bdy;
+					break;
 				}
-				break;
+			case C_IF:
+				if (c3->cif.cnd)
+					c3 = c3->cif.cnd;
+				else if (c3->cif.brs[0])
+					c3 = c3->cif.brs[0];
+				else return exec_cmd_3_up(c3, st, r_st, 0);
+			break;
 		}
 	}
 }

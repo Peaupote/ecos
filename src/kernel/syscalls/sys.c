@@ -155,18 +155,19 @@ pid_t sys_fork() {
         pp->p_fchd = fpid;
     }
 
-    fp->p_fchd  = PID_NONE;
-    fp->p_nchd  = 0;
-    fp->p_stat  = RUN;
-    fp->p_ring  = pp->p_ring;
-    fp->p_prio  = pp->p_prio;
-    fp->p_brk   = pp->p_brk;
-	fp->p_brkm  = pp->p_brkm;
-    fp->p_spnd  = 0;
-    fp->p_shnd  = pp->p_shnd;
-    fp->p_errno = pp->p_errno;
-    fp->p_cino  = pp->p_cino;
-    fp->p_dev   = pp->p_dev;
+    fp->p_fchd   = PID_NONE;
+    fp->p_nchd   = 0;
+    fp->p_stat   = RUN;
+    fp->p_ring   = pp->p_ring;
+    fp->p_prio   = pp->p_prio;
+    fp->p_brk    = pp->p_brk;
+	fp->p_brkm   = pp->p_brkm;
+    fp->p_spnd   = 0;
+    fp->p_shnd   = pp->p_shnd;
+    fp->p_errno  = pp->p_errno;
+	fp->p_werrno = pp->p_werrno;
+    fp->p_cino   = pp->p_cino;
+    fp->p_dev    = pp->p_dev;
 
     pp->p_nchd++; // one more child
     memcpy(&fp->p_reg, &pp->p_reg, sizeof(struct reg));

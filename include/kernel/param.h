@@ -27,3 +27,6 @@
 
 // Quantité maximale de mémoire qu'un processus peut allouer avec sbrk
 #define PROC_MAX_BRK 0x100000 //1MB
+
+// Nombre maximal de #! qu'execve peut suivre
+#define EXECVE_FOLLOW_MAX 10

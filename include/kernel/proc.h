@@ -108,6 +108,7 @@ typedef struct proc {
     struct proc_shnd p_shnd;
 
     int*             p_errno;    // pointer to errno of libc
+	int              p_werrno;   // waiting errno
 } proc_t;
 
 /**
@@ -274,6 +275,7 @@ void kill_proc(int status);
 
 __attribute__((noreturn))
 void wait_file(pid_t pid, cid_t cid);
+
 //
 
 static inline pid_t find_new_pid() {
@@ -315,7 +317,7 @@ void proc_execve_abort(pid_t aux_pid);
 static inline void* make_proc_stack() {
     *kmem_acc_pts_entry(paging_add_lvl(pgg_pd, USER_STACK_PD),
                             pgg_pd, PAGING_FLAG_U | PAGING_FLAG_W)
-        = SPAGING_FLAG_P | PAGING_FLAG_W | PAGING_FLAG_U;
+        = SPAGING_ALLOC | PAGING_FLAG_W | PAGING_FLAG_U;
     return (void*)paging_add_lvl(pgg_pd, USER_STACK_PD + 1);
 }
 

@@ -22,6 +22,12 @@
 // numéro du spg_info
 #define SPAGING_INFO_SHIFT 11
 
+#define SPAGING_SHARED   (SPAGING_FLAG_V|PAGING_FLAG_P)
+#define SPAGING_ALLOC    SPAGING_FLAG_P
+#define SPAGING_ALLOC0   SPAGING_FLAG_V
+#define SPAGING_VALUE(I) (((I)<<SPAGING_INFO_SHIFT)\
+							|SPAGING_FLAG_V|SPAGING_FLAG_P)
+
 uint8_t handle_PF(uint_ptr fault_vaddr);
 
 // Prépare un nouveau paging avec copie des pages lors de l'accès
@@ -36,14 +42,12 @@ void    kmem_free_paging(phy_addr old_pml4, phy_addr new_pml4);
 void    kmem_free_paging_range(uint64_t* page_bg,
 				enum pgg_level lvl, uint16_t lim);
 
-static inline uint64_t kmem_mk_shared(uint64_t* e, 
+static inline uint64_t kmem_mk_svalue(uint64_t* e, 
 					uint64_t* sp_idx, struct sptr_hd** sp_hd) {
 	*sp_idx        = sptr_alloc();
 	*sp_hd         = sptr_at(*sp_idx);
 	(*sp_hd)->addr = (*e) & PAGE_MASK;
-	return *e = ((*sp_idx) << SPAGING_INFO_SHIFT)
-			   | SPAGING_FLAG_P | SPAGING_FLAG_V
-			   | ((*e) & SPAGING_FLAGS_1);
+	return *e = SPAGING_VALUE(*sp_idx) | ((*e) & SPAGING_FLAGS_1);
 }
 
 #endif

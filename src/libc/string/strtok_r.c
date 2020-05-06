@@ -18,7 +18,7 @@ char *strtok_r(char *src, const char *delim, char** saveptr) {
     return rt;
 }
 
-char *strtok_rnull(char *src, const char *delim, char** saveptr) {
+char *strtok_rnul(char *src, const char *delim, char** saveptr) {
     char* it = src ? src : *saveptr;
     char   c = *it;
     //On enlève les délimiteurs au début du token

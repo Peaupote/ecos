@@ -9,7 +9,7 @@
 #include <fs/ext2.h>
 
 static void ls (char** tokpt) {
-    char* arg1 = strtok_rnull(NULL, " ", tokpt);
+    char* arg1 = strtok_rnul(NULL, " ", tokpt);
     if (!arg1) return;
 
 	vfile_t *vf = vfs_load(arg1, 0);
@@ -95,7 +95,7 @@ static uint_ptr read_ptr(const char str[]) {
  * */
 static void change_log(char** tokpt) {
 	char* arg;
-	while ((arg = strtok_rnull(NULL, " ", tokpt))) {
+	while ((arg = strtok_rnul(NULL, " ", tokpt))) {
 		if (arg[0] == '-') {
 			switch(arg[1]) {
 				case 'e':
@@ -121,24 +121,24 @@ static void change_log(char** tokpt) {
 }
 
 static void builtin_info(char** tokpt) {
-	char *arg = strtok_rnull(NULL, " ", tokpt);
+	char *arg = strtok_rnul(NULL, " ", tokpt);
 	if (!arg) return;
 	if (!strcmp(arg, "mem")) kmem_print_info();
 }
 
 void tty_built_in_exec(tty_seq_t* sq, char* cmd) {
     char* tokpt;
-    char* cmd_name = strtok_rnull(cmd, " ", &tokpt);
+    char* cmd_name = strtok_rnul(cmd, " ", &tokpt);
     if (!cmd_name) return;
 
     if (!strcmp(cmd_name, "memat")) {
-        char* arg1 = strtok_rnull(NULL, " ", &tokpt);
+        char* arg1 = strtok_rnul(NULL, " ", &tokpt);
         if (!arg1) return;
         uint_ptr ptr = read_ptr(arg1);
 		tty_seq_printf(sq, "%hhx", *(char*)ptr);
 
     } else if (!strcmp(cmd_name, "pg2")) {
-        char* arg1 = strtok_rnull(NULL, " ", &tokpt);
+        char* arg1 = strtok_rnul(NULL, " ", &tokpt);
         if (!arg1) return;
         uint_ptr ptr = read_ptr(arg1);
         kmem_print_paging(ptr);
@@ -153,7 +153,7 @@ void tty_built_in_exec(tty_seq_t* sq, char* cmd) {
         use_azerty = 0;
 
     else if (!strcmp(cmd_name, "test")) {
-        char* arg1 = strtok_rnull(NULL, " ", &tokpt);
+        char* arg1 = strtok_rnul(NULL, " ", &tokpt);
         if (!arg1) return;
         if (!strcmp(arg1, "statut"))      test_print_statut();
         else if(!strcmp(arg1, "kheap"))   test_kheap();
@@ -162,9 +162,9 @@ void tty_built_in_exec(tty_seq_t* sq, char* cmd) {
         proc_ps();
 
     else if (!strcmp(cmd_name, "unblock")) {
-        char* arg1 = strtok_rnull(NULL, " ", &tokpt);
+        char* arg1 = strtok_rnul(NULL, " ", &tokpt);
         if (!arg1) return;
-        char* arg2 = strtok_rnull(NULL, " ", &tokpt);
+        char* arg2 = strtok_rnul(NULL, " ", &tokpt);
         if (!arg2) return;
         int   ipid, val = 0;
         sscanf(arg1, "%d", &ipid);
@@ -174,9 +174,9 @@ void tty_built_in_exec(tty_seq_t* sq, char* cmd) {
         proc_unblock_1(pid, state.st_proc + pid);
 
     } else if (!strcmp(cmd_name, "kill")) {
-        char* arg1 = strtok_rnull(NULL, " ", &tokpt);
+        char* arg1 = strtok_rnul(NULL, " ", &tokpt);
         if (!arg1) return;
-        char* arg2 = strtok_rnull(NULL, " ", &tokpt);
+        char* arg2 = strtok_rnul(NULL, " ", &tokpt);
         if (!arg2) return;
         int   ipid, signum = 0;
         sscanf(arg1, "%d", &ipid);

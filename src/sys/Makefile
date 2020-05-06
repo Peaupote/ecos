@@ -3,10 +3,11 @@ export AS?=x86_64-elf-as
 ROOT=../..
 include $(ROOT)/vars.Makefile
 
-CFILES_0=init1.c cat.c echo.c stat.c ls.c ps.c wc.c env.c mkdir.c \
+CFILES_0=init1.c cat.c stat.c ls.c ps.c wc.c env.c mkdir.c \
 		head.c pwd.c
-CFILES_SH=sh/main.c sh/ast.c sh/parse.c sh/run.c
+CFILES_SH=sh/main.c sh/ast.c sh/parse.c sh/run.c sh/builtin.c
 CFILES=$(CFILES_0) $(CFILES_SH)
+SHFILES=echo.sh
 OUT=$(CFILES_0:.c=.out) sh.out
 SRCDEP=$(CFILES) "-MT start.s start.S"
 INCLUDE_LIBC?=-I ../../include/libc
@@ -29,13 +30,14 @@ sh.out:sh/sh.h $(CFILES_SH) libc start.o
 	$(CC) $(FLAGS_UR) -o $@ $(CFILES_SH) $< start.o \
 		$(LINK_LC) $(INCLUDES) -lgcc
 
-root.img:$(OUT)
+root.img:$(OUT) $(SHFILES)
 	@rm   -rf root
 	@mkdir -p root
 	@mkdir -p root/home
 	@mkdir -p root/bin
 	@mkdir -p root/proc
 	@$(foreach o,$(OUT),cp "$(o)" "root/bin/$(o:.out=)" &&) echo $(OUT)
+	@$(foreach s,$(SHFILES),cp "$(s)" "root/bin/$(s:.sh=)" &&) echo $(SHFILES)
 	$(ROOT)/tools/build-ext2.sh root root.img
 
 all:root.img

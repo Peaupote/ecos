@@ -13,4 +13,5 @@ int main() {
     rc = printf("%12", 1);
     assert(rc < 0);
     perror("printf");
+	return 0;
 }

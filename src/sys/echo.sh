@@ -1,0 +1,1 @@
+#!/bin/sh -B echo

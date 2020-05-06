@@ -90,7 +90,7 @@ char *index(const char *s, int c);
 char *strtok_r(char *str, const char *delim, char** saveptr);
 // Reconnait le dernier token même si '\0' n'est pas précédé
 // d'un délimiteur
-char *strtok_rnull(char *str, const char *delim, char** saveptr);
+char *strtok_rnul(char *str, const char *delim, char** saveptr);
 
 #ifndef __is_kernel
 char *strtok(char *str, const char *delim);

@@ -15,7 +15,7 @@
 
 #include <headers/unistd.h>
 
-#include <util/vga.h>
+#include <libc/errno.h>
 
 #define GATE_INT  (IDT_ATTR_P|IDT_TYPE_INT)
 
@@ -83,6 +83,16 @@ static inline void kill_cur_for_err(uint8_t errnum, uint64_t errcode) {
                         (int)state.st_curr_pid, desc, errcode);
     proc_t* p = cur_proc();
 
+	if (p->p_ring == 1) {
+		proc_t* pp = state.st_proc + p->p_ppid;
+		if (pp->p_stat == BLOCK && pp->p_reg.r.rax.ll == SYS_EXECVE) {
+			pp->p_werrno = EINVAL;
+			proc_unblock_1(p->p_ppid, pp);
+			proc_execve_abort(state.st_curr_pid);
+			schedule_proc();
+		}
+	}
+
     if (~p->p_fds[STDERR_FILENO]) { //TODO
         chann_t *chann = &state.st_chann[p->p_fds[STDERR_FILENO]];
         vfile_t *vfile = chann->chann_vfile;
@@ -106,9 +116,10 @@ static inline void kill_cur_for_err(uint8_t errnum, uint64_t errcode) {
 }
 
 void common_hdl(uint8_t num, uint64_t errcode) {
+	if (num == 0x8) // Double Fault
+		kpanicf("#DF", "errcode=%x", (int)errcode);
     kill_cur_for_err(num, errcode);
 }
-
 
 // Processus partiellent sauvegardé
 int pit_hdl(void) {
@@ -141,6 +152,10 @@ void pit_hdl_switch(int ty) {
           p->p_reg.rip.p, p->p_reg.rsp.p);
 
     write_eoi();
+	if (p->p_werrno) {
+		set_errno(p->p_werrno);
+		p->p_werrno = 0;
+	}
     proc_hndl_sigs();
     run_proc(p);
 }

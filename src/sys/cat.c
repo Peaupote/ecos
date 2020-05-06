@@ -14,13 +14,17 @@ int main(int argc, char *argv[]) {
     if (argc == 1) goto start;
 
     for (i = 1; i < argc; i++) {
-        fd = open(argv[i], O_RDONLY);
-        if (fd < 0) {
-            sprintf(buf, "cat: %s", argv[i]);
-            perror(buf);
-            rts = 1;
-			continue;
-        }
+		if (argv[i][0] == '-' && !argv[i][1])
+			fd = STDIN_FILENO;
+		else {
+			fd = open(argv[i], O_RDONLY);
+			if (fd < 0) {
+				sprintf(buf, "cat: %s", argv[i]);
+				perror(buf);
+				rts = 1;
+				continue;
+			}
+		}
 
     start:
         while ((rc = read(fd, buf, 1024)) > 0)
@@ -33,8 +37,8 @@ int main(int argc, char *argv[]) {
             perror(buf);
             exit(1);
         }
-
-        close(fd);
+		if (fd != STDIN_FILENO)
+			close(fd);
     }
 
     return rts;

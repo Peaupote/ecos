@@ -48,8 +48,7 @@ static void libc_ldr_fill0(void* err_pt,
 			*((uint8_t*) err_pt) = 1;
 			return;
 		}
-		//Alloc0
-		*e = SPAGING_FLAG_V | PAGING_FLAG_W | PAGING_FLAG_U;
+		*e = SPAGING_ALLOC0 | PAGING_FLAG_W | PAGING_FLAG_U;
 	}
 }
 static void libc_ldr_copy(void* err_pt, 
@@ -83,7 +82,7 @@ static uint8_t load_libc() {
 
 	uint64_t* lc_e = paging_acc_pd(0, 0, PD_LIBC);
 	struct sptr_hd* sp_hd;
-	kmem_mk_shared(lc_e, &libc_shared_idx, &sp_hd);
+	kmem_mk_svalue(lc_e, &libc_shared_idx, &sp_hd);
 	sp_hd->count = 2;
 
 	paging_refresh();
@@ -171,6 +170,9 @@ void proc_init() {
 		// set work directory to root
 		state.st_proc[pid].p_dev  = ROOT_DEV;
 		state.st_proc[pid].p_cino = devices[ROOT_DEV].dev_info.root_ino;
+		
+		state.st_proc[pid].p_errno  = NULL;
+		state.st_proc[pid].p_werrno = 0;
 	}
 
     // set all remaining slots to free processus
@@ -269,6 +271,10 @@ void _schedule_proc() {
               p->p_reg.rsp.p);
 
 		state.st_time_slice = SCHED_TIME_SLICE;
+		if (p->p_werrno) {
+			set_errno(p->p_werrno);
+			p->p_werrno = 0;
+		}
         proc_hndl_sigs();
         run_proc(p);
     }

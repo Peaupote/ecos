@@ -15,7 +15,7 @@ struct kwent {
 #define KEYWORD_MAX_LEN 5
 #define KEYWORD_HT_MOD  32
 #define G(K) static struct kwent kw_##K ={.next=0,.kw=KW_##K,.name=#K};
-G(while)G(do)G(done)
+G(while)G(do)G(done)G(if)G(then)G(elif)G(else)G(fi)
 #undef G
 static struct kwent* kw_ht[KEYWORD_HT_MOD] = {0};
 static void add_kw(struct kwent* e) {
@@ -27,6 +27,11 @@ void init_parse() {
 	add_kw(&kw_while);
 	add_kw(&kw_do);
 	add_kw(&kw_done);
+	add_kw(&kw_if);
+	add_kw(&kw_then);
+	add_kw(&kw_elif);
+	add_kw(&kw_else);
+	add_kw(&kw_fi);
 }
 static int find_kw(const char* k) {
 	unsigned char h = hash_str8(k, 0) % KEYWORD_HT_MOD;
@@ -582,12 +587,17 @@ static int ev_reds3(src_t* s, cmd_3_t** rt) {
 	} else if (rts == 1) {
 		return *rt ? 0 : 1;
 	} else {
-		if (*rt) {
-			destr_cmd_3(*rt);
-			free(*rt);
-		}
+		destr_cmd_3nl(rt);
 		return ERR(s);
 	}
+}
+
+static inline cmd_3_t* set_child_i(cmd_3_t* p, cmd_3_t* c, uint8_t sibnum) {
+	if (c) {
+		c->parent = p;
+		c->sibnum = sibnum;
+	}
+	return c;
 }
 
 int parse_cmd_3a(src_t* s, cmd_3_t** rt) {
@@ -599,46 +609,77 @@ int parse_cmd_3a(src_t* s, cmd_3_t** rt) {
 			rts = parse_cmd_3c(s, rt);
 			if (rts > 1) return rts;
 			if (read_keyw(s) != KW_group_ed) {
-				if (*rt) {
-					destr_cmd_3(*rt);
-					free(*rt);
-				}
+				destr_cmd_3nl(rt);
 				return ERR(s);
 			}
 			keyw_vald(s);
 			return ev_reds3(s, rt);
+
 		case KW_while: {
 			keyw_vald(s);
 			cmd_3_t *cnd, *bdy;
-			int rts1 = 2, rts2 = 2;
-			if (   (rts1 = parse_cmd_3c(s, &cnd)) > 1
-				|| read_keyw(s) != KW_do
-				|| (keyw_vald(s), (rts2 = parse_cmd_3c(s, &bdy)) > 1)
-				|| read_keyw(s) != KW_done) {
-				if (!rts1) {
-					destr_cmd_3(cnd);
-					free(cnd);
-				}
-				if (!rts2) {
-					destr_cmd_3(bdy);
-					free(bdy);
-				}
+			if (parse_cmd_3c(s, &cnd) > 1
+			||  read_keyw(s) != KW_do
+			||  (keyw_vald(s), parse_cmd_3c(s, &bdy) > 1)
+			||  read_keyw(s) != KW_done) {
+				destr_cmd_3nl(&cnd);
+				destr_cmd_3nl(&bdy);
+				*rt = NULL;
 				return ERR(s);
 			}
 			keyw_vald(s);
+
 			cmd_3_t* r = *rt = malloc(sizeof(cmd_3_t));
 			r->ty      = C_WHL;
-			if (cnd) {
-				cnd->parent = r;
-				cnd->sibnum = 0;
-			}
-			r->whl.cnd = cnd;
-			if (bdy) {
-				bdy->parent = r;
-				bdy->sibnum = 1;
-			}
-			r->whl.bdy = bdy;
+			r->whl.cnd = set_child_i(r, cnd, 0);
+			r->whl.bdy = set_child_i(r, bdy, 1);
+
 			return ev_reds3(s, rt);
+		}
+		case KW_if: {
+			keyw_vald(s);
+			cmd_3_t* r = *rt = malloc(sizeof(cmd_3_t));
+			
+			while (true) {
+				r->ty = C_IF;
+				r->cif.brs[0] = r->cif.brs[1] = NULL;
+				if (parse_cmd_3c(s, &r->cif.cnd) > 1
+				||  read_keyw(s) != KW_then
+				||  (keyw_vald(s), parse_cmd_3c(s, r->cif.brs) > 1)) {
+					destr_cmd_3nl(rt);
+					return ERR(s);
+				}
+
+				set_child_i(r, r->cif.cnd,    0);
+				set_child_i(r, r->cif.brs[0], 1);
+
+				switch (read_keyw(s)) {
+					case KW_fi:
+						keyw_vald(s);
+						return ev_reds3(s, rt);
+					case KW_elif:
+						keyw_vald(s);
+						r->cif.brs[1] = malloc(sizeof(cmd_3_t));
+						r = set_child_i(r, r->cif.brs[1], 2);
+						break;
+					case KW_else:
+						keyw_vald(s);
+						if (parse_cmd_3c(s, r->cif.brs+1) > 1
+						||  read_keyw(s) != KW_fi) {
+							destr_cmd_3nl(rt);
+							return ERR(s);
+						} else {
+							keyw_vald(s);
+							set_child_i(r, r->cif.brs[1], 2);
+							return ev_reds3(s, rt);
+						}
+					default:
+						destr_cmd_3nl(&r->cif.cnd);
+						destr_cmd_3nl(r->cif.brs);
+						destr_cmd_3nl(rt);
+						return ERR(s);
+				}
+			}
 		}
 	}
 
@@ -693,6 +734,7 @@ int parse_cmd_3b(src_t* s, cmd_3_t** rt) {
 		if (rts) {
 			destr_cmd_3(cm);
 			free(cm);
+			*rt = NULL;
 			return rts == 1 ? ERR(s) : rts;
 		}
 		cm = mk_bin_cmd_3(ty, cm, c1);
@@ -713,10 +755,7 @@ int parse_cmd_3c(src_t* s, cmd_3_t** rt) {
 		cmd_3_t* c1;
 		rts = parse_cmd_3b(s, &c1);
 		if (rts > 1) {
-			if (cm) {
-				destr_cmd_3(cm);
-				free(cm);
-			}
+			destr_cmd_3nl(&cm);
 			return rts;
 		}
 		c = wait_conj(s) ? peek_1(s) : '\0';
@@ -740,9 +779,7 @@ int parse_sh(src_t* s, cmd_3_t** rt) {
 	int rts = parse_cmd_3c(s, rt);
 	if (rts) return rts;
 	if (peek_1(s) != '\0') {
-		destr_cmd_3(*rt);
-		free(*rt);
-		*rt = NULL;
+		destr_cmd_3nl(rt);
 		return ERR(s);
 	}
 	return 0;

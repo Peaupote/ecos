@@ -226,7 +226,6 @@ int run_file(int argc, char* argv[]) {
 
 int main(int argc, char* argv[]) {
 	init_builtins();
-	init_parse();
 	int argi = 1;
 	while (argi < argc) {
 		char* arg = argv[argi];
@@ -241,12 +240,28 @@ int main(int argc, char* argv[]) {
 					case 'p':
 						parse_only = true;
 						continue;
+					case 'B':
+						if (argi >= argc)
+							fprintf(stderr, "arguments manquants pour -B\n");
+						else {
+							builtin_t* bt = find_builtin(argv[argi]);
+							if (!bt)
+								fprintf(stderr, "builtin inconnue: %s\n",
+										argv[argi]);
+							else if (bt->ty != BLTI_ASYNC || !bt->exp)
+								fprintf(stderr, "utilisation invalide de %s\n",
+										argv[argi]);
+							else return bt->fun(argc - (argi + 1),
+									argv + argi + 1);
+						}
+						return 2;
 				}
-				fprintf(stderr, "sh: option non reconnue: %c\n", c);
-				break;
+				fprintf(stderr, "sh: option non reconnue: %c\n", *c);
+				return 2;
 			}
 		}
 	}
+	init_parse();
 	if (argi >= argc)
 		return run_prompt();
 	else

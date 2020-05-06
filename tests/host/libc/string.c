@@ -45,9 +45,9 @@ void sq_test_strtok() {
 	const char delim[] = " ";
 	char* saveptr;
 
-	tAssert(!my_strcmp(my_strtok_rnull(text, delim, &saveptr), "cmd"));
-	tAssert(!my_strcmp(my_strtok_rnull(NULL, delim, &saveptr), "arg1"));
-	tAssert(!my_strcmp(my_strtok_rnull(NULL, delim, &saveptr), "arg2"));
+	tAssert(!my_strcmp(my_strtok_rnul(text, delim, &saveptr), "cmd"));
+	tAssert(!my_strcmp(my_strtok_rnul(NULL, delim, &saveptr), "arg1"));
+	tAssert(!my_strcmp(my_strtok_rnul(NULL, delim, &saveptr), "arg2"));
 }
 
 int main(void) {
