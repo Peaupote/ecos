@@ -12,7 +12,7 @@
 #include <util/misc.h>
 
 void sys_errno(int *errno) {
-    state.st_proc[state.st_curr_pid].p_errno = errno;
+	state.st_proc[state.st_curr_pid].p_errno = errno;
 }
 
 int sys_open(const char *fname, int oflags, int perms) {
@@ -200,7 +200,11 @@ err_enfile:
 }
 
 ssize_t sys_read(int fd, uint8_t *d, size_t len) {
-    proc_t *p  = &state.st_proc[state.st_curr_pid];;
+	if (!check_argW(d, len)) {
+		set_errno(EINVAL);
+		return -1;
+	}
+    proc_t *p  = cur_proc();
 
     if (!d || fd < 0 || fd > NFD || p->p_fds[fd] == -1)
         goto err_badf;
@@ -268,7 +272,11 @@ err_badf:
 }
 
 ssize_t sys_write(int fd, uint8_t *s, size_t len) {
-    proc_t *p  = &state.st_proc[state.st_curr_pid];;
+	if (!check_argR(s, len)) {
+		set_errno(EINVAL);
+		return -1;
+	}
+    proc_t *p  = cur_proc();
 
     if (!s || fd < 0 || fd > NFD || p->p_fds[fd] == -1)
         goto err_badf;

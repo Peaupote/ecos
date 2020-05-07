@@ -11,9 +11,6 @@ int      _getpriority();
 int      setpriority(int prio);
 int      getpriority();
 
-int      debug_block(int v);
-
-
 void     _sigsethnd(sighandler_t);
 void     _sigreturn();
 uint8_t  _signal(int sigid, uint8_t hnd);

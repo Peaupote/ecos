@@ -39,7 +39,7 @@ syscall_tab:
     .quad sys_signal
     .quad sys_kill
     .quad sys_errno
-    .quad sys_debug_block
+    .quad sys_pause
 syscall_ring1j_tab:
     .quad sys_prires
 syscall_ring1c_tab:
@@ -150,7 +150,7 @@ syscall_ring1c_tab:
     movq   (%r15), %r15
     movq   0x18(%r15), %rax
     movq   0x20(%r15), %rcx
-    movq   0x32(%r15), %rdx
+    movq   0x28(%r15), %rdx
     movq   0x30(%r15), %rsi
     movq   0x38(%r15), %rdi
     movq   0x40(%r15), %r8

@@ -4,12 +4,12 @@ CFILES=main.c \
 		kutil.c \
 		idt.c \
 		gdt.c \
-		keyboard.c \
-		display.c \
-		tty.c \
-		tty_builtin.c \
 		tests.c \
 		file.c \
+		interface/keyboard.c \
+		interface/display.c \
+		interface/tty.c \
+		interface/tty_builtin.c \
 		proc/proc.c \
 		proc/signal.c \
 		syscalls/sleep.c \

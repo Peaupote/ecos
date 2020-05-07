@@ -3,13 +3,7 @@ export AS?=x86_64-elf-as
 ROOT=../..
 include $(ROOT)/vars.Makefile
 
-CFILES_0=init1.c cat.c stat.c ls.c ps.c wc.c env.c mkdir.c \
-		head.c pwd.c
-CFILES_SH=sh/main.c sh/ast.c sh/parse.c sh/run.c sh/builtin.c
-CFILES=$(CFILES_0) $(CFILES_SH)
-SHFILES=echo.sh
-OUT=$(CFILES_0:.c=.out) sh.out
-SRCDEP=$(CFILES) "-MT start.s start.S"
+include list.Makefile
 INCLUDE_LIBC?=-I ../../include/libc
 INCLUDES=-I ../../include $(INCLUDE_LIBC)
 

@@ -57,7 +57,7 @@ static inline void abort_syscalls(proc_t* p) {
 }
 
 void proc_hndl_sig_i(int sigid) {
-	klogf(Log_info, "hndl", "i%d -> %d", sigid, state.st_curr_pid);
+	klogf(Log_info, "sig", "hndl: i%d -> %d", sigid, state.st_curr_pid);
 	proc_t* p  = cur_proc();
 	p->p_spnd &= ~(((sigset_t)1) << sigid);
 
@@ -97,8 +97,11 @@ void proc_hndl_sig_i(int sigid) {
 }
 
 int8_t send_sig_to_proc(pid_t pid, int sigid) {
-	klogf(Log_info, "send", "send i%d to %d", sigid, (int)pid);
 	proc_t* p  = state.st_proc + pid;
+	klogf(Log_info, "sig", "send i%d to %d %c%c",
+			sigid, (int)pid,
+			contain_id(p->p_shnd.ign, sigid) ? 'i' : '_',
+			contain_id(p->p_shnd.dfl, sigid) ? 'd' : '_');
 	if (sigid + 1 == SIGKILL) {
 
 		if (state.st_curr_pid != pid) {
@@ -140,18 +143,24 @@ int8_t send_sig_to_proc(pid_t pid, int sigid) {
 }
 
 int sys_kill(pid_t pid, int signum) {
-	if (pid < 0 || pid >= NPROC || signum < 0 || signum > SIG_COUNT)
+	if (pid < 0 || pid >= NPROC || signum < 0 || signum > SIG_COUNT) {
+		set_errno(EINVAL);
 		return -1;
+	}
 	proc_t* d = state.st_proc + pid;
-	if (!proc_alive(d))
+	if (!proc_alive(d)) {
+		set_errno(ESRCH);
 		return -1;
+	}
 	
 	if (!signum)       return 0;
-	if (d->p_ring < 3) return -1;
+	if (d->p_ring < 3) {
+		set_errno(EPERM);
+		return -1;
+	}
 
 	bool self = state.st_curr_pid == pid;
 	int8_t  r = send_sig_to_proc(pid, signum - 1);
-	if (r == -1)     return -1;
 	if (!r || !self) return  0;
 	
 	schedule_proc();

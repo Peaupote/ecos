@@ -138,6 +138,8 @@ typedef struct ecmd_2 {
 extern ecmd_2_t* ecmd_llist;
 extern int       next_cmd_num;
 extern bool      update_cwd;
+extern bool      is_subsh;
+extern bool int_tstp, int_sint;
 
 typedef struct var {
 	char* name;
@@ -291,9 +293,8 @@ var_t*     var_set(const char* name, char* val);
 var_t*     find_lvar(const char* name);
 char*      get_var(const char* name);
 var_t*     arg_var_assign(char* arg);
-ecmd_2_t*  exec_cmd_2(const cmd_2_t* c2, ecmd_st* st);
-int        start_sub(const cmd_3_t* c3, bool keep_stdin);
-int        exec_cmd_3_bg(const cmd_3_t* c3);
+ecmd_2_t*  exec_cmd_2(const cmd_3_t* /*C_CM2*/ c2, ecmd_st* st);
+int        exec_cmd_3_bg(const cmd_3_t* c3, bool print_pid);
 ecmd_2_t*  exec_cmd_3_down(const cmd_3_t* c3, ecmd_st* st, int* r_st);
 ecmd_2_t*  exec_cmd_3_up(const cmd_3_t* c3, ecmd_st* st,
 							int* r_st, int c_st);
@@ -302,5 +303,9 @@ int        run_sub(ecmd_2_t* e);
 bool       run_fg(int* st);
 ecmd_2_t** find_exd_num(int num);
 ecmd_st*   mk_ecmd_st();
+
+int        start_sub(const cmd_3_t* c3, bool keep_stdin);
+bool       start_fg(const cmd_3_t* c3, int* st);
+bool       continue_fg(int* st);
 
 #endif

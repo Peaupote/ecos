@@ -9,7 +9,7 @@ export TSFX?=
 OPT?=-O2
 
 #Communs
-FLAGS_C?=$(OPT) -Wall -Wextra -std=gnu99 -nostdlib -mno-red-zone -D__is_debug
+FLAGS_C?=$(OPT) -g -Wall -Wextra -std=gnu99 -nostdlib -mno-red-zone -D__is_debug
 #Kernel
 FLAGS_K?=$(FLAGS_C) -mcmodel=large -ffreestanding -D__is_kernel
 #Boot

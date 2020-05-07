@@ -10,14 +10,54 @@
 #include <libc/errno.h>
 
 #include "proc.h"
+#include "memory/shared_pages.h"
 
 static inline void set_proc_errno(proc_t *p, int e) {
     if (p->p_errno) *p->p_errno = e;
 }
 
 static inline void set_errno(int e) {
-    set_proc_errno(state.st_proc + state.st_curr_pid, e);
+    set_proc_errno(cur_proc(), e);
 }
+
+static inline bool check_arg_ubound(uint_ptr bg, size_t sz) {
+	return bg + sz >= bg
+		&& bg + sz <= paging_set_lvl(pgg_pml4, PML4_END_USPACE);
+}
+
+/**
+ * Vérifie que la plage est dans la plage de l'userspace
+ * Un accès PEUT provoquer un #PF non rattrapé
+ */
+static inline bool check_argb(void* pbg, size_t sz) {
+	uint_ptr bg = (uint_ptr)pbg;
+	return cur_proc()->p_ring < 3 || check_arg_ubound(bg, sz);
+}
+
+/**
+ * Vérifie que le processus peut accéder à la plage en lecture
+ * Si vrai, un accès en lecture ne peut pas provoquer de #PF
+ */
+static inline bool check_argR(void* pbg, size_t sz) {
+	uint_ptr bg = (uint_ptr)pbg;
+	return cur_proc()->p_ring < 3
+		|| (check_arg_ubound(bg, sz) 
+			&& (PAGING_FLAG_P & get_range_flags(bg & PAGE_MASK, bg + sz)));
+}
+
+/**
+ * Vérifie que le processus peut accéder à la plage en lecture et écriture
+ * Si vrai, un accès ne peut pas provoquer de #PF
+ */
+static inline bool check_argW(void* pbg, size_t sz) {
+	uint_ptr bg = (uint_ptr)pbg;
+	return cur_proc()->p_ring < 3
+		|| (check_arg_ubound(bg, sz) 
+			&& ((PAGING_FLAG_P | PAGING_FLAG_W) &
+					get_range_flags(bg & PAGE_MASK, bg + sz))
+				== (PAGING_FLAG_P | PAGING_FLAG_W) );
+}
+
 
 int      sys_usleep(usecond_t tm);
 void     lookup_end_sleep(void);
@@ -61,7 +101,7 @@ void     sys_sigreturn();
 uint8_t  sys_signal(int sigid, uint8_t hnd);
 int      sys_kill(pid_t pid, int signum);
 
-int      sys_debug_block(int v);
+int      sys_pause();
 
 uint64_t invalid_syscall();
 

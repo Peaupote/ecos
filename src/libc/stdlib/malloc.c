@@ -73,8 +73,9 @@ void _malloc_init() {
 	malloc_check_nb = 0;
 #endif
     up_lim    = (uint_ptr) sbrk(0);
-    if (up_lim % MALLOC_ALIGN != 0) {
-        uint_ptr  add = MALLOC_ALIGN - (up_lim % MALLOC_ALIGN);
+    if (up_lim % MALLOC_ALIGN != MALLOC_ALIGN - MALLOC_HD_SZ) {
+        uint_ptr  add = (2 * MALLOC_ALIGN - MALLOC_HD_SZ
+							- (up_lim % MALLOC_ALIGN)) % MALLOC_ALIGN;
         up_lim += add;
         sbrk((intptr_t)add);
     }

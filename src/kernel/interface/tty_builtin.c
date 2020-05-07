@@ -161,19 +161,7 @@ void tty_built_in_exec(tty_seq_t* sq, char* cmd) {
     } else if (!strcmp(cmd_name, "ps"))
         proc_ps();
 
-    else if (!strcmp(cmd_name, "unblock")) {
-        char* arg1 = strtok_rnul(NULL, " ", &tokpt);
-        if (!arg1) return;
-        char* arg2 = strtok_rnul(NULL, " ", &tokpt);
-        if (!arg2) return;
-        int   ipid, val = 0;
-        sscanf(arg1, "%d", &ipid);
-        pid_t pid = ipid;
-        sscanf(arg2, "%i", &val);
-        state.st_proc[pid].p_reg.r.rdi.i = val;
-        proc_unblock_1(pid, state.st_proc + pid);
-
-    } else if (!strcmp(cmd_name, "kill")) {
+    else if (!strcmp(cmd_name, "kill")) {
         char* arg1 = strtok_rnul(NULL, " ", &tokpt);
         if (!arg1) return;
         char* arg2 = strtok_rnul(NULL, " ", &tokpt);

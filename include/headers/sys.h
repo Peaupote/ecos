@@ -30,7 +30,7 @@
 #define SYS_SIGNAL      24
 #define SYS_KILL        25
 #define SYS_SETERRNO    26
-#define SYS_DEBUG_BLOCK 27
+#define SYS_PAUSE       27
 
 #define SYS_R1J_PRIRES   0
 #define SYS_R1C_TTYOWN   0

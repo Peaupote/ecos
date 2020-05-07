@@ -15,6 +15,8 @@ void*    sbrk(intptr_t increment);
 int      usleep(usecond_t usec);
 unsigned int sleep(unsigned int sec);
 
+int      pause();
+
 ssize_t  write(int fd, const void *s, size_t len);
 ssize_t  read(int fd, void *buf, size_t len);
 int      close(int fd);
@@ -23,7 +25,7 @@ int      dup2(int fd1, int fd2);
 int      pipe(int fds[2]);
 off_t    lseek(int fd, off_t offset, int whence);
 
-int chdir(const char *fname);
+int      chdir(const char *fname);
 
 pid_t    fork(void);
 pid_t    getpid(void);

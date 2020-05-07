@@ -27,8 +27,18 @@ int main(int argc, char *argv[]) {
 		}
 
     start:
-        while ((rc = read(fd, buf, 1024)) > 0)
-            write(STDOUT_FILENO, buf, rc);
+        while ((rc = read(fd, buf, 1024)) > 0) {
+			char* buf1 = buf;
+			while (rc > 0) {
+				int wc = write(STDOUT_FILENO, buf1, rc);
+				if (wc < 0 && errno != EINTR) {
+					perror("cat");
+					return 1;
+				}
+				rc   -= wc;
+				buf1 += wc;
+			}
+		}
 
         if (rc < 0) {
 			if (errno == EINTR)

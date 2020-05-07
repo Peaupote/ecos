@@ -12,12 +12,10 @@ void _env_init(char **env_ptr) {
     memset(_env, 0, NENV);
     nenv = 0;
 
-    for (ptr = env_ptr, nenv = 0; nenv + 1 < NENV && *ptr; ++ptr, ++nenv) {
-        _env[nenv] = malloc(strlen(*ptr) + 1);
-        strcpy(_env[nenv], *ptr);
-    }
+    for (ptr = env_ptr, nenv = 0; nenv + 1 < NENV && *ptr; ++ptr, ++nenv)
+        _env[nenv] = strdup(*ptr);
 
-    _env[nenv] = 0;
+    _env[nenv] = NULL;
 }
 
 char *getenv(const char *name) {

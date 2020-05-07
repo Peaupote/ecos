@@ -169,6 +169,8 @@ void kmem_free_rec(uint64_t* entry, enum pgg_level lvl) {
 		kmem_free_paging_range(page_bg, lvl, PAGE_ENT);
 	}
 	kmem_free_page((*entry) & PAGE_MASK);
+	uint_ptr vaddr = paging_rm_loop((uint_ptr) entry);
+	invalide_page(vaddr);
 }
 void kmem_free_paging(phy_addr old_pml4, phy_addr new_pml4) {
 	kmem_free_paging_range(paging_acc_pml4(0), pgg_pml4, PML4_END_USPACE);
@@ -179,4 +181,31 @@ void kmem_free_paging(phy_addr old_pml4, phy_addr new_pml4) {
 
 	klogf(Log_verb, "mem", "%lld pages disponibles",
 			(long long int)kmem_nb_page_free());
+}
+
+static inline void get_page_flag(uint_ptr vaddr, uint64_t* rt) {
+	uint64_t query_addr = (uint64_t) paging_acc_pml4(PML4_LOOP);
+	for (enum pgg_level lvl=pgg_pml4; lvl; --lvl) {
+		uint16_t rel = (vaddr >> (lvl * 9)) & PAGE_ENT_MASK;
+		query_addr = paging_rm_loop(query_addr) | rel;
+
+		uint64_t ent = *(uint64_t*)query_addr;
+		if (ent & PAGING_FLAG_P) {
+			kAssert(! (ent & PAGING_FLAG_S));
+			*rt &= ent;
+		} else {
+			if (! (ent & (SPAGING_FLAG_P | SPAGING_FLAG_V)) )
+				*rt = 0;
+			else
+				*rt &= PAGING_FLAG_P | ent;
+			return;
+		}
+	}
+}
+
+uint64_t get_range_flags(uint_ptr page_bg, uint_ptr ed) {
+	uint64_t rt = PAGING_FLAG_P | PAGING_FLAG_W | PAGING_FLAG_U;
+	for (uint_ptr it = page_bg; it < ed; it += PAGE_SIZE)
+		get_page_flag(it, &rt);
+	return rt;
 }

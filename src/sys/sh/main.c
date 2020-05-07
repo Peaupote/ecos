@@ -13,6 +13,7 @@ ecmd_2_t*   ecmd_llist   = NULL;
 int         next_cmd_num = 0;
 char        line[513];
 bool        update_cwd   = true;
+bool        is_subsh;
 static char cwd[256]     = "";
 static bool parse_only   = false;
 
@@ -65,6 +66,7 @@ static void do_update_cwd() {
 }
 
 int run_prompt() {
+	is_subsh = false;
 	int   buf_rem = 0;
 	char* buf = NULL;
 
@@ -126,7 +128,8 @@ end_input_read:;
 
     	printf("\033d"); fflush(stdout);
 
-		int st = 0;
+		int st    = 0;
+		bool hend = false;
 		if (cmd->ty == C_CM2
 				&& cmd->cm2.cmdc == 1
 				&& cmd->cm2.cmds[0].r.redc == 0
@@ -148,29 +151,22 @@ end_input_read:;
 
 				bool ended = b->tfun(args.sz - 1, args.c, &st);
 
-				for (char** it = args.c; *it; ++it)
-					free(*it);
+				for (char** it = args.c; *it; ++it) free(*it);
 				pbuf_destr(&args);
 				destr_cmd_3(cmd);
 				free(cmd);
-				if (ended) goto check_status;
-				else       continue;
+				if (ended) hend = true;
+				else continue;
 			}
 		}
-		ecmd_2_t* ecmd = exec_cmd_3_down(cmd, mk_ecmd_st(), &st);
-		if (ecmd) {
-			ecmd->num  = next_cmd_num++;
-			ecmd->next = ecmd_llist;
-			ecmd_llist = ecmd;
-			if (!run_fg(&st)) continue;
-		}
-check_status:
-		if (st)
-			fprintf(stderr, "exit status %d\n", st);
+
+		if ((hend || start_fg(cmd, &st)) && st)
+			fprintf(stderr, "\033\nexit status %d\n", st);
     }
 }
 
 int run_file(int argc, char* argv[]) {
+	is_subsh = true;
 	FILE* f = fopen(argv[0], "r");
 	if (!f) {
 		perror(argv[0]);
@@ -212,6 +208,24 @@ int run_file(int argc, char* argv[]) {
 	return start_sub(cmd, true);
 }
 
+int run_builtin(int argc, char* argv[]) {
+	is_subsh = true;
+	if (argc <= 0)
+		fprintf(stderr, "arguments manquants pour -B\n");
+	else {
+		builtin_t* bt = find_builtin(argv[0]);
+		if (!bt)
+			fprintf(stderr, "builtin inconnue: %s\n", argv[0]);
+		else if (!bt->exp)
+			fprintf(stderr, "utilisation invalide de %s\n", argv[0]);
+		else if (bt->ty == BLTI_ASYNC)
+			return bt->fun(argc - 1, argv + 1);
+		else if (bt->ty == BLTI_SYNC)
+			return bt->sfun(argc - 1, argv + 1, STDIN_FILENO);
+	}
+	return 2;
+}
+
 int main(int argc, char* argv[]) {
 	init_builtins();
 	int argi = 1;
@@ -230,20 +244,7 @@ int main(int argc, char* argv[]) {
 						parse_only = true;
 						continue;
 					case 'B':
-						if (argi >= argc)
-							fprintf(stderr, "arguments manquants pour -B\n");
-						else {
-							builtin_t* bt = find_builtin(argv[argi]);
-							if (!bt)
-								fprintf(stderr, "builtin inconnue: %s\n",
-										argv[argi]);
-							else if (bt->ty != BLTI_ASYNC || !bt->exp)
-								fprintf(stderr, "utilisation invalide de %s\n",
-										argv[argi]);
-							else return bt->fun(argc - (argi + 1),
-									argv + argi + 1);
-						}
-						return 2;
+						return run_builtin(argc - argi, argv + argi);
 					case 't':
 						display_msg = false;
 						continue;

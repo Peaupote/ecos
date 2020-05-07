@@ -123,8 +123,9 @@ pid_t sys_waitpid(pid_t cpid, int* rt_st) {
 
 pid_t sys_fork() {
     proc_t *fp, *pp = cur_proc();
-
+	
     pid_t fpid = find_new_pid();
+	
     // we didn't find place for a new processus
     if (!~fpid) {
         set_errno(EAGAIN);
@@ -237,14 +238,11 @@ void* sys_sbrk(intptr_t inc) {
     return rt;
 }
 
-int sys_debug_block(int v) {
-    if (~v) return v;
-
+int sys_pause() {
     //On bloque le processus actuel
     proc_t* p = cur_proc();
     proc_self_block(p);
     schedule_proc();
-    never_reached return -1;
 }
 
 uint64_t invalid_syscall() {

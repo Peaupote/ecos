@@ -7,6 +7,7 @@
 #include <string.h>
 #include <util/misc.h>
 #include <assert.h>
+#include <errno.h>
 
 // --Variables--
 var_t* lvars[256] = {NULL};
@@ -91,18 +92,21 @@ ecmd_2_t** on_child_end(pid_t pid, int st) {
 
 // --Gestion des interruptions--
 
-static bool int_tstp;
+bool int_tstp, int_sint;
+static ecmd_2_t* fgc = NULL; // = ecmd_llist ou NULL
 
 static void broadcast(int signum) {
-	ecmd_2_t* fgc = ecmd_llist;
+	if (!fgc) return;
 	size_t   cmdc = fgc->c->cm2.cmdc;
     for (size_t i = 0; i < cmdc; ++i)
         if (~fgc->procs[i].pid && kill(fgc->procs[i].pid, signum))
-            perror("error broadcasting signal");
+			if (errno != ESRCH) // déjà mort
+				perror("error broadcasting signal");
 }
 
 void int_handler(int signum __attribute__((unused))) {
 	broadcast(SIGINT);
+	int_sint = true;
 }
 void tstp_handler(int signum __attribute__((unused))) {
 	broadcast(SIGTSTP);
@@ -115,9 +119,11 @@ void sub_int_handler(int signum __attribute__((unused))) {
 }
 void sub_tstp_handler(int signum __attribute__((unused))) {
 	broadcast(SIGTSTP);
+	int_tstp = true;
 }
 void sub_cont_handler(int signum __attribute__((unused))) {
 	broadcast(SIGCONT);
+	int_tstp = false;
 }
 
 // --Exécution--
@@ -414,17 +420,22 @@ void expand(const char* c, pbuf_t* wds) {
 	}
 }
 
-ecmd_2_t* exec_cmd_2(const cmd_2_t* c2, ecmd_st* st) {
+ecmd_2_t* exec_cmd_2(const cmd_3_t* c3, ecmd_st* st) {
+	const cmd_2_t* c2 = &c3->cm2;
 	size_t cmdc = c2->cmdc;
 	ecmd_2_t* ecmd = malloc(offsetof(ecmd_2_t, procs) 
 								+ cmdc * sizeof(ecmdp_t));
 	ecmd->nb_alive = 0;
 	ecmd->st       = st;
+	ecmd->c        = c3;
+	for (size_t ic = 0; ic < cmdc; ++ic) {
+		ecmd->procs[ic].pid = PID_NONE;
+		ecmd->procs[ic].st  = 66;
+	}
+	fgc = ecmd;
 
     int fd_in = -1;
     for (size_t ic = 0; ic < cmdc; ++ic) {
-		ecmd->procs[ic].pid = PID_NONE;
-		ecmd->procs[ic].st  = 66;
         cmd_1_t          *c = c2->cmds + ic;
 
         int next_fd_in = -1,
@@ -443,6 +454,7 @@ ecmd_2_t* exec_cmd_2(const cmd_2_t* c2, ecmd_st* st) {
 		}
 
 		pbuf_t argsb;
+		argsb.c = NULL;
 		char** args = NULL;
 		size_t argc = 0;
 		builtin_t* blti = NULL;
@@ -452,8 +464,7 @@ ecmd_2_t* exec_cmd_2(const cmd_2_t* c2, ecmd_st* st) {
 			pbuf_init(&argsb, 8);
 			expand(c->c.bas, &argsb);
 			pbuf_put(&argsb, NULL);
-			pbuf_shrink(&argsb);
-			args = argsb.c;
+			args = pbuf_shrink(&argsb);
 			argc = argsb.sz - 1;
 
 			var_t** lv_tail = &loc_vars;
@@ -469,9 +480,7 @@ ecmd_2_t* exec_cmd_2(const cmd_2_t* c2, ecmd_st* st) {
 						var_t* lv = malloc(sizeof(var_t));
 						*setp     = '\0';
 						lv->name  = args[0];
-						char*  v0 = setp + 1;
-						lv->val   = malloc(strlen(v0) + 1);
-						strcpy(lv->val, v0);
+						lv->val   = strdup(setp + 1);
 						lv->next  = NULL;
 						*lv_tail  = lv;
 						lv_tail   = &lv->next;
@@ -505,9 +514,11 @@ ecmd_2_t* exec_cmd_2(const cmd_2_t* c2, ecmd_st* st) {
 		}
 
         int rf = fork();
+
         if (rf < 0) perror("sh fork\n");
 
         else if (rf == 0) {// enfant
+
 			// redirections hérités
 			apply_reds3(st);
 
@@ -535,8 +546,7 @@ ecmd_2_t* exec_cmd_2(const cmd_2_t* c2, ecmd_st* st) {
 				free(v);
 				v = vn;
 			}
-
-	
+			
 			if (blti)
 				exit(blti->fun(argc, args));
 
@@ -558,10 +568,10 @@ ecmd_2_t* exec_cmd_2(const cmd_2_t* c2, ecmd_st* st) {
 
 continue_pipe:
 
-		if (args) {
-			for (char** it = args; *it; ++it)
+		if (argsb.c) {
+			for (char** it = argsb.c; *it; ++it)
 				free(*it);
-			free(args);
+			pbuf_destr(&argsb);
 		}
 
         if (~fd_in)  close(fd_in);
@@ -572,32 +582,7 @@ continue_pipe:
 	return ecmd;
 }
 
-ecmd_st* mk_ecmd_st() {
-	ecmd_st* rt = malloc(sizeof(ecmd_st));
-	for (int i = 0; i < 3; ++i)
-		rt->fds[i] = i;
-	rt->stack = NULL;
-	rt->reds  = NULL;
-	return rt;
-}
-
-int start_sub(const cmd_3_t* c3, bool keep_stdin) {
-	if (!keep_stdin) {
-		int nfd = open("/proc/null", O_RDONLY, 0640);
-		if (nfd < 0) {
-			perror("sh /proc/null");
-			return 1;
-		}
-		if (!~dup2(nfd, STDIN_FILENO)) exit(1);
-		close(nfd);
-	}
-
-	int st;
-	ecmd_2_t* ecmd = exec_cmd_3_down(c3, mk_ecmd_st(), &st);
-	return ecmd ? run_sub(ecmd) : st;
-}
-
-int exec_cmd_3_bg(const cmd_3_t* c3) {
+int exec_cmd_3_bg(const cmd_3_t* c3, bool print_pid) {
 	int rf0 = fork();
 	if (rf0 < 0) {
 		perror("fork");
@@ -616,10 +601,17 @@ int exec_cmd_3_bg(const cmd_3_t* c3) {
 	if (rf1 < 0) {
 		perror("fork");
 		exit(1);
-	} else if (rf1) // enfant 0
+	} else if (rf1) { // enfant 0
+		if (print_pid) {
+			printf("\033\n|%d|\t", rf1);
+			pp_cmd_3(stdout, 'c', c3);
+			printf("\n");
+		}
 		exit(0);
+	}
 
 	// enfant 1: sous-shell
+	is_subsh = true;
 	exit(start_sub(c3, false));
 }
 
@@ -702,14 +694,10 @@ ecmd_2_t* exec_cmd_3_down(const cmd_3_t* c3, ecmd_st* st,
 	int rts;
 	while (true) {
 		switch (c3->ty) {
-			case C_CM2: {
-				ecmd_2_t* ecmd = exec_cmd_2(&c3->cm2, st);
-				ecmd->c        = c3;
-				return ecmd;
-			}
+			case C_CM2: return exec_cmd_2(c3, st);
 			case C_BG:
 				return exec_cmd_3_up(c3, st, r_st,
-							exec_cmd_3_bg(c3->childs[0]));
+							exec_cmd_3_bg(c3->childs[0], !is_subsh));
 			case C_SEQ: case C_AND: case C_OR:
 				c3 = c3->childs[0];
 				break;
@@ -778,29 +766,31 @@ ecmd_2_t* continue_job(ecmd_2_t* e, int* st) {
 
 bool run_fg(int* st) {
     ecmd_2_t* ecmd = ecmd_llist;
-	//printf("run fg %d\n", ecmd->num);
 	while (true) {
-		int_tstp = false;
-		sighandler_t
-			prev_hnd_int  = signal(SIGINT,  & int_handler),
-			prev_hnd_tstp = signal(SIGTSTP, &tstp_handler);
-
 		int rs;
 		pid_t wpid;
 		while (ecmd->nb_alive > 0) {
-			while (!~(wpid = wait(&rs))) {
+			do {
 				if (int_tstp) {
-					signal(SIGINT,  prev_hnd_int);
-					signal(SIGTSTP, prev_hnd_tstp);
+					fgc = NULL;
 					printf("\n[%d]\tstopped\n", ecmd->num);
 					return false;
 				}
-			}
+			} while(!~(wpid = wait(&rs)));
 			on_child_end(wpid, rs);
 		}
 
-		signal(SIGINT,  prev_hnd_int);
-		signal(SIGTSTP, prev_hnd_tstp);
+		fgc = NULL;
+
+		if (int_sint) {
+			cmd_3_t* d3 = (cmd_3_t*)cmd_top(ecmd->c);
+			destr_cmd_3(d3);
+			free(d3);
+			ecmd_llist = ecmd->next;
+			free(ecmd);
+			*st = 0;
+			return true;
+		}
 
 		ecmd_2_t* ccm = continue_job(ecmd, st);
 
@@ -821,12 +811,6 @@ int run_sub(ecmd_2_t* ecmd) {
 	while (true) {
 		ecmd->next = NULL;
 		ecmd_llist = ecmd;
-		int_tstp = false;
-		sighandler_t
-			prev_hnd_int  = signal(SIGINT,  &sub_int_handler),
-			prev_hnd_tstp = signal(SIGTSTP, &sub_int_handler),
-			prev_hnd_cont = signal(SIGCONT, &sub_int_handler);
-
 
 		int rs;
 		pid_t wpid;
@@ -835,9 +819,11 @@ int run_sub(ecmd_2_t* ecmd) {
 			on_child_end(wpid, rs);
 		}
 
-		signal(SIGINT,  prev_hnd_int);
-		signal(SIGTSTP, prev_hnd_tstp);
-		signal(SIGCONT, prev_hnd_cont);
+		fgc = NULL;
+
+		if (int_sint) return 0;
+
+		while (int_tstp) pause();
 
 		int st;
 		ecmd_2_t* ccm = continue_job(ecmd, &st);
@@ -853,4 +839,65 @@ int run_sub(ecmd_2_t* ecmd) {
 		free(ecmd);
 		ecmd = ccm;
 	}
+}
+
+ecmd_st* mk_ecmd_st() {
+	ecmd_st* rt = malloc(sizeof(ecmd_st));
+	for (int i = 0; i < 3; ++i)
+		rt->fds[i] = i;
+	rt->stack = NULL;
+	rt->reds  = NULL;
+	return rt;
+}
+
+int start_sub(const cmd_3_t* c3, bool keep_stdin) {
+	if (!keep_stdin) {
+		int nfd = open("/proc/null", O_RDONLY, 0640);
+		if (nfd < 0) {
+			perror("sh /proc/null");
+			return 1;
+		}
+		if (!~dup2(nfd, STDIN_FILENO)) exit(1);
+		close(nfd);
+	}
+
+	int st;
+	ecmd_2_t* ecmd = exec_cmd_3_down(c3, mk_ecmd_st(), &st);
+	return ecmd ? run_sub(ecmd) : st;
+}
+
+bool start_fg(const cmd_3_t* c3, int* st) {
+	int_tstp = int_sint = false;
+	sighandler_t
+		prev_hnd_int  = signal(SIGINT,  &int_handler),
+		prev_hnd_tstp = signal(SIGTSTP, &tstp_handler);
+	
+	ecmd_2_t* ecmd = exec_cmd_3_down(c3, mk_ecmd_st(), st);
+	bool rt = true;
+	if (ecmd) {
+		ecmd->num  = next_cmd_num++;
+		ecmd->next = ecmd_llist;
+		ecmd_llist = ecmd;
+		rt = run_fg(st);
+	}
+
+	signal(SIGINT,  prev_hnd_int);
+	signal(SIGTSTP, prev_hnd_tstp);
+	int_sint = int_tstp = false;
+	return rt;
+}
+
+bool continue_fg(int* st) {
+	fgc = ecmd_llist;
+	sighandler_t
+		prev_hnd_int  = signal(SIGINT,  &int_handler),
+		prev_hnd_tstp = signal(SIGTSTP, &tstp_handler);
+
+	broadcast(SIGCONT);
+	bool rt = run_fg(st);
+
+	signal(SIGINT,  prev_hnd_int);
+	signal(SIGTSTP, prev_hnd_tstp);
+
+	return rt;
 }

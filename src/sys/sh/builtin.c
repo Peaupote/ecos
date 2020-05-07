@@ -5,6 +5,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdbool.h>
+#include <errno.h>
 
 #include <util/misc.h>
 
@@ -59,32 +60,62 @@ int blti_read(int argc, char **args, int fd_in) {
 	cbuf_t buf;
 	cbuf_init(&buf, 256);
 	char* seg = cbuf_mkn(&buf, 256);
-	int rc;
-	while ((rc = read(fd_in, seg, 256)) > 0) {
-		buf.sz -= 256 - rc;
-		for (int i = 0; i < rc; ++i) {
-			if (seg[i] == '\n') {
-				lseek(fd_in, -rc + i+1, SEEK_CUR);
-				seg[i] = '\0';
+	int rc = 1;
+	while (!int_sint) {
 
-				char* sv;
-				char* word = strtok_rnul(buf.c, " ", &sv);
-				for(int argi = 1; argi < argc; ++argi) {
-					if (word) {
-						char* v = malloc((strlen(word) + 1) * sizeof(char));
-						strcpy(v, word);
-						var_set(args[argi], v);
-					} else break;
-					word = strtok_rnul(NULL, " ", &sv);
+		while (!int_tstp && !int_sint && (rc = read(fd_in, seg, 256)) > 0) {
+			buf.sz -= 256 - rc;
+			for (int i = 0; i < rc; ++i) {
+				if (seg[i] == '\n') {
+					lseek(fd_in, -rc + i+1, SEEK_CUR);
+					seg[i] = '\0';
+
+					char* sv;
+					char* word = strtok_rnul(buf.c, " ", &sv);
+					for(int argi = 1; argi < argc; ++argi) {
+						if (word)
+							var_set(args[argi], strdup(word));
+						else {
+							cbuf_destr(&buf);
+							return 1;
+						}
+						word = strtok_rnul(NULL, " ", &sv);
+					}
+					cbuf_destr(&buf);
+					return 0;
 				}
-				cbuf_destr(&buf);
-				return 0;
 			}
+			seg = cbuf_mkn(&buf, 256);
 		}
-		seg = cbuf_mkn(&buf, 256);
+
+		if (is_subsh && rc < 0 && errno == EINTR) 
+			while (int_tstp && !int_sint) pause();
+		else break;
 	}
 	cbuf_destr(&buf);
 	return 1;
+}
+
+int blti_kill(int argc, char** args, int fd_in __attribute__((unused))) {
+	int argi   = 1;
+	int signum = SIGINT;
+	for (; argi < argc; ++argi) {
+		if (*args[argi] == '-')
+			signum = atoi(args[argi] + 1);
+		else break;
+	}
+	int rts = 0;
+	for (; argi < argc; ++argi) {
+		pid_t pid = atoi(args[argi]);
+		int rts1  = kill(pid, signum);
+		if (rts1) {
+			if (!rts) rts = rts1;
+			char buf[20];
+			sprintf(buf, "%d", pid);
+			perror(buf);
+		}
+	}
+	return rts;
 }
 
 bool blti_fg(int argc, char** args, int* st) {
@@ -110,12 +141,7 @@ bool blti_fg(int argc, char** args, int* st) {
 	pp_cmd_3(stdout, 'c', cmd_top(e->c));
 	printf("\n");
 
-	size_t cmdc = e->c->cm2.cmdc;
-    for (size_t i = 0; i < cmdc; ++i)
-        if (~e->procs[i].pid && kill(e->procs[i].pid, SIGCONT))
-            perror("error sending SIGCONT");
-
-    return run_fg(st);
+    return continue_fg(st);
 }
 
 int blti_jobs(int argc __attribute__((unused)),
@@ -136,14 +162,14 @@ int blti_echo(int argc, char *argv[]) {
 	bool nwl = true;
 
 	for (; argi < argc; ++argi) {
-		char* arg = argv[argi];
+		const char* arg = argv[argi];
 		if (arg[0] == '-' && arg[1]) {
-			for (char* c = arg + 1; *c; ++c)
+			for (const char* c = arg + 1; *c; ++c)
 				switch (*c) {
 					case 'e': case 'E': case 'n': continue;
 					default: goto start_echo;
 				}
-			for (char* c = arg + 1; *c; ++c)
+			for (const char* c = arg + 1; *c; ++c)
 				switch (*c) {
 					case 'e': itp = true;  continue;
 					case 'E': itp = false; continue;
@@ -155,7 +181,7 @@ start_echo:
 	for (int mi0 = argi; argi < argc; ++argi) {
 		if (argi > mi0) printf(" ");
 		if (itp) {
-			for (char *c = argv[argi]; *c; ++c) {
+			for (const char *c = argv[argi]; *c; ++c) {
 				if (*c == '\\') {
 					switch (*++c) {
 						case 'n':  fputc('\n', stdout);    break;
@@ -178,12 +204,13 @@ start_echo:
 static char sblti_n_##N[]=#N;\
 static builtin_t sblti_##N={.name=sblti_n_##N,.ty= T,.exp=E,.F=(Y)&blti_##N};
 #define GEN_SBLTI_ASYNC(N, E) GEN_SBLTI(N,BLTI_ASYNC,fun,builtin_f, E)
-#define GEN_SBLTI_SYNC(N) GEN_SBLTI(N,BLTI_SYNC,sfun,builtin_syf, false)
+#define GEN_SBLTI_SYNC(N, E)  GEN_SBLTI(N,BLTI_SYNC,sfun,builtin_syf, E)
 #define GEN_SBLTI_TOP(N) GEN_SBLTI(N,BLTI_TOP,tfun,builtin_top, false)
-GEN_SBLTI_SYNC(exit)
-GEN_SBLTI_SYNC(cd)
-GEN_SBLTI_SYNC(export)
-GEN_SBLTI_SYNC(read)
+GEN_SBLTI_SYNC(exit, true)
+GEN_SBLTI_SYNC(cd,   false)
+GEN_SBLTI_SYNC(export, false)
+GEN_SBLTI_SYNC(read, false)
+GEN_SBLTI_SYNC(kill, true)
 GEN_SBLTI_TOP(fg)
 GEN_SBLTI_ASYNC(jobs, false)
 GEN_SBLTI_ASYNC(echo, true)
@@ -207,6 +234,7 @@ void init_builtins() {
 	add_builtin(&sblti_fg);
 	add_builtin(&sblti_jobs);
 	add_builtin(&sblti_echo);
+	add_builtin(&sblti_kill);
 }
 
 builtin_t* find_builtin(const char* name) {

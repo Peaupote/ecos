@@ -30,3 +30,6 @@
 
 // Nombre maximal de #! qu'execve peut suivre
 #define EXECVE_FOLLOW_MAX 10
+
+// Empêche les processus de modifier leurs arguments / env
+#define PROC_RO_ARGS

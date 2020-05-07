@@ -424,6 +424,8 @@ static void kill_proc_remove(pid_t pid, proc_t* p, proc_t* pp) {
                 ip->p_fchd = p->p_fchd;
         }
         ip->p_nchd += p->p_nchd;
+
+		proc_unblock_1(PID_INIT, state.st_proc + PID_INIT);
     }
 
     if (~p->p_nxsb)

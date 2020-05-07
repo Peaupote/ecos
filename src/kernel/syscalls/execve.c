@@ -285,10 +285,12 @@ static inline bool execve_load_sections(int fd) {
             }
 		}
     }
+#ifndef PROC_RO_ARGS
 	// Readd flag W on args
     for (uint_ptr dst = trf()->args_bg & PAGE_MASK;
             dst < trf()->args_ed; dst += PAGE_SIZE)
 		*paging_page_entry(dst) |= PAGING_FLAG_W;
+#endif
 	// Remove flag Y3
     for (size_t i_s = 0; i_s < trf()->nb_sections; ++i_s) {
         struct section* s = sections() + i_s;
@@ -418,6 +420,9 @@ static inline bool execve_tr_args(const char* args[], const char* envs[],
     for (size_t s = 0; s < trf()->nb_sections; ++s)
         maxa_uint_ptr(&trf()->args_bg,
                 sections()[s].dst + sections()[s].sz);
+#ifdef PROC_RO_ARGS
+    trf()->args_bg = align_to(trf()->args_bg, PAGE_SIZE);
+#endif
     trf()->args_bg = align_to(trf()->args_bg, alignof(char**));
 
 	// emplacement dans la zone de transfert
@@ -427,6 +432,8 @@ static inline bool execve_tr_args(const char* args[], const char* envs[],
 	if (trf()->args_t_bg >= sargs_ed 
 			&& !execve_tr_alloc_pg(trf()->args_t_bg))
 		return false;
+
+	sargs_ed = align_to(sargs_ed, alignof(char**));
 
     uint_ptr aofs     = trf()->args_bg - trf()->args_t_bg;
 	int sargc = execve_shift_sargs(shift, aofs, sbg0, &sargs_ed,
@@ -556,6 +563,7 @@ void proc_execve_entry(const char *fname,
 	uint_ptr tralim = trf()->args_t_bg;
 	char* nsarg = (char*)trf()->args_t_bg;
 
+	// #!
 	while (true) {
 		if (!read_bytes(fd, header, 2)) {
 			close(fd);
@@ -587,9 +595,16 @@ void proc_execve_entry(const char *fname,
     // Lecture des headers du fichier ELF
 	memcpy(&trf()->ehdr, header, 2);
     trf()->nb_sections = 0;
-    if (!read_bytes(fd, ((uint8_t*)&trf()->ehdr)+2, sizeof(Elf64_Ehdr)-2)
-            //TODO: check
-            || !execve_read_sections(fd))
+    if (!read_bytes(fd, ((uint8_t*)&trf()->ehdr)+2, sizeof(Elf64_Ehdr)-2))
+		goto err_1;
+
+	unsigned char ident[4] = {0x7f, 'E', 'L', 'F'};
+	if (memcmp(ident, trf()->ehdr.e_ident, 4)) {
+		trf()->errno = ENOEXEC;
+		goto err_1;
+	}
+
+    if (!execve_read_sections(fd))
 		goto err_1;
 
     // Transfert des arguments
@@ -609,6 +624,7 @@ void proc_execve_entry(const char *fname,
     call_proc_execve_end();
 
 err_1:
+	cur_proc()->p_errno = NULL;
 	close(fd);
 	call_proc_execve_error_1();
 }
@@ -624,7 +640,11 @@ void proc_execve_end() {
     pp->p_reg.r.rsi.p = trf()->argv;
     pp->p_reg.r.rdx.p = trf()->envv;
     pp->p_pml4        = mp->p_pml4;
-    pp->p_brkm = pp->p_brk = align_to(trf()->args_ed, 8);
+#ifdef PROC_RO_ARGS
+    pp->p_brkm = pp->p_brk = align_to(trf()->args_ed, PAGE_SIZE);
+#else
+    pp->p_brkm = pp->p_brk = trf()->args_ed;
+#endif
     pp->p_shnd.usr    = NULL;
     pp->p_shnd.blk    = trf()->sigblk_save;
     //on hérite p_shnd.ign

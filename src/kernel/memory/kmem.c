@@ -201,10 +201,13 @@ uint64_t* kmem_acc_pts_entry(uint_ptr v_addr, enum pgg_level rlvl,
 				((uint64_t*) query_addr)[i] = PAGING_FLAG_W;
 		} else if((*query) & PAGING_FLAG_S)
 			return NULL;
-		else {
+		else if (((*query) & flags) != flags) {
 			*query |=  flags;
 			query_addr = paging_rm_loop(query_addr);
-		}
+			invalide_page(query_addr);
+		} else
+			query_addr = paging_rm_loop(query_addr);
+
 		query_addr |= (v_addr >> (lvl * 9)) & PAGE_ENT_MASK;
 	}
 
@@ -225,6 +228,7 @@ void kmem_print_paging(uint_ptr v_addr) {
 			return;
 		}
 	}
+	kprintf("val: %p\n", *(uint64_t*)v_addr);
 }
 
 void kmem_print_info() {
