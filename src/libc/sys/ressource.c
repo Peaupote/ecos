@@ -7,3 +7,9 @@ int setpriority(int prio) {
 int getpriority() {
 	return 19 - _getpriority();
 }
+
+int nice(int inc) {
+	int prio = getpriority();
+	prio += inc;
+	return setpriority(prio) ? - 1 : prio;
+}

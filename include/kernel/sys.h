@@ -20,7 +20,7 @@ static inline void set_errno(int e) {
     set_proc_errno(cur_proc(), e);
 }
 
-static inline bool check_arg_ubound(uint_ptr bg, size_t sz) {
+static inline bool check_arg_ubound(uint_ptr bg, uint64_t sz) {
 	return bg + sz >= bg
 		&& bg + sz <= paging_set_lvl(pgg_pml4, PML4_END_USPACE);
 }
@@ -29,7 +29,7 @@ static inline bool check_arg_ubound(uint_ptr bg, size_t sz) {
  * Vérifie que la plage est dans la plage de l'userspace
  * Un accès PEUT provoquer un #PF non rattrapé
  */
-static inline bool check_argb(void* pbg, size_t sz) {
+static inline bool check_argb(void* pbg, uint64_t sz) {
 	uint_ptr bg = (uint_ptr)pbg;
 	return cur_proc()->p_ring < 3 || check_arg_ubound(bg, sz);
 }
@@ -38,7 +38,7 @@ static inline bool check_argb(void* pbg, size_t sz) {
  * Vérifie que le processus peut accéder à la plage en lecture
  * Si vrai, un accès en lecture ne peut pas provoquer de #PF
  */
-static inline bool check_argR(void* pbg, size_t sz) {
+static inline bool check_argR(void* pbg, uint64_t sz) {
 	uint_ptr bg = (uint_ptr)pbg;
 	return cur_proc()->p_ring < 3
 		|| (check_arg_ubound(bg, sz) 

@@ -5,6 +5,7 @@
 #include <kernel/file.h>
 #include <kernel/tty.h>
 #include <kernel/proc.h>
+#include <kernel/display.h>
 
 #include <fs/proc.h>
 
@@ -14,14 +15,17 @@
 #include <util/misc.h>
 
 #define PROC_BLOCK_SIZE 1024
+#define PROC_STAT_BSIZE 0
+#define PROC_STAT_DSIZE 0x7fffffff
 
 #define PROC_INO_PID_SHIFT   16
 #define PROC_INO_PID_MASK    0x7fff0000
 #define PROC_INO_PID_PART(P) (((ino_t)(P))<<PROC_INO_PID_SHIFT)
 
-#define PROC_TTY_INO   2
-#define PROC_PIPES_INO 3
-#define PROC_NULL_INO  4
+#define PROC_TTY_INO    2
+#define PROC_PIPES_INO  3
+#define PROC_NULL_INO   4
+#define PROC_DISPL_INO  5
 #define PROC_TTYI_INO(I) (0x10|(I))
 #define PROC_PIPEI_INO(I) ((1<<31)|(I))
 #define PROC_PID_INO(P)      PROC_INO_PID_PART(P)
@@ -36,7 +40,7 @@ struct spart_wtdt {
     char*  dst;
 };
 
-void spart_wt(void* pdt, const char* src, size_t c) {
+static void spart_wt(void* pdt, const char* src, size_t c) {
     struct spart_wtdt* dt = (struct spart_wtdt*) pdt;
     if (dt->ofs) {
         if (dt->ofs >= c) {
@@ -52,7 +56,7 @@ void spart_wt(void* pdt, const char* src, size_t c) {
     dt->count -= c;
     dt->dst   += c;
 }
-int spart_printf(void* dst, size_t ofs, size_t count,
+static int spart_printf(void* dst, size_t ofs, size_t count,
         const char *fmt, ...) {
     struct spart_wtdt dt = {.ofs=ofs, .count=count, .dst=(char*)dst};
     va_list p;
@@ -60,6 +64,14 @@ int spart_printf(void* dst, size_t ofs, size_t count,
     fpprintf(&spart_wt, &dt, fmt, p);
     va_end(p);
     return count - dt.count;
+}
+
+static int spart_read(void* dst, size_t ofs, size_t dc,
+			  void* src, size_t sc) {
+	if (ofs >= sc) return 0;
+	mina_size_t(&dc, sc - ofs);
+	memcpy(dst, src + ofs, dc);
+	return dc;
 }
 
 //
@@ -134,25 +146,32 @@ static inline bool dirent_stc(int* rc, struct dirent** d,
 
 static int root_getents(fpd_dt_t* n __attribute__((unused)),
         int rc, bool begin, cdt_t* dt, struct dirent* d, size_t sz) {
-    pid_t i = begin ? -2 : dt->pid;
+    pid_t i = begin ? -3 : dt->pid;
     switch (i) {
-        case -2:
+        case -3:
             if(!dirent_stc(&rc, &d, &sz,
                         PROC_TTY_INO, TYPE_DIR, "tty", 3)) {
+                dt->pid = -3;
+                return rc;
+            }
+            // FALLTHRU
+        case -2:
+            if (!dirent_stc(&rc, &d, &sz,
+                        PROC_PIPES_INO, TYPE_DIR, "pipes", 5)) {
                 dt->pid = -2;
                 return rc;
             }
             // FALLTHRU
-        case -1:
-            if (!dirent_stc(&rc, &d, &sz,
-                        PROC_PIPES_INO, TYPE_DIR, "pipes", 5)) {
+		case -1:
+            if(!dirent_stc(&rc, &d, &sz,
+                    PROC_NULL_INO, TYPE_REG, "null", 4)) {
                 dt->pid = -1;
                 return rc;
             }
             // FALLTHRU
 		case 0:
             if(!dirent_stc(&rc, &d, &sz,
-                    PROC_NULL_INO, TYPE_REG, "null", 4)) {
+                    PROC_DISPL_INO, TYPE_REG, "display", 7)) {
                 dt->pid = 0;
                 return rc;
             }
@@ -204,7 +223,7 @@ static int ttyi_stat(file_ins* ins, struct stat* st) {
     st->st_nlink   = 1;
     st->st_size    = ins->ttyi ? 0 : (ttyin_force0 ? 1 : ttyin_buf.sz);
     st->st_blksize = PROC_BLOCK_SIZE;
-    st->st_blocks  = 0;
+    st->st_blocks  = PROC_STAT_BSIZE;
     return st->st_ino;
 }
 static int ttyi_read(file_ins* ins, void* dst,
@@ -299,15 +318,15 @@ static int pipei_write(file_ins* ins, void* src,
     return wc;
 }
 
-// --/null --
+// -- /null --
 
 static int null_stat(file_ins* ins __attribute__((unused)),
 					 struct stat* st) {
     st->st_mode    = TYPE_REG|0666;
     st->st_nlink   = 1;
-    st->st_size    = 0;
+    st->st_size    = PROC_STAT_DSIZE;
     st->st_blksize = PROC_BLOCK_SIZE;
-    st->st_blocks  = 0;
+    st->st_blocks  = PROC_STAT_BSIZE;
     return st->st_ino;
 }
 static int null_read(file_ins* ins __attribute__((unused)),
@@ -321,6 +340,22 @@ static int null_write(file_ins* ins __attribute__((unused)),
         off_t ofs __attribute__((unused)),
 		size_t sz) {
 	return sz;
+}
+
+// -- /display --
+
+static void displ_close(file_ins* ins __attribute__((unused))) {
+	display_set_graph(false);
+}
+static int displ_read(file_ins* ins __attribute__((unused)),
+						void* dst, off_t ofs, size_t sz) {
+	return spart_read(dst, ofs, sz, &display_info, sizeof(display_info));
+}
+static int displ_write(file_ins* ins __attribute__((unused)),
+		void* src, off_t ofs __attribute__((unused)),
+		size_t sz) {
+	if (sz < sizeof(struct display_rq)) return 0;
+	return display_handle_rq((struct display_rq*) src);
 }
 
 // -- /<pid> --
@@ -385,9 +420,9 @@ static int pid_fd_getents(fpd_dt_t* ddt,
 static int fdi_stat(file_ins* n __attribute__((unused)), struct stat* st) {
     st->st_mode    = TYPE_SYM;
     st->st_nlink   = 1;
-    st->st_size    = 0;
+    st->st_size    = PROC_STAT_DSIZE;
     st->st_blksize = PROC_BLOCK_SIZE;
-    st->st_blocks  = 0;
+    st->st_blocks  = PROC_STAT_BSIZE;
     return st->st_ino;
 }
 static int fdi_read(file_ins* ins __attribute__((unused)),
@@ -425,9 +460,9 @@ static int stat_read(file_ins* ins, void* d, off_t ofs, size_t sz) {
 static int reg_stat(file_ins* n __attribute__((unused)), struct stat* st) {
     st->st_mode    = TYPE_REG|0400;
     st->st_nlink   = 1;
-    st->st_size    = ~0;
+    st->st_size    = PROC_STAT_DSIZE;
     st->st_blksize = PROC_BLOCK_SIZE;
-    st->st_blocks  = 0;
+    st->st_blocks  = PROC_STAT_BSIZE;
     return st->st_ino;
 }
 
@@ -437,9 +472,9 @@ static int dir_stat(file_ins* ins __attribute__((unused)),
         struct stat* st) {
     st->st_mode    = TYPE_DIR|0400;
     st->st_nlink   = 1;
-    st->st_size    = 0;
+    st->st_size    = PROC_STAT_DSIZE;
     st->st_blksize = PROC_BLOCK_SIZE;
-    st->st_blocks  = 0;
+    st->st_blocks  = PROC_STAT_BSIZE;
     return st->st_ino;
 }
 
@@ -592,6 +627,17 @@ static struct fs_proc_file
             .lookup   = NULL,
             .getdents = NULL,
             .readsymlink = NULL
+    },
+    fun_displ = {
+            .opench   = NULL,
+            .open     = NULL,
+            .close    = displ_close,
+            .stat     = null_stat,
+            .read     = displ_read,
+            .write    = displ_write,
+            .lookup   = NULL,
+            .getdents = NULL,
+            .readsymlink = NULL
     };
 
 static inline fpd_dt_t* set_dir_dt(file_ins* ins, ino_t p, dir_getents e) {
@@ -617,6 +663,9 @@ static bool fs_proc_from_ino(ino_t ino, file_ins* ins, struct fs_proc_file** rt)
             return true;
 		case PROC_NULL_INO:
 			*rt = &fun_null;
+			return true;
+		case PROC_DISPL_INO:
+			*rt = &fun_displ;
 			return true;
         default:
             if (ino & (1<<31)) {

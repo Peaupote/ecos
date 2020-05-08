@@ -117,6 +117,7 @@ typedef struct ecmd_stack {
 	};
 } ecmd_stack_t;
 typedef struct {
+	int               num;
 	ecmd_stack_t*     stack;
 	ecmd_stack_red_t* reds;
 	int               fds[3];
@@ -127,7 +128,6 @@ typedef struct {
 	int st;
 } ecmdp_t;
 typedef struct ecmd_2 {
-	int            num;
 	ecmd_st*       st;
 	const cmd_3_t *c;// C_CM2
 	struct ecmd_2 *next;
@@ -147,7 +147,7 @@ typedef struct var {
 	struct var* next;
 } var_t;
 
-typedef bool (*builtin_top)(int argc, char** args, int* st);
+typedef bool (*builtin_top)(int argc, char** args, int*  st);
 typedef int  (*builtin_syf)(int argc, char** args, int fdin);
 typedef int  (*builtin_f  )(int argc, char** args);
 enum builtin_ty {
@@ -302,10 +302,14 @@ ecmd_2_t*  continue_job(ecmd_2_t* e, int* st);
 int        run_sub(ecmd_2_t* e);
 bool       run_fg(int* st);
 ecmd_2_t** find_exd_num(int num);
-ecmd_st*   mk_ecmd_st();
+ecmd_st*   mk_ecmd_st(int num);
 
+void       broadcast_e(ecmd_2_t* e, int signum);
 int        start_sub(const cmd_3_t* c3, bool keep_stdin);
 bool       start_fg(const cmd_3_t* c3, int* st);
 bool       continue_fg(int* st);
+
+__attribute__((noreturn))
+void       sh_exit(int st);
 
 #endif

@@ -5,6 +5,8 @@ Le tty possède un flux de lecture (`tty0`) et deux flux d'écriture (`tty1` et 
   via des séquences précédés du caractère `\033` (`\e`, `\x1B`):
   - `\033d`: passe le tty en mode défaut
   - `\033p__prompt_msg__\033;`: passe le tty en mode prompt
+  - `\033l`: passe le tty en mode `live`: les entrés claviers sont envoyées
+    directement sur tty0 au format binaire de la structure `key_event`
   - `\033\n`: nouvelle ligne si la ligne actuelle n'est pas vide
   - `\033[__colors__m`: change la couleur, `__colors__` est une liste de codes
     séparés par `;`:

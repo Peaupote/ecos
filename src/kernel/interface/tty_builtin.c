@@ -4,6 +4,7 @@
 #include <kernel/kutil.h>
 
 #include <kernel/memory/kmem.h>
+#include <kernel/display.h>
 #include <kernel/proc.h>
 #include <kernel/tests.h>
 #include <fs/ext2.h>
@@ -123,7 +124,9 @@ static void change_log(char** tokpt) {
 static void builtin_info(char** tokpt) {
 	char *arg = strtok_rnul(NULL, " ", tokpt);
 	if (!arg) return;
-	if (!strcmp(arg, "mem")) kmem_print_info();
+	if (!strcmp(arg, "mem"))      kmem_print_info();
+	else if (!strcmp(arg, "dis")) display_print_info();
+	else if (!strcmp(arg, "err")) kprintf("early err:%d\n", nb_early_error);
 }
 
 void tty_built_in_exec(tty_seq_t* sq, char* cmd) {

@@ -8,7 +8,7 @@ include $(ROOT)/vars.Makefile
 export CC?=x86_64-elf-gcc
 export AS?=x86_64-elf-as
 
-CFILES=test.c test2.c test3.c test_printf.c test_args.c
+CFILES=test.c test2.c test3.c test_printf.c test_args.c test_display.c
 OUT=$(CFILES:.c=.out) test_reg.out
 SRCDEP=$(CFILES)
 CPFILES=test.c

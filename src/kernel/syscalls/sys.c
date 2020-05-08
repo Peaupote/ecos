@@ -201,8 +201,12 @@ pid_t sys_fork() {
 
 int sys_setpriority(int prio) {
     proc_t *p = state.st_proc + state.st_curr_pid;
-    if (prio > p->p_prio) return -1;
+    if (prio > p->p_prio) {
+		set_errno(EPERM);
+		return -1;
+	}
     p->p_prio = prio;
+	set_errno(SUCC);
     return 0;
 }
 int sys_getpriority() {

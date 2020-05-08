@@ -73,21 +73,25 @@ void kpanic_early() {
 }
 
 void kpanic(const char *msg) {
+	if (klog_level > Log_early) {
+		kprintf("PANIC! cpid=%d\n", (int)state.st_curr_pid);
+		kprintf("%s", msg);
+	}
 	if (kpanic_is_early) kpanic_early();
-    kprintf("PANIC! cpid=%d\n", (int)state.st_curr_pid);
-    kprintf("%s", msg);
-    kpanic_stop();
+	else kpanic_stop();
 }
 void kpanicf(const char *msg, const char *fmt, ...) {
+	if (klog_level > Log_early) {
+		kprintf("PANIC! cpid=%d\n", (int)state.st_curr_pid);
+		kprintf("%s\n", msg);
+		va_list params;
+		va_start(params, fmt);
+		vprintf(fmt, params);
+		va_end(params);
+		kprintf("\n");
+	}
 	if (kpanic_is_early) kpanic_early();
-    kprintf("PANIC! cpid=%d\n", (int)state.st_curr_pid);
-    kprintf("%s\n", msg);
-    va_list params;
-    va_start(params, fmt);
-    vprintf(fmt, params);
-    va_end(params);
-    kprintf("\n");
-    kpanic_stop();
+	else kpanic_stop();
 }
 void kassert(uint8_t b, const char *msg) {
     if(!b) kpanic(msg);

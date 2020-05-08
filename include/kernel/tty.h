@@ -14,8 +14,9 @@
 enum tty_mode {
     ttym_def,
 	ttym_prompt,
+	ttym_live,
     ttym_debug,
-    ttym_panic
+    ttym_panic,
 };
 
 typedef struct {
@@ -34,8 +35,11 @@ void   tty_set_owner(pid_t p);
 bool   tty_input(scancode_byte scb, key_event ev);
 void   tty_on_pit();
 
-//L'affichage du prompt doit être mis à jour (tty_update_prompt)
-void   tty_afficher_buffer_range(size_t idx_begin, size_t idx_end);
+// L'affichage du prompt doit être mis à jour avant
+// (tty_update_prompt)
+void   tty_afficher_buffer_range(
+		    size_t idx_bg, size_t x_bg,
+		    size_t idx_ed, size_t x_ed);
 void   tty_afficher_buffer_all();
 
 size_t tty_new_prompt(void);
@@ -43,11 +47,12 @@ void   tty_afficher_prompt(bool fill);
 size_t tty_update_prompt(void);
 size_t tty_prompt_to_buffer(size_t in_len);
 
-size_t tty_buffer_cur_idx ();
+void   tty_afficher_all();
+
 size_t tty_buffer_next_idx();
 
-//indice sans shift dans le buffer
-//retourne le shift_array effectué
+// indice sans shift dans le buffer
+// retourne le shift_array effectué
 size_t tty_new_buffer_line_idx(size_t* index);
 
 void   tty_force_new_line(void);
@@ -57,20 +62,13 @@ void   tty_writer(void* shift, const char* str);
 
 typedef struct {
     size_t idx_bg;
+	size_t x_bg;
     size_t shift;
 } tty_seq_t;
 
-static inline void tty_seq_init(tty_seq_t* s) {
-    s->idx_bg = tty_buffer_cur_idx();
-    s->shift  = 0;
-}
-static inline void tty_seq_commit(tty_seq_t* s) {
-    s->shift += tty_update_prompt();
-    if (s->shift) tty_afficher_buffer_all();
-    else tty_afficher_buffer_range(s->idx_bg, tty_buffer_next_idx());
-}
-
-void tty_seq_write(void* seq, const char* s, size_t len);
+void   tty_seq_init(tty_seq_t* s);
+void   tty_seq_write(void* seq, const char* s, size_t len);
+void   tty_seq_commit(tty_seq_t* s);
 
 static inline int tty_seq_printf(tty_seq_t* sq, const char* fmt, ...) {
     va_list ps;

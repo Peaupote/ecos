@@ -1,13 +1,15 @@
 #include "sh.h"
 
+#include <sys/wait.h>
 #include <signal.h>
 #include <stdlib.h>
 #include <fcntl.h>
-#include <sys/wait.h>
 #include <string.h>
-#include <util/misc.h>
 #include <assert.h>
 #include <errno.h>
+#include <unistd.h>
+
+#include <util/misc.h>
 
 // --Variables--
 var_t* lvars[256] = {NULL};
@@ -73,7 +75,7 @@ struct ecmdp_ref find_exd_proc(pid_t pid) {
 }
 ecmd_2_t** find_exd_num(int num) {
     for (ecmd_2_t** cmdr = &ecmd_llist; *cmdr; cmdr = &(*cmdr)->next)
-        if ((*cmdr)->num == num)
+        if ((*cmdr)->st->num == num)
             return cmdr;
     return NULL;
 }
@@ -95,13 +97,16 @@ ecmd_2_t** on_child_end(pid_t pid, int st) {
 bool int_tstp, int_sint;
 static ecmd_2_t* fgc = NULL; // = ecmd_llist ou NULL
 
-static void broadcast(int signum) {
-	if (!fgc) return;
-	size_t   cmdc = fgc->c->cm2.cmdc;
+void broadcast_e(ecmd_2_t* e, int signum) {
+	size_t   cmdc = e->c->cm2.cmdc;
     for (size_t i = 0; i < cmdc; ++i)
-        if (~fgc->procs[i].pid && kill(fgc->procs[i].pid, signum))
+        if (~e->procs[i].pid && kill(e->procs[i].pid, signum))
 			if (errno != ESRCH) // déjà mort
 				perror("error broadcasting signal");
+}
+static void broadcast(int signum) {
+	if (!fgc) return;
+	broadcast_e(fgc, signum);
 }
 
 void int_handler(int signum __attribute__((unused))) {
@@ -115,7 +120,7 @@ void tstp_handler(int signum __attribute__((unused))) {
 
 void sub_int_handler(int signum __attribute__((unused))) {
 	broadcast(SIGINT);
-	exit(1);
+	sh_exit(1);
 }
 void sub_tstp_handler(int signum __attribute__((unused))) {
 	broadcast(SIGTSTP);
@@ -433,6 +438,8 @@ ecmd_2_t* exec_cmd_2(const cmd_3_t* c3, ecmd_st* st) {
 		ecmd->procs[ic].st  = 66;
 	}
 	fgc = ecmd;
+	ecmd->next = ecmd_llist;
+	ecmd_llist = ecmd;
 
     int fd_in = -1;
     for (size_t ic = 0; ic < cmdc; ++ic) {
@@ -446,7 +453,7 @@ ecmd_2_t* exec_cmd_2(const cmd_3_t* c3, ecmd_st* st) {
             int rp     = pipe(fds);
             if (rp < 0) {
                 perror("sh pipe");
-                exit(1);
+				continue;
             }
 
             next_fd_in = fds[0];
@@ -501,7 +508,16 @@ ecmd_2_t* exec_cmd_2(const cmd_3_t* c3, ecmd_st* st) {
 					case BLTI_TOP:
 						blti = NULL;
 						break;
-					case BLTI_ASYNC: break;
+					case BLTI_ASYNC:
+						if (!~fd_in 
+							&& st->fds[STDOUT_FILENO]==STDOUT_FILENO
+							&& !c->r.redc ) {
+					// Si il n'y a pas de redirections, on accélère
+					// la builtin en ne forkant pas
+							ecmd->procs[ic].st = blti->fun(argc, args);
+							goto continue_pipe;
+						} else
+							break;
 					case BLTI_SYNC: {
 						int mfd_in = ~fd_in ? fd_in : STDIN_FILENO;
 						if (0 <= mfd_in && mfd_in < 3)
@@ -519,10 +535,12 @@ ecmd_2_t* exec_cmd_2(const cmd_3_t* c3, ecmd_st* st) {
 
         else if (rf == 0) {// enfant
 
+			nice(1);
+
 			// redirections hérités
 			apply_reds3(st);
 
-			// on ferme les pipes inutiles
+			// pipes
             if (~fd_in && fd_in != STDIN_FILENO) {
 				dup2(fd_in, STDIN_FILENO);
 				close(fd_in);
@@ -557,7 +575,7 @@ ecmd_2_t* exec_cmd_2(const cmd_3_t* c3, ecmd_st* st) {
 					exit(1);
 				case C_SUB:
 					if (!c->c.sub) exit(0);
-					exit(start_sub(c->c.sub, true));
+					sh_exit(start_sub(c->c.sub, true));
 			}
 			exit(2);
 
@@ -612,7 +630,7 @@ int exec_cmd_3_bg(const cmd_3_t* c3, bool print_pid) {
 
 	// enfant 1: sous-shell
 	is_subsh = true;
-	exit(start_sub(c3, false));
+	sh_exit(start_sub(c3, false));
 }
 
 ecmd_2_t* exec_cmd_3_up(const cmd_3_t* c3, ecmd_st* st,
@@ -766,14 +784,14 @@ ecmd_2_t* continue_job(ecmd_2_t* e, int* st) {
 
 bool run_fg(int* st) {
     ecmd_2_t* ecmd = ecmd_llist;
-	while (true) {
+	do {
 		int rs;
 		pid_t wpid;
 		while (ecmd->nb_alive > 0) {
 			do {
 				if (int_tstp) {
 					fgc = NULL;
-					printf("\n[%d]\tstopped\n", ecmd->num);
+					printf("\n[%d]\tstopped\n", ecmd->st->num);
 					return false;
 				}
 			} while(!~(wpid = wait(&rs)));
@@ -781,37 +799,28 @@ bool run_fg(int* st) {
 		}
 
 		fgc = NULL;
+		ecmd_llist = ecmd->next;
 
 		if (int_sint) {
 			cmd_3_t* d3 = (cmd_3_t*)cmd_top(ecmd->c);
 			destr_cmd_3(d3);
 			free(d3);
-			ecmd_llist = ecmd->next;
 			free(ecmd);
 			*st = 0;
 			return true;
 		}
 
-		ecmd_2_t* ccm = continue_job(ecmd, st);
-
-		if (!ccm) {
-			ecmd_llist = ecmd->next;
-			free(ecmd);
-			return true;
-		}
-
-		ccm->next  = ecmd->next;
-		ecmd_llist = ccm;
+		ecmd_2_t* necmd = continue_job(ecmd, st);
 		free(ecmd);
-		ecmd = ccm;
-	}
+		ecmd = necmd;
+
+	} while (ecmd);
+	return true;
 }
 
 int run_sub(ecmd_2_t* ecmd) {
-	while (true) {
-		ecmd->next = NULL;
-		ecmd_llist = ecmd;
-
+	int st;
+	do {
 		int rs;
 		pid_t wpid;
 		while (ecmd->nb_alive > 0) {
@@ -820,37 +829,32 @@ int run_sub(ecmd_2_t* ecmd) {
 		}
 
 		fgc = NULL;
+		ecmd_llist = ecmd->next;
 
 		if (int_sint) return 0;
 
 		while (int_tstp) pause();
 
-		int st;
-		ecmd_2_t* ccm = continue_job(ecmd, &st);
-
-		if (!ccm) {
-			ecmd_llist = NULL;
-			free(ecmd);
-			return st;
-		}
-
-		ccm->next  = NULL;
-		ecmd_llist = ccm;
+		ecmd_2_t* necmd = continue_job(ecmd, &st);
 		free(ecmd);
-		ecmd = ccm;
-	}
+		ecmd = necmd;
+
+	} while (ecmd);
+	return st;
 }
 
-ecmd_st* mk_ecmd_st() {
+ecmd_st* mk_ecmd_st(int num) {
 	ecmd_st* rt = malloc(sizeof(ecmd_st));
 	for (int i = 0; i < 3; ++i)
 		rt->fds[i] = i;
+	rt->num   = num;
 	rt->stack = NULL;
 	rt->reds  = NULL;
 	return rt;
 }
 
 int start_sub(const cmd_3_t* c3, bool keep_stdin) {
+	ecmd_llist = NULL;
 	if (!keep_stdin) {
 		int nfd = open("/proc/null", O_RDONLY, 0640);
 		if (nfd < 0) {
@@ -862,7 +866,8 @@ int start_sub(const cmd_3_t* c3, bool keep_stdin) {
 	}
 
 	int st;
-	ecmd_2_t* ecmd = exec_cmd_3_down(c3, mk_ecmd_st(), &st);
+	ecmd_2_t* ecmd = exec_cmd_3_down(c3, 
+						mk_ecmd_st(next_cmd_num++), &st);
 	return ecmd ? run_sub(ecmd) : st;
 }
 
@@ -872,14 +877,9 @@ bool start_fg(const cmd_3_t* c3, int* st) {
 		prev_hnd_int  = signal(SIGINT,  &int_handler),
 		prev_hnd_tstp = signal(SIGTSTP, &tstp_handler);
 	
-	ecmd_2_t* ecmd = exec_cmd_3_down(c3, mk_ecmd_st(), st);
+	ecmd_2_t* ecmd = exec_cmd_3_down(c3, mk_ecmd_st(next_cmd_num++), st);
 	bool rt = true;
-	if (ecmd) {
-		ecmd->num  = next_cmd_num++;
-		ecmd->next = ecmd_llist;
-		ecmd_llist = ecmd;
-		rt = run_fg(st);
-	}
+	if (ecmd) rt = run_fg(st);
 
 	signal(SIGINT,  prev_hnd_int);
 	signal(SIGTSTP, prev_hnd_tstp);
