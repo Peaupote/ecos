@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <sys/wait.h>
+#include <sys/ressource.h>
 #include <libc/sys.h>
 #include <stdbool.h>
 

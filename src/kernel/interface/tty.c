@@ -66,6 +66,9 @@ size_t          tty_width, tty_height, tty_sb_height;
 
 static size_t   cur_ln_x;
 
+static int      buf_all_clock = 0;
+static int      buf_all_st    = 0;
+
 
 // --Affichage--
 
@@ -112,22 +115,55 @@ static inline size_t sb_sc_ed() {
     return sb_nb_lines - sb_display_shift;
 }
 
-void tty_afficher_buffer_range(size_t idx_begin, size_t idx_end) {
-    size_t r_b = idx_begin > sb_ashift
-            ? (idx_begin - sb_ashift)%tty_sb_height
-            : 0;
-    size_t r_e = (idx_end - sb_ashift)%tty_sb_height;
-    maxa_size_t(&r_b, sb_rel_im_bg());
-    mina_size_t(&r_e, sb_rel_im_ed());
+void tty_afficher_buffer_range(
+		size_t idx_bg, size_t x_bg,
+		size_t idx_ed,   size_t x_ed) {
 
-    for (size_t it = r_b; it < r_e; ++it) {
-        uint16_t* line = sbuffer + ((sb_ashift + it)%tty_sb_height)*tty_width;
-        for (size_t x = 0; x < tty_width; ++x)
-            puteat(line[x], x, it - sb_display_shift);
+	if (display_graph) return;
+
+	size_t r_b = 0;
+	if (idx_bg > sb_ashift)
+		 r_b = (idx_bg - sb_ashift)%tty_sb_height;
+	else x_bg = 0;
+	size_t ri_bg = sb_rel_im_bg();
+	if (ri_bg > r_b) {
+		r_b  = ri_bg;
+		x_bg = 0;
+	}
+	
+	size_t r_e = 0;
+	if (idx_ed > sb_ashift)
+    	 r_e = (idx_ed - sb_ashift)%tty_sb_height;
+	else return;
+	size_t ri_ed = sb_rel_im_ed();
+	if (ri_ed < r_e) {
+		r_e  = ri_ed;
+		x_ed = tty_width;
+	}
+
+	if (r_e == r_b + 1) {
+		uint16_t* line = sbuffer
+					   + ((sb_ashift + r_b)%tty_sb_height) * tty_width;
+		for (size_t x = x_bg; x < x_ed; ++x) 
+            puteat(line[x], x, r_b - sb_display_shift);
+	} else if (r_e > r_b){
+		size_t it = r_b;
+		size_t x  = x_bg;
+		goto loop_enter;
+		for (; it < r_e; ++it) {
+			uint16_t* line;
+			x = 0;
+		loop_enter:	
+			line = sbuffer + ((sb_ashift + it)%tty_sb_height)*tty_width;
+			for (; x < tty_width; ++x)
+				puteat(line[x], x, it - sb_display_shift);
+		}
     }
 }
 
-void tty_afficher_buffer_all() {
+static void tty_afficher_buffer_all_do() {
+	if (display_graph) return;
+
     size_t r_b = sb_rel_im_bg();
     size_t r_e = sb_rel_im_ed();
 
@@ -138,10 +174,13 @@ void tty_afficher_buffer_all() {
     }
 }
 
-size_t tty_buffer_cur_idx(){
-    return cur_ln_x < tty_width
-            ? sb_ashift + sb_nb_lines - 1
-            : sb_ashift + sb_nb_lines;
+void tty_afficher_buffer_all() {
+	if (buf_all_st >= 1) {
+		buf_all_st = 2;
+		return;
+	}
+	tty_afficher_buffer_all_do();
+	buf_all_st = 1;
 }
 
 size_t tty_buffer_next_idx(){
@@ -232,10 +271,23 @@ loop_enter:
 void tty_writer(void* shift, const char *str) {
     *((size_t*)shift) = tty_writestringl(str, strlen(str), tty_def_color);
 }
+
+void tty_seq_init(tty_seq_t* s) {
+	s->idx_bg = sb_ashift + sb_nb_lines - 1;
+	s->x_bg   = cur_ln_x;
+    s->shift  = 0;
+}
+
 void tty_seq_write(void* seq, const char* s, size_t len) {
     ((tty_seq_t*)seq)->shift += tty_writestringl(s, len, tty_def_color);
 }
 
+void tty_seq_commit(tty_seq_t* s) {
+    s->shift += tty_update_prompt();
+    if (s->shift) tty_afficher_buffer_all();
+    else tty_afficher_buffer_range(s->idx_bg, s->x_bg,
+								   sb_ashift + sb_nb_lines, cur_ln_x);
+}
 
 
 // --Prompt--
@@ -257,13 +309,16 @@ tty_pos_t tty_input_at(size_t p) {
 }
 
 static void redraw_input_cursor() {
-	if (input_cursor_clock < TTY_CURSOR_T / 2 && ~input_cursor) {
+	if (input_cursor_clock < TTY_CURSOR_T / 2
+			&& ~input_cursor && ~input_top_line) {
 		tty_pos_t cpos = tty_input_at(input_cursor);
 		display_cursor_at(cpos.x, cpos.y);
 	}
 }
 
 static void set_input_cursor(size_t nc) {
+	if (display_graph || !~input_top_line) return;
+
 	if (~input_cursor) {
 		tty_pos_t cpos = tty_input_at(input_cursor);
 		putat(ibuffer[input_cursor], input_color, cpos);
@@ -320,6 +375,8 @@ size_t tty_new_prompt() {
 }
 
 void tty_afficher_prompt(bool fill) {
+	if (display_graph || !~input_top_line) return;
+
     tty_pos_t pos = {.x = 0, .y = input_top_line};
 	if (ib_printed < 0) {
     	pos = afficher_string(pos, 0, input_msg_len, input_msg, prompt_color);
@@ -340,6 +397,8 @@ void tty_afficher_prompt(bool fill) {
 }
 
 static void tty_erase_prompt() {
+	if (display_graph || !~input_top_line) return;
+
     for (tty_pos_t pos = {.y = input_top_line};
 			pos.y < input_top_line + input_height; ++pos.y)
 		for(pos.x = 0; pos.x < tty_width; ++pos.x)
@@ -411,6 +470,11 @@ void tty_set_mode(enum tty_mode m) {
                     VGA_COLOR_LIGHT_GREY, VGA_COLOR_BLACK);
         input_lmargin = 0;
         break;
+	case ttym_live:
+		tty_mode = ttym_live;
+		tty_erase_prompt();
+		input_top_line =  ~(size_t)0;
+		return;
     case ttym_panic:
         prompt_color = vga_entry_color (
                     VGA_COLOR_LIGHT_RED, VGA_COLOR_BLACK);
@@ -441,8 +505,10 @@ void tty_set_mode(enum tty_mode m) {
 
     if (~input_top_line) {
 		tty_erase_prompt();
-		tty_refresh_prompt();
-	}
+		if (tty_refresh_prompt())
+			tty_afficher_buffer_all();
+	} else if(tty_new_prompt())
+		tty_afficher_all();
 }
 
 void tty_set_mode_to_b() {
@@ -465,19 +531,80 @@ static void on_tty0_action() {
 		tty_set_bmode(ttym_def, 0, NULL);
 }
 
+void tty_afficher_all() {
+	tty_afficher_buffer_all_do();
+	tty_afficher_prompt(true);
+}
 
 
 bool tty_input(scancode_byte s, key_event ev) {
-	bool rt = false;
     tty_seq_t sq;
     tty_seq_init(&sq);
+	bool rt = false;
+
+	if ((ev.flags & (KEY_FLAG_MODS | KEY_FLAG_PRESSED))
+			== (KEY_FLAG_CTRL | KEY_FLAG_PRESSED)) {
+		switch (ev.key) {
+			case KEY_TAB:
+				switch (tty_mode) {
+					case ttym_def: case ttym_prompt: case ttym_live:
+						tty_set_mode(ttym_debug);
+						display_set_debug(true);
+					break;
+					case ttym_debug:
+						tty_set_mode_to_b();
+						display_set_debug(false);
+					break;
+					case ttym_panic:  break;
+				}
+			return false;
+			case KEY_C:
+				if (~state.st_owng[own_tty]) {
+					sq.shift += tty_writestringl("^C", 2, tty_def_color);
+					send_sig_to_proc(state.st_owng[own_tty], SIGINT - 1);
+					on_tty0_action();
+					rt = true;
+				}
+			break;
+			case KEY_Z:
+				if (~state.st_owng[own_tty]) {
+					sq.shift += tty_writestringl("^Z", 2, tty_def_color);
+					send_sig_to_proc(state.st_owng[own_tty], SIGTSTP - 1);
+					on_tty0_action();
+					rt = true;
+				}
+			break;
+			case KEY_D:
+				if (!~input_top_line) break;
+				if (ib_size) {
+					sq.shift += tty_input_to_buffer();
+					if(fs_proc_write_tty(ibuffer, ib_size) != ib_size)
+						klogf(Log_error, "tty", "in_buffer saturated");
+					sq.shift += tty_new_prompt();
+				} else {
+					sq.shift += tty_writestringl("^D", 2, tty_def_color);
+					fs_proc_send0_tty();
+				}
+				on_tty0_action();
+				rt = true;
+			break;
+		}
+	}
+
+	if (tty_mode == ttym_live) {
+		if (!ev.key) return false;
+		if(fs_proc_write_tty((char*)&ev, sizeof(ev)) != sizeof(ev))
+			klogf(Log_error, "tty", "in_buffer saturated");
+		return true;
+	}
 
     if (tty_do_kprint)
-		tty_seq_printf(&sq, "s=%x c=%x f=%x p=%x\n",
+		tty_seq_printf(&sq, "s=%x c=%x f=%x p=%c\n",
 				(int)s, (int)ev.key, (int)ev.flags,
-				(int)keycode_to_printable(ev.key));
+				0x20 <= ev.ascii && ev.ascii <= 0x7e
+				? ev.ascii : '_');
 
-    if (ev.key && !(ev.flags & 0x1)) {//évènement appui
+    if (ev.key && (ev.flags & KEY_FLAG_PRESSED)) {
 		switch (ev.key) {
 		case KEYS_ENTER: case KEY_KP_ENTER:
             sq.shift += tty_input_to_buffer();
@@ -502,9 +629,13 @@ bool tty_input(scancode_byte s, key_event ev) {
 		break;
 		case KEY_BACKSPACE:
             if(input_cursor > 0) {
-                putat(' ', input_color, tty_input_at(ib_size));
-                --ib_size;
-                putat(' ', input_color, tty_input_at(ib_size));
+                if (display_graph || !~input_top_line)
+					--ib_size;
+				else {
+					putat(' ', input_color, tty_input_at(ib_size));
+					--ib_size;
+					putat(' ', input_color, tty_input_at(ib_size));
+				}
 				for (size_t i = input_cursor-1; i < ib_size; ++i)
 					ibuffer[i] = ibuffer[i + 1];
 				mina_int(&ib_printed, input_cursor-1);
@@ -514,26 +645,26 @@ bool tty_input(scancode_byte s, key_event ev) {
         break;
 		case KEY_UP_ARROW:
             if (sb_display_shift) {
-                size_t mv = key_state_shift()
+                size_t mv = ev.flags & KEY_FLAG_SHIFT
                           ? (tty_height - input_height) : 1;
                 if (mv > sb_display_shift)
                     sb_display_shift = 0;
                 else
                     sb_display_shift -= mv;
                 sb_dtcd = true;
-                tty_afficher_buffer_all();
+				sq.shift -= mv;
             }
 		break;
 		case KEY_DOWN_ARROW:
             if (sb_sc_ed() > tty_height - input_height) {
-                size_t mv = key_state_shift()
+                size_t mv = ev.flags & KEY_FLAG_SHIFT
                           ? (tty_height - input_height) : 1;
                 mina_size_t(&mv,
                         sb_sc_ed() - (tty_height - input_height));
                 sb_display_shift += mv;
                 if (sb_sc_ed() == tty_height - input_height)
                     sb_dtcd = false;
-                tty_afficher_buffer_all();
+                sq.shift += mv;
             }
         break;
 		case KEY_LEFT_ARROW:
@@ -544,58 +675,18 @@ bool tty_input(scancode_byte s, key_event ev) {
 			if (input_cursor < ib_size)
 				set_input_cursor(input_cursor + 1);
 		break;
-		default:	
-		if (key_state_ctrl()) {
-            switch (ev.key) {
-                case KEY_TAB:
-                switch (tty_mode) {
-                    case ttym_def:    tty_set_mode(ttym_debug); break;
-                    case ttym_prompt: tty_set_mode(ttym_debug); break;
-                    case ttym_debug:  tty_set_mode_to_b();      break;
-                    case ttym_panic:  break;
-                }
-                break;
-                case KEY_C:
-                    if (~state.st_owng[own_tty]) {
-                        sq.shift += tty_writestringl("^C", 2, tty_def_color);
-                        send_sig_to_proc(state.st_owng[own_tty], SIGINT - 1);
-						on_tty0_action();
-						rt = true;
-                    }
-                break;
-				case KEY_Z:
-                    if (~state.st_owng[own_tty]) {
-                		sq.shift += tty_writestringl("^Z", 2, tty_def_color);
-                        send_sig_to_proc(state.st_owng[own_tty], SIGTSTP - 1);
-						on_tty0_action();
-						rt = true;
-					}
+		default:
+			if (ev.flags & (KEY_FLAG_CTRL | KEY_FLAG_ALT))
 				break;
-				case KEY_D:
-					if (ib_size) {
-						sq.shift += tty_input_to_buffer();
-						if(fs_proc_write_tty(ibuffer, ib_size) != ib_size)
-							klogf(Log_error, "tty", "in_buffer saturated");
-						sq.shift += tty_new_prompt();
-					} else {
-                		sq.shift += tty_writestringl("^D", 2, tty_def_color);
-						fs_proc_send0_tty();
-					}
-					on_tty0_action();
-					rt = true;
-				break;
-            }
-        } else {
-            char kchar = keycode_to_printable(ev.key);
-            if (kchar && ib_size < IB_LENGTH - 1) {
+			char kchar = ev.ascii;
+			if (0x20 <= kchar && kchar <= 0x7e && ib_size < IB_LENGTH - 1) {
 				mina_int(&ib_printed, input_cursor);
 				for (size_t i = ib_size; i > input_cursor; --i)
 					ibuffer[i] = ibuffer[i-1];
-                ibuffer[input_cursor] = kchar;
+				ibuffer[input_cursor] = kchar;
 				ibuffer[++ib_size]    = ' ';
 				set_input_cursor(input_cursor+1);
 			}
-        }
 		break;
 		}
     }
@@ -604,7 +695,8 @@ bool tty_input(scancode_byte s, key_event ev) {
 }
 
 void tty_on_pit() {
-	if (~input_cursor) {
+	if (display_graph) return;
+	if (~input_cursor && ~input_top_line) {
 		input_cursor_clock = (input_cursor_clock + 1) % TTY_CURSOR_T;
 		if (input_cursor_clock == 0) {
 			tty_pos_t cpos = tty_input_at(input_cursor);
@@ -613,6 +705,12 @@ void tty_on_pit() {
 			tty_pos_t cpos = tty_input_at(input_cursor);
 			putat(ibuffer[input_cursor], input_color, cpos);
 		}
+	}
+	if (++buf_all_clock >= TTY_BUFALL_T) {
+		buf_all_clock = 0;
+		if (buf_all_st == 2)
+			tty_afficher_buffer_all_do();
+		buf_all_st = 0;
 	}
 }
 
@@ -687,6 +785,9 @@ size_t tty_writei(uint8_t num, const char* str, size_t len) {
 					case 'd':
 						tty_set_bmode(ttym_def, 0, NULL);
 						break;
+					case 'l':
+						tty_set_bmode(ttym_live, 0, NULL);
+						break;
 					case 'p':
 						for (++i; i < len; ++i) {
 							if (str[i] == '\033'
@@ -701,7 +802,7 @@ size_t tty_writei(uint8_t num, const char* str, size_t len) {
 								str + t_ed + 2);
 					break;
 					case '\n':
-						tty_force_new_line();
+						if (cur_ln_x) tty_force_new_line();
 					break;
 					case '[':
 						for (int cbg = ++i; i < len; ++i) {

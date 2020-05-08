@@ -6,6 +6,7 @@
 
 #include <sys/stat.h>
 #include <dirent.h>
+#include <signal.h>
 
 #include <util/misc.h>
 
@@ -16,6 +17,15 @@ bool        update_cwd   = true;
 bool        is_subsh;
 static char cwd[256]     = "";
 static bool parse_only   = false;
+
+void sh_exit(int st) {
+	for (ecmd_2_t* e = ecmd_llist; e; e = e->next)
+		broadcast_e(e, SIGHUP);
+	exit(st);
+}
+void hup_handler(int signum __attribute__((unused))) {
+	sh_exit(0);
+}
 
 static inline bool stat_eq(struct stat* a, struct stat* b) {
 	return a->st_ino == b->st_ino && a->st_dev == b->st_dev;
@@ -64,6 +74,7 @@ static void do_update_cwd() {
 	update_cwd = false;
 	return;
 }
+
 
 int run_prompt() {
 	is_subsh = false;
@@ -161,7 +172,7 @@ end_input_read:;
 		}
 
 		if ((hend || start_fg(cmd, &st)) && st)
-			fprintf(stderr, "\033\nexit status %d\n", st);
+			fprintf(stderr, "exit status %d\n", st);
     }
 }
 
@@ -254,10 +265,13 @@ int main(int argc, char* argv[]) {
 			}
 		}
 	}
+
 	init_parse();
+	signal(SIGHUP, &hup_handler);
+
 	if (argi >= argc) {
 		if (display_msg) printf("ecos-shell\n");
-		return run_prompt();
+		sh_exit(run_prompt());
 	} else
-		return run_file(argc - argi, argv + argi);
+		sh_exit(run_file(argc - argi, argv + argi));
 }

@@ -11,7 +11,7 @@
 
 int blti_exit(int argc, char** argv, int fd_in __attribute__((unused))) {
 	int st = argc > 1 ? atoi(argv[1]) : 0;
-	exit(st);
+	sh_exit(st);
 }
 
 int blti_cd(int argc, char **argv, int fd_in __attribute__((unused))) {
@@ -137,7 +137,7 @@ bool blti_fg(int argc, char** args, int* st) {
     e->next     = ecmd_llist;
     ecmd_llist  = e;
 
-	printf("[%d]\t", e->num);
+	printf("[%d]\t", e->st->num);
 	pp_cmd_3(stdout, 'c', cmd_top(e->c));
 	printf("\n");
 
@@ -148,7 +148,7 @@ int blti_jobs(int argc __attribute__((unused)),
 		char** args __attribute__((unused))) {
 	
 	for (ecmd_2_t* e = ecmd_llist; e; e = e->next) {
-		printf("[%d]\t", e->num);
+		printf("[%d]\t", e->st->num);
 		pp_cmd_3(stdout, 'c', cmd_top(e->c));
 		printf("\n");
 	}

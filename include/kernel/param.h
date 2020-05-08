@@ -18,6 +18,7 @@
 #define SCHED_TIME_SLICE 2
 
 #define TTY_CURSOR_T     100
+#define TTY_BUFALL_T     4
 
 // Nombre de priorités (nice) dans le scheduler
 // Au sein du kernel la meilleure priorité est NB_PRIORITY_LVL-1, la pire 0
@@ -32,4 +33,4 @@
 #define EXECVE_FOLLOW_MAX 10
 
 // Empêche les processus de modifier leurs arguments / env
-#define PROC_RO_ARGS
+// #define PROC_RO_ARGS

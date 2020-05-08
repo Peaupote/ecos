@@ -11,6 +11,7 @@
 
 int      brk(void* addr);
 void*    sbrk(intptr_t increment);
+int      nice(int inc);
 
 int      usleep(usecond_t usec);
 unsigned int sleep(unsigned int sec);

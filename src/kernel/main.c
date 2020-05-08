@@ -31,7 +31,7 @@ static void kernel_init(uint32_t boot_info) {
 
     kmem_init_alloc(mbi);
 
-    display_init(mbi);
+    if (!display_init(mbi)) kpanic("Display");
     tty_init(ttym_def);
     klog_level = Log_warn;
 
@@ -53,8 +53,6 @@ void kernel_main(uint32_t boot_info) {
             (long long int)kmem_nb_page_free());
 
     tty_afficher_buffer_all();
-
-    tty_new_prompt();
 
     proc_start();
 }

@@ -8,8 +8,6 @@ void     _libc_init();
 
 int      _setpriority(int prio);
 int      _getpriority();
-int      setpriority(int prio);
-int      getpriority();
 
 void     _sigsethnd(sighandler_t);
 void     _sigreturn();
