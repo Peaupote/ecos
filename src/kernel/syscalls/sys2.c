@@ -12,7 +12,7 @@
 #include <util/misc.h>
 
 void sys_errno(int *errno) {
-	state.st_proc[state.st_curr_pid].p_errno = errno;
+    state.st_proc[state.st_curr_pid].p_errno = errno;
 }
 
 int sys_open(const char *fname, int oflags, int perms) {
@@ -36,12 +36,10 @@ int sys_open(const char *fname, int oflags, int perms) {
             c->chann_vfile = vfs_load(fname, oflags);
             is_new_file   = 1;
             if (!c->chann_vfile) {
-                set_errno(ENOENT);
                 klogf(Log_info, "syscall", "couldn't create file %s", fname);
                 return -1;
             }
         } else {
-            set_errno(ENOENT);
             klogf(Log_info, "sys", "process %d couldn't open %s",
                   state.st_curr_pid, fname);
             return -1;
@@ -200,10 +198,10 @@ err_enfile:
 }
 
 ssize_t sys_read(int fd, uint8_t *d, size_t len) {
-	if (!check_argW(d, len)) {
-		set_errno(EINVAL);
-		return -1;
-	}
+    if (!check_argW(d, len)) {
+        set_errno(EINVAL);
+        return -1;
+    }
     proc_t *p  = cur_proc();
 
     if (!d || fd < 0 || fd > NFD || p->p_fds[fd] == -1)
@@ -272,10 +270,10 @@ err_badf:
 }
 
 ssize_t sys_write(int fd, uint8_t *s, size_t len) {
-	if (!check_argR(s, len)) {
-		set_errno(EINVAL);
-		return -1;
-	}
+    if (!check_argR(s, len)) {
+        set_errno(EINVAL);
+        return -1;
+    }
     proc_t *p  = cur_proc();
 
     if (!s || fd < 0 || fd > NFD || p->p_fds[fd] == -1)
@@ -421,4 +419,17 @@ int sys_chdir(const char *fname) {
     p->p_dev  = dev_id;
 
     return 0;
+}
+
+
+int sys_link(const char *path1, const char *path2) {
+    return vfs_link(path1, path2);
+}
+
+int sys_symlink(const char *path1, const char *path2) {
+    return vfs_symlink(path1, path2);
+}
+
+int sys_readlink(const char *path, char *buf, size_t len) {
+    return vfs_readlink(path, buf, len);
 }

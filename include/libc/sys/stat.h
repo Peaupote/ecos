@@ -5,6 +5,7 @@
 
 int fstat(int fd, struct stat *st);
 int stat(const char *fname, struct stat *st);
+int lstat(const char *fname, struct stat *st);
 int mkdir(const char *fname, mode_t mode);
 
 #endif

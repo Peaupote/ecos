@@ -40,6 +40,9 @@ syscall_tab:
     .quad sys_kill
     .quad sys_errno
     .quad sys_pause
+    .quad sys_link
+    .quad sys_symlink
+    .quad sys_readlink
 syscall_ring1j_tab:
     .quad sys_prires
 syscall_ring1c_tab:
@@ -103,9 +106,9 @@ syscall_ring1c_tab:
     movq   %r15, %r10
     popq   %r15
     movq   %r15, 0x88(%r10)
-    
-	// Sauvegarde des données présentes dans la structure d'iret
-	// en %rsp+ofs
+
+    // Sauvegarde des données présentes dans la structure d'iret
+    // en %rsp+ofs
     movq   (IRETQ_RFLAGS + \ofs)(%rsp), %r11
     movq   %r11,  0x00(%r10) // reg.rflags
     movq   (IRETQ_RIP + \ofs)(%rsp),    %r11
@@ -260,7 +263,7 @@ irq_keyboard:
     movw  $SEG_SEL(GDT_RING0_DATA,0), %r10w
     set_data_segments
 
-	movabs $keyboard_hdl, %r10
+    movabs $keyboard_hdl, %r10
     callq *%r10
 
     restore_data_segments
@@ -273,18 +276,18 @@ irq_pit:
     movw  $SEG_SEL(GDT_RING0_DATA,0), %r10w
     set_data_segments
 
-	movabs $pit_hdl, %r10
+    movabs $pit_hdl, %r10
     callq  *%r10
     testl  %eax, %eax
     je     irq_pit_remain
 
-	movq   %rax, (%rsp)
+    movq   %rax, (%rsp)
     leaq   8(%rsp), %rsp
     restore_c_reg
     save_curr_proc_reg 0
-	movq   -0x50(%rsp), %rdi //retour de pid_hdl
+    movq   -0x50(%rsp), %rdi //retour de pid_hdl
     movabs $pit_hdl_switch, %r10
-	callq  *%r10
+    callq  *%r10
 
 irq_pit_remain:
     restore_data_segments
@@ -311,7 +314,7 @@ func_end:
     iretq
 
 incorrect_rax:
-	movabs $invalid_syscall, %r10
+    movabs $invalid_syscall, %r10
     callq  *%r10
     jmp    func_end
 

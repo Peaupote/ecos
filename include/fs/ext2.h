@@ -336,4 +336,14 @@ uint32_t ext2_mkdir(uint32_t parent, const char *dirname, uint16_t type,
 int      ext2_getdents(ino_t, struct dirent* dst, size_t sz,
                         chann_adt_t*, struct mount_info*);
 
+// links
+
+ino_t ext2_link(ino_t target, ino_t parent, const char *fname,
+                struct ext2_mount_info*);
+
+ino_t ext2_symlink(ino_t parent, const char *name, const char *target,
+                   struct ext2_mount_info*);
+
+int ext2_readlink(ino_t ino, char *buf, size_t, struct ext2_mount_info*);
+
 #endif

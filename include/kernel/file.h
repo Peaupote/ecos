@@ -96,7 +96,24 @@ typedef void (fs_close_t)(ino_t, struct mount_info*);
 typedef ino_t (fs_destroy_dirent_t)(ino_t parent, ino_t ino, struct mount_info*);
 typedef ino_t (fs_rm_t)(ino_t, struct mount_info*);
 
-typedef ino_t (fs_readsymlink_t)(ino_t, char*, struct mount_info*);
+/**
+ * Create hard link to target in parent with given name
+ * return target's inode if succeded, 0 otherwise
+ */
+typedef ino_t (fs_link_t)(ino_t target, ino_t parent,
+                          const char *name, struct mount_info*);
+
+/**
+ * Create a symbolic link in parent to given target
+ * return link's inode if created 0 otherwise
+ */
+typedef ino_t (fs_symlink_t)(ino_t parent, const char *name,
+                             const char *target, struct mount_info*);
+
+/**
+ * Read content (target) of a symbolic link in given buffer
+ */
+typedef int (fs_readlink_t)(ino_t, char*, size_t, struct mount_info*);
 
 struct fs {
     char                 fs_name[8];
@@ -114,7 +131,9 @@ struct fs {
     fs_close_t          *fs_close;
     fs_rm_t             *fs_rm;
     fs_destroy_dirent_t *fs_destroy_dirent;
-    fs_readsymlink_t    *fs_readsymlink;
+    fs_link_t           *fs_link;
+    fs_symlink_t        *fs_symlink;
+    fs_readlink_t       *fs_readlink;
 } fst [NFST];
 
 void vfs_init();
@@ -126,6 +145,7 @@ int  vfs_mount(const char *path, uint8_t fs, void *partition);
 uint32_t vfs_pipe(vfile_t* rt[2]);
 
 // *pathend doit être '/' ou '\0'
+// suit les liens symbolique sauf le dernier si le fichier path en est un
 bool vfs_find(const char* path, const char* pathend, dev_t* dev, ino_t* ino);
 vfile_t *vfs_load(const char *path, int flags);
 void     vfs_opench(vfile_t *vf, chann_adt_t* cdt);
@@ -142,5 +162,9 @@ int   vfs_getdents(vfile_t *vf, struct dirent* dst, size_t sz,
 
 int   vfs_rm(const char *fname);
 ino_t vfs_rmdir(const char *fname, uint32_t rec);
+
+int vfs_link(const char *path1, const char *path2);
+int vfs_symlink(const char *path1, const char *path2);
+int vfs_readlink(const char *path, char *buf, size_t len);
 
 #endif

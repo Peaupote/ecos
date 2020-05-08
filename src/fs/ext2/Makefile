@@ -4,7 +4,7 @@ export AR?=x86_64-elf-ar
 ROOT=../../..
 include $(ROOT)/vars.Makefile
 
-FILES=ext2.c inode.c dir.c
+FILES=ext2.c inode.c dir.c link.c
 SRCDEP=$(FILES)
 OBJ=$(FILES:%.c=%$(TSFX).o)
 INCLUDE_LIBC?=-I $(ROOT)/include/libc

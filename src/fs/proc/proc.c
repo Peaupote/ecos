@@ -150,14 +150,14 @@ static int root_getents(fpd_dt_t* n __attribute__((unused)),
                 return rc;
             }
             // FALLTHRU
-		case 0:
+        case 0:
             if(!dirent_stc(&rc, &d, &sz,
                     PROC_NULL_INO, TYPE_REG, "null", 4)) {
                 dt->pid = 0;
                 return rc;
             }
             i = 1;
-			break;
+            break;
     }
     for (; i < NPROC; ++i) {
         if (proc_alive(state.st_proc + i)) {
@@ -302,7 +302,7 @@ static int pipei_write(file_ins* ins, void* src,
 // --/null --
 
 static int null_stat(file_ins* ins __attribute__((unused)),
-					 struct stat* st) {
+                     struct stat* st) {
     st->st_mode    = TYPE_REG|0666;
     st->st_nlink   = 1;
     st->st_size    = 0;
@@ -311,16 +311,16 @@ static int null_stat(file_ins* ins __attribute__((unused)),
     return st->st_ino;
 }
 static int null_read(file_ins* ins __attribute__((unused)),
-		void* dst __attribute__((unused)),
+        void* dst __attribute__((unused)),
         off_t ofs __attribute__((unused)),
-		size_t sz __attribute__((unused))) {
-	return 0;
+        size_t sz __attribute__((unused))) {
+    return 0;
 }
 static int null_write(file_ins* ins __attribute__((unused)),
-		void* src __attribute__((unused)),
+        void* src __attribute__((unused)),
         off_t ofs __attribute__((unused)),
-		size_t sz) {
-	return sz;
+        size_t sz) {
+    return sz;
 }
 
 // -- /<pid> --
@@ -417,7 +417,7 @@ static int stat_read(file_ins* ins, void* d, off_t ofs, size_t sz) {
     proc_t* p = state.st_proc + ins->pid;
     return spart_printf(d, ofs, sz, "%d (%s) %c %p",
             ins->pid, p->p_cmd, proc_state_char[p->p_stat],
-			p->p_brk - p->p_brkm);
+            p->p_brk - p->p_brkm);
 }
 
 // -- régulier --
@@ -615,9 +615,9 @@ static bool fs_proc_from_ino(ino_t ino, file_ins* ins, struct fs_proc_file** rt)
             *rt = &fun_dir;
             set_dir_dt(ins, PROC_ROOT_INO, pipes_getents);
             return true;
-		case PROC_NULL_INO:
-			*rt = &fun_null;
-			return true;
+        case PROC_NULL_INO:
+            *rt = &fun_null;
+            return true;
         default:
             if (ino & (1<<31)) {
                 // /pipes/<pipei>
@@ -745,13 +745,33 @@ int fs_proc_stat(ino_t ino, struct stat* st,
     return -1;
 }
 
+ino_t fs_proc_link(ino_t target __attribute__((unused)),
+                   ino_t parent __attribute__((unused)),
+                   const char *name __attribute__((unused)),
+                   struct mount_info*info __attribute__((unused))) {
+    return 0;
+}
+
+ino_t fs_proc_symlink(ino_t parent __attribute__((unused)),
+                      const char *name __attribute__((unused)),
+                      const char *target __attribute__((unused)),
+                      struct mount_info *info __attribute__((unused))) {
+    return 0;
+}
+
+int fs_proc_readlink(ino_t ino __attribute__((unused)),
+                     char *buf __attribute__((unused)),
+                     size_t len __attribute__((unused)),
+                     struct mount_info *info __attribute__((unused))) {
+    return 0;
+}
+
 GEN_RRTV(opench, VAH(chann_adt_t* cdt), VAH(cdt))
 GEN_RRTV(open,   VAH(vfile_t* vf), VAH(vf))
 GEN_RRTV(close,  VAH(), VAH())
 GEN_RRT(uint32_t, lookup, 0, VAH(const char *fname), VAH(ino, fname))
 GEN_RRT(int, read,  -1, VAH(void* d, off_t o, size_t s), VAH(d,o,s))
 GEN_RRT(int, write, -1, VAH(void* d, off_t o, size_t s), VAH(d,o,s))
-GEN_RRT(ino_t, readsymlink, 0, VAH(char* d), VAH(d))
 GEN_RRT(int, getdents, -1,
         VAH(struct dirent* d, size_t sz, chann_adt_t* cdt),
         VAH(ino, d, sz, cdt))

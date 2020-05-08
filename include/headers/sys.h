@@ -1,7 +1,7 @@
 #ifndef _HD_SYS_H
 #define _HD_SYS_H
 
-#define NSYSCALL 28
+#define NSYSCALL 31
 
 #define SYS_USLEEP       0
 #define SYS_FORK         1
@@ -31,6 +31,9 @@
 #define SYS_KILL        25
 #define SYS_SETERRNO    26
 #define SYS_PAUSE       27
+#define SYS_LINK        28
+#define SYS_SYMLINK     29
+#define SYS_READLINK    30
 
 #define SYS_R1J_PRIRES   0
 #define SYS_R1C_TTYOWN   0

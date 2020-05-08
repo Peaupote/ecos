@@ -29,11 +29,14 @@ uint32_t ext2_block_alloc(struct ext2_mount_info *info) {
     uint32_t g = 0;
     struct ext2_group_desc *group;
 
-    // TODO : adapt to make block contiguous
-
     for (group = info->bg + g;
          g < info->group_count && group->g_free_blocks_count == 0;
          group++, g++);
+
+    if (g == info->group_count) return 0;
+
+    // here we assume the file system is not corrupted
+    // so, there is some free block in this block group
 
     uint8_t *bitmap = ext2_get_block(group->g_block_bitmap, info);
     uint32_t block, rem = 0;
@@ -43,9 +46,6 @@ uint32_t ext2_block_alloc(struct ext2_mount_info *info) {
         if (block != 0 && rem == 0) bitmap++;
         if (0 == (*bitmap & (1 << rem))) break;
     }
-
-    // TODO : try an other group
-    if (block == info->sp->s_blocks_per_group) return 0;
 
     *bitmap |= 1 << rem;
     group->g_free_blocks_count--;
@@ -128,8 +128,11 @@ int ext2_write(ino_t ino, const void *buf, off_t pos, size_t len,
     for (i = 0; i < len; i++) {
         block[pos++ % info->block_size] = *src++;
         if (pos % info->block_size == 0) {
-            if (++block_nb >= blk_size) { // alloc a new block at end of file
-                uint32_t b = ext2_block_alloc(info); // TODO : fail
+            // alloc a new block at end of file
+            if (++block_nb >= blk_size) {
+                uint32_t b = ext2_block_alloc(info);
+                if (!b) return i; // can't write anything more on this device
+
                 ext2_set_inode_block(block_nb, b, inode, info);
                 ++blk_size;
             }

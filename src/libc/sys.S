@@ -53,6 +53,9 @@ mksc kill         SYS_KILL
 mksc _seterrno    SYS_SETERRNO
 mksc mkdir        SYS_MKDIR
 mksc pause        SYS_PAUSE
+mksc link         SYS_LINK
+mksc symlink      SYS_SYMLINK
+mksc readlink     SYS_READLINK
 
 mksc1j r1_prires  SYS_R1J_PRIRES
 mksc1c r1_ttyown  SYS_R1C_TTYOWN
