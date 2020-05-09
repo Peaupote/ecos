@@ -197,6 +197,7 @@ start_echo:
 	}
 
 	if (nwl) printf("\n");
+	else fflush(stdout);
     return 0;
 }
 

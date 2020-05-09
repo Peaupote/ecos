@@ -105,6 +105,10 @@ static ssize_t parse_signedi(string_reader r, void* ri, size_t slim,
 				f = &hexa_digit_of_char;
 				base = 16;
 				break;
+			} else if (ic < '0' || ic > '7') { // 0
+				r.unget(ri);
+				*rt = 0;
+				return 0;
 			}
 			f = &oct_digit_of_char;
 			base = 8;
@@ -266,6 +270,11 @@ ssize_t fpscanf(string_reader r, void* ri, const char* fmt, va_list ps) {
 							break;
 					}
 					break;
+				case 'u':
+					skip_space(r, ri);
+					rd_nb_st = parse_unsigned(r, ri, slim,
+								&dec_digit_of_char, 10, &rd_nb_u);
+					goto unsigned_store;
 				case 'p':
 					mod = 3;
 					// FALLTHRU
@@ -273,6 +282,7 @@ ssize_t fpscanf(string_reader r, void* ri, const char* fmt, va_list ps) {
 					skip_space(r, ri);
 					rd_nb_st = parse_unsigned(r, ri, slim,
 								&hexa_digit_of_char, 0x10, &rd_nb_u);
+				unsigned_store:
 					if (rd_nb_st < 0) return rd_nb_st;
 					if (rd_nb_st)     return matched;
 					if (ignore)       break;

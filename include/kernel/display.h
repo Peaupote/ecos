@@ -9,8 +9,6 @@
 #include <stddef.h>
 #include <stdbool.h>
 
-typedef uint64_t rgbcolor_t;
-
 extern bool display_graph;
 extern struct display_info display_info;
 

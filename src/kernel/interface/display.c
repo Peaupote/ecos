@@ -271,7 +271,7 @@ static bool display_draw_rq(struct display_rq* rq) {
 							(right - left) * (uint64_t)sbpp))
 		return false;
 
-	uint8_t *src0 = rq->data,
+	uint8_t *src0 = (uint8_t*)(rq->data),
 		    *dst0 = pixbuf.p + top*pitch + left*bpp;
 
 	if (is_bgr) {

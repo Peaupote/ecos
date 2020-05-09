@@ -35,11 +35,11 @@ int main() {
 	rq.right = 50;
 	rq.bpp   = 4;
 	rq.pitch = 4 * 50;
-	int buf[50][50];
+	rgbcolor_t buf[50][50];
 	for (int i = 0; i < 50; ++i)
 		for (int j = 0; j < 50; ++j)
 			buf[i][j] = ((i * 5) << 0x10) + ((j*5) << 0x08);
-	rq.data = buf;
+	rq.data = buf[0];
 	printf("wc = %d\n", write(fd, &rq, sizeof(rq)));
 
 	while (1) {

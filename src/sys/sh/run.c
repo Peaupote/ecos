@@ -334,7 +334,7 @@ bool word_split(const char** src, pbuf_t* b0, cbuf_t* b1, bool b1w) {
 			goto rvw;
 		else return true;
 	}
-	while (true) {
+	do {
 		while (getctype(**src) == CT_SPA) ++*src;
 		if (!**src) return false;
 		cbuf_init(b1, 256);
@@ -345,7 +345,7 @@ rvw:;
 		if (!**src) return true;
 		cbuf_put(b1, '\0');
 		pbuf_put(b0, cbuf_shrink(b1));
-	}
+	} while(true);
 }
 
 bool expand_var_split(const char** src, pbuf_t* b0, cbuf_t* b1, bool b1w) {

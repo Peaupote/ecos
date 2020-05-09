@@ -44,6 +44,7 @@ GEN_BIT(8,   uint8_t)
 	static inline T min_##T(T a, T b) {return b < a ? b : a;}\
 	static inline void mina_##T(T* a, T b) {if(b < *a) *a = b;}
 GEN_COMP(int)
+GEN_COMP(unsigned)
 GEN_COMP(uint64_t)
 GEN_COMP(uint32_t)
 GEN_COMP(uint16_t)
@@ -51,6 +52,11 @@ GEN_COMP(size_t)
 GEN_COMP(uint_ptr)
 GEN_COMP(phy_addr)
 #undef GEN_COMP
+
+#define GEN_ABS(T) \
+	static inline T abs_##T(T a) {return a >= 0 ? a : -a;}
+GEN_ABS(int)
+#undef GEN_ABS
 
 #define GEN_ALIGN(N,T,U) \
 	static inline T N(T addr, U align) {\
@@ -85,5 +91,14 @@ GEN_HASH_STR(unsigned char,  8,  3)
 GEN_HASH_STR(uint64_t,      64, 23)
 #undef EMPTY
 #undef GEN_HASH_STR
+
+#define GEN_SWAP(T) \
+static inline void swap_##T(T* a, T* b) {\
+	T tmp = *a; \
+	*a = *b; \
+	*b = tmp;\
+}
+GEN_SWAP(unsigned)
+#undef GEN_SWAP
 
 #endif

@@ -8,6 +8,13 @@ int isspace(int c) {
 	}
 	return 0;
 }
+int isblank(int c) {
+	switch(c) {
+		case  ' ': case '\t': case '\v':
+			return 1;
+	}
+	return 0;
+}
 
 int isdigit(int c) {
 	return '0' <= c && c <= '9';

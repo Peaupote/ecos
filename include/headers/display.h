@@ -3,6 +3,10 @@
 
 #define DISPLAY_FILE "/proc/display"
 
+#include <stdint.h>
+
+typedef uint32_t rgbcolor_t;
+
 enum display_info_ty {
 	display_type_err,
 	display_type_text,
@@ -26,7 +30,7 @@ struct display_rq {
 	enum display_rq_ty type;
 	unsigned top, left, bot, right;
 	unsigned bpp, pitch; // en octets
-	void* data;
+	rgbcolor_t* data;
 };
 
 #endif

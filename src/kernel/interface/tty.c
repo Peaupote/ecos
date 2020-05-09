@@ -244,6 +244,7 @@ size_t tty_writestringl(const char* str, size_t len, uint8_t color) {
     size_t ln_index = (sb_ashift + sb_nb_lines - 1) %tty_sb_height;
     uint16_t* line = sbuffer + ln_index * tty_width;
 
+	if (str == end) return rt;
     goto loop_enter; while (str != end) {
         rt += new_buffer_line(&line);
         x = 0;
@@ -292,11 +293,19 @@ void tty_seq_commit(tty_seq_t* s) {
 
 // --Prompt--
 
-static inline size_t tty_input_to_buffer() {
-    if (tty_mode == ttym_def)
-        return tty_writestringl(ibuffer, ib_size, tty_def_color);
-    else
-        return tty_prompt_to_buffer(ib_size);
+static inline size_t tty_input_to_buffer(bool nl) {
+	size_t rt = 0;
+    if (tty_mode == ttym_def) {
+		if (!ib_size) {
+			if (!nl) return 0;
+			size_t idx;
+			return tty_new_buffer_line_idx(&idx);
+		}
+        rt = tty_writestringl(ibuffer, ib_size, tty_def_color);
+	} else
+        rt = tty_prompt_to_buffer(ib_size);
+	if (nl) tty_force_new_line();
+	return rt;
 }
 
 tty_pos_t tty_input_at(size_t p) {
@@ -577,7 +586,7 @@ bool tty_input(scancode_byte s, key_event ev) {
 			case KEY_D:
 				if (!~input_top_line) break;
 				if (ib_size) {
-					sq.shift += tty_input_to_buffer();
+					sq.shift += tty_input_to_buffer(false);
 					if(fs_proc_write_tty(ibuffer, ib_size) != ib_size)
 						klogf(Log_error, "tty", "in_buffer saturated");
 					sq.shift += tty_new_prompt();
@@ -607,8 +616,7 @@ bool tty_input(scancode_byte s, key_event ev) {
     if (ev.key && (ev.flags & KEY_FLAG_PRESSED)) {
 		switch (ev.key) {
 		case KEYS_ENTER: case KEY_KP_ENTER:
-            sq.shift += tty_input_to_buffer();
-            tty_force_new_line();
+            sq.shift += tty_input_to_buffer(true);
 
             switch(tty_mode) {
             case ttym_def:

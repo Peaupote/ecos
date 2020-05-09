@@ -256,13 +256,14 @@ ssize_t getdelim(char **lineptr, size_t *n, int delim, FILE *stream) {
     while ((c = fgetc(stream)) != EOF) {
         if (cnt == *n) {
             // realloc
-            char *ptr = malloc(*n << 1);
-            if (!*ptr) return -1;
-
-            memcpy(ptr, *lineptr, *n);
-            *lineptr = ptr;
+            char *ptr = realloc(*lineptr, *n << 1);
+            if (!*ptr) {
+				*lineptr = ptr;
+				return -1;
+			}
+			dst     += ptr - *lineptr;
+			*lineptr = dst;
             *n <<= 1;
-            dst = *lineptr;
         }
 
         *dst++ = c;
