@@ -49,12 +49,18 @@ int sys_open(const char *fname, int oflags, int perms) {
     }
 
     // set chann open path
-    int sz = vfs_absolute_path(p->p_cino, p->p_dev, c->chann_path, 255);
-    int len = strlen(fname);
-    int rem = 256 - sz;
-    len = len < rem ? len : rem;
-    memcpy(c->chann_path + sz, fname, len);
-    c->chann_path[sz + len] = 0;
+    if (fname[0]) { // already absolute path
+        size_t len = strlen(fname);
+        memcpy(c->chann_path, fname, len);
+        c->chann_path[len] = 0;
+    } else { // prepend path up to root
+        int sz = vfs_absolute_path(p->p_cino, p->p_dev, c->chann_path, 255);
+        int len = strlen(fname);
+        int rem = 256 - sz;
+        len = len < rem ? len : rem;
+        memcpy(c->chann_path + sz, fname, len);
+        c->chann_path[sz + len] = 0;
+    }
 
     for (int fd = 0; fd < NFD; fd++) {
         if (p->p_fds[fd] == -1) {
