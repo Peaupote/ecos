@@ -21,8 +21,8 @@ static inline void set_errno(int e) {
 }
 
 static inline bool check_arg_ubound(uint_ptr bg, uint64_t sz) {
-	return bg + sz >= bg
-		&& bg + sz <= paging_set_lvl(pgg_pml4, PML4_END_USPACE);
+    return bg + sz >= bg
+        && bg + sz <= paging_set_lvl(pgg_pml4, PML4_END_USPACE);
 }
 
 /**
@@ -30,8 +30,8 @@ static inline bool check_arg_ubound(uint_ptr bg, uint64_t sz) {
  * Un accès PEUT provoquer un #PF non rattrapé
  */
 static inline bool check_argb(void* pbg, uint64_t sz) {
-	uint_ptr bg = (uint_ptr)pbg;
-	return cur_proc()->p_ring < 3 || check_arg_ubound(bg, sz);
+    uint_ptr bg = (uint_ptr)pbg;
+    return cur_proc()->p_ring < 3 || check_arg_ubound(bg, sz);
 }
 
 /**
@@ -39,10 +39,10 @@ static inline bool check_argb(void* pbg, uint64_t sz) {
  * Si vrai, un accès en lecture ne peut pas provoquer de #PF
  */
 static inline bool check_argR(void* pbg, uint64_t sz) {
-	uint_ptr bg = (uint_ptr)pbg;
-	return cur_proc()->p_ring < 3
-		|| (check_arg_ubound(bg, sz) 
-			&& (PAGING_FLAG_P & get_range_flags(bg & PAGE_MASK, bg + sz)));
+    uint_ptr bg = (uint_ptr)pbg;
+    return cur_proc()->p_ring < 3
+        || (check_arg_ubound(bg, sz)
+            && (PAGING_FLAG_P & get_range_flags(bg & PAGE_MASK, bg + sz)));
 }
 
 /**
@@ -50,12 +50,12 @@ static inline bool check_argR(void* pbg, uint64_t sz) {
  * Si vrai, un accès ne peut pas provoquer de #PF
  */
 static inline bool check_argW(void* pbg, size_t sz) {
-	uint_ptr bg = (uint_ptr)pbg;
-	return cur_proc()->p_ring < 3
-		|| (check_arg_ubound(bg, sz) 
-			&& ((PAGING_FLAG_P | PAGING_FLAG_W) &
-					get_range_flags(bg & PAGE_MASK, bg + sz))
-				== (PAGING_FLAG_P | PAGING_FLAG_W) );
+    uint_ptr bg = (uint_ptr)pbg;
+    return cur_proc()->p_ring < 3
+        || (check_arg_ubound(bg, sz)
+            && ((PAGING_FLAG_P | PAGING_FLAG_W) &
+                    get_range_flags(bg & PAGE_MASK, bg + sz))
+                == (PAGING_FLAG_P | PAGING_FLAG_W) );
 }
 
 
@@ -79,7 +79,10 @@ int      sys_pipe(int fds[2]);
 ssize_t  sys_write(int fd, uint8_t *s, size_t len);
 ssize_t  sys_read(int fd, uint8_t *buf, size_t len);
 off_t    sys_lseek(int fd, off_t offset, int whence);
-int      mkdir(const char *fname, mode_t mode);
+int      sys_mkdir(const char *fname, mode_t mode);
+int      sys_link(const char *path1, const char *path2);
+int      sys_symlink(const char *path1, const char *path2);
+int      sys_readlink(const char *path, char *buf, size_t len);
 
 int      sys_execve(reg_t fname, reg_t argv, reg_t env);
 

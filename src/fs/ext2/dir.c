@@ -51,7 +51,6 @@ uint32_t ext2_lookup_dir(struct ext2_inode *inode, const char *fname,
                          struct ext2_mount_info *info) {
     lookup_name = fname;
     struct dirent *entry = ext2_iter_dir(inode, cmp_dir_name, info);
-    // TODO : binary search
     return entry ? entry->d_ino : 0;
 }
 
@@ -107,6 +106,9 @@ uint32_t ext2_mkdir(uint32_t parent, const char *dirname, uint16_t type,
         !ext2_add_dirent(ino, ino, ".", info) ||
         !ext2_add_dirent(ino, parent, "..", info)) return 0;
 
+    struct ext2_group_desc *gd = info->bg + ext2_inode_block_group(ino, info->sp);
+    ++gd->g_dir_count;
+
     return ino;
 }
 
@@ -137,8 +139,8 @@ int ext2_getdents(ino_t ino, struct dirent* dst, size_t sz,
         struct dirent src;
         ext2_read(ino, &src, cdt->pos, DIRENT_OFF, info);
 
-		size_t mlen = offsetof(struct dirent, d_name)
-	                        + src.d_name_len + 1;
+        size_t mlen = offsetof(struct dirent, d_name)
+                            + src.d_name_len + 1;
         size_t rlen = align_to_size(mlen, 4);
 
         if (sz < rlen) {
@@ -148,13 +150,13 @@ int ext2_getdents(ino_t ino, struct dirent* dst, size_t sz,
         }
 
         ext2_read(ino, offsetof(struct dirent, d_name) + (char*)dst,
-						cdt->pos + offsetof(struct dirent, d_name),
-						src.d_name_len, info);
-		dst->d_ino       = src.d_ino;
-		dst->d_rec_len   = rlen;
-		dst->d_name_len  = src.d_name_len;
-		dst->d_file_type = src.d_file_type;
-		dst->d_name[src.d_name_len] = '\0'; 
+                        cdt->pos + offsetof(struct dirent, d_name),
+                        src.d_name_len, info);
+        dst->d_ino       = src.d_ino;
+        dst->d_rec_len   = rlen;
+        dst->d_name_len  = src.d_name_len;
+        dst->d_file_type = src.d_file_type;
+        dst->d_name[src.d_name_len] = '\0';
 
         cdt->pos += src.d_rec_len;
         rc      += rlen;

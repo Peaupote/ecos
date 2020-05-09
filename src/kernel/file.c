@@ -44,7 +44,9 @@ void vfs_init() {
     fst[PROC_FS].fs_close          = &fs_proc_close;
     fst[PROC_FS].fs_rm             = &fs_proc_rm;
     fst[PROC_FS].fs_destroy_dirent = &fs_proc_destroy_dirent;
-    fst[PROC_FS].fs_readsymlink    = &fs_proc_readsymlink;
+    fst[PROC_FS].fs_link           = &fs_proc_link;
+    fst[PROC_FS].fs_symlink        = &fs_proc_symlink;
+    fst[PROC_FS].fs_readlink       = &fs_proc_readlink;
 
     klogf(Log_info, "vfs", "setup ext2 file system");
     memcpy(fst[EXT2_FS].fs_name, "ext2", 5);
@@ -62,7 +64,9 @@ void vfs_init() {
     fst[EXT2_FS].fs_close          = &ext2_close;
     fst[EXT2_FS].fs_rm             = 0; // not implemted yet
     fst[EXT2_FS].fs_destroy_dirent = 0;
-    fst[EXT2_FS].fs_readsymlink    = 0;
+    fst[EXT2_FS].fs_link           = (fs_link_t*)&ext2_link;
+    fst[EXT2_FS].fs_symlink        = (fs_symlink_t*)&ext2_symlink;
+    fst[EXT2_FS].fs_readlink       = (fs_readlink_t*)&ext2_readlink;
 
     klogf(Log_info, "ext2", "root_part: %p - %p",
                     root_partition, root_partition_end);
@@ -76,20 +80,32 @@ void vfs_init() {
 
 }
 
-bool vfs_find(const char* path, const char* pathend,
-                dev_t* dev, ino_t* ino) {
+bool vfs_find(const char* path1, const char* pathend1, dev_t* dev, ino_t* ino) {
+    char buf[1024], *path = buf, *pathend;
+    memcpy(path, path1, pathend1 - path1);
+    pathend = path + (pathend1 - path1);
+    *pathend = 0;
+
+    // number of times we jumped back to begin
+    // while following a symbolic link
+    int cnt = 0;
+
+begin:
     if (*path == '/') {
         *dev = ROOT_DEV;
         *ino = devices[ROOT_DEV].dev_info.root_ino;
         while(*path == '/') ++path;
     }
+
     struct device* dv = devices + *dev;
     struct fs*     fs = fst + dv->dev_fs;
+    struct stat st;
+
     while(path < pathend) {
-        const char* end_part = strchrnul(path, '/');
+        char* end_part = strchrnul(path, '/');
         size_t len = end_part - path;
         if (len == 2 && path[0] == '.' && path[1] == '.'
-                     && *ino == dv->dev_info.root_ino) {
+            && *ino == dv->dev_info.root_ino) {
             *ino = dv->dev_parent_ino;
             *dev = dv->dev_parent_dev;
             dv   = devices + *dev;
@@ -102,10 +118,40 @@ bool vfs_find(const char* path, const char* pathend,
             char name[256];
             memcpy(name, path, len);
             name[len] = '\0';
-            *ino = fs->fs_lookup(*ino, name, &dv->dev_info);
+
+            ino_t pino = *ino;
+            *ino = fs->fs_lookup(pino, name, &dv->dev_info);
             if (!*ino) {
                 klogf(Log_info, "vfs", "can't find %s", name);
                 return false;
+            }
+
+            fs->fs_stat(*ino, &st, &dv->dev_info);
+            if ((st.st_mode&0xf000) == TYPE_SYM) {
+                int rc = fs->fs_readlink(*ino, name, 255, &dv->dev_info);
+                kAssert(rc >= 0);
+                name[rc] = 0;
+
+                // if not last mem of path
+                if (*end_part) {
+                    if (++cnt > 10) { // probably trapped in a symlink loop
+                        set_errno(ELOOP);
+                        return false;
+                    }
+
+                    len = pathend - end_part;
+
+                    // restart find at begining without recursion
+                    // and on the concatenation of symlink path and remaining path
+                    memmove(buf + rc, end_part, len);
+                    memcpy(buf, name, rc);
+                    buf[rc + len] = 0;
+
+                    path = buf;
+                    pathend = buf + rc + len;
+                    *ino = pino;
+                    goto begin;
+                }
             }
 
             for (dev_t d = dv->dev_childs; ~d; d = devices[d].dev_sib)
@@ -195,8 +241,12 @@ uint32_t vfs_pipe(vfile_t* rt[2]) {
     return pipeid;
 }
 
-vfile_t *vfs_load(const char *filename, int flags) {
+static vfile_t *vfs_load_cnt(const char *filename, int flags, int load_cnt) {
     if (!filename || !*filename) return NULL;
+    if (++load_cnt > 10) { // probably in a symlink loop
+        set_errno(ELOOP);
+        return 0;
+    }
 
     ino_t ino    = cur_proc()->p_cino;
     dev_t dev_id = cur_proc()->p_dev;
@@ -212,15 +262,12 @@ vfile_t *vfs_load(const char *filename, int flags) {
     struct stat st;
     fs->fs_stat(ino, &st, &dev->dev_info);
 
-    // TODO : follow symlink in find
-    if ((st.st_mode&0xf000) == TYPE_SYM) {
-        if (flags&O_NOFOLLOW || flags&O_CREAT)
-            return 0;
-
+    if ((st.st_mode&0xf000) == TYPE_SYM && !(flags&O_NOFOLLOW)) {
         char buf[256] = { 0 };
-        fs->fs_readsymlink(st.st_ino, buf, &dev->dev_info);
-        return vfs_load(buf, 0);
+        fs->fs_readlink(st.st_ino, buf, 255, &dev->dev_info);
+        return vfs_load_cnt(buf, flags, load_cnt);
     }
+
 
     vfile_t *v;
     size_t free = NFILE;
@@ -253,6 +300,10 @@ vfile_t *vfs_load(const char *filename, int flags) {
     fs->fs_open(st.st_ino, v, &dev->dev_info);
 
     return state.st_files + free;
+}
+
+vfile_t *vfs_load(const char *filename, int flags) {
+    return vfs_load_cnt(filename, flags, 0);
 }
 
 void vfs_opench(vfile_t *vf, chann_adt_t* cdt) {
@@ -512,4 +563,70 @@ destroy_root:
     }
 
     return root;
+}
+
+
+int vfs_link(const char *path1, const char *path2) {
+    ino_t pino = cur_proc()->p_cino, tino = pino;
+    dev_t pdev_id = cur_proc()->p_dev, tdev_id = pdev_id;
+
+    if (!vfs_find(path1, path1 + strlen(path1), &tdev_id, &tino)) {
+        set_errno(ENOENT);
+        klogf(Log_info, "vfs", "file '%s' dont exists", path1);
+        return -1;
+    }
+
+    const char *parent_end = strrchr(path2, '/');
+    if (!parent_end) {
+        parent_end = path2;
+    } else if (!vfs_find(path2, parent_end, &pdev_id, &pino)) {
+        set_errno(ENOENT);
+        klogf(Log_info, "vfs", "file '%s' dont exists", path2);
+        return -1;
+    } else ++parent_end; // skip '/'
+
+    if (pdev_id != tdev_id) {
+        set_errno(EXDEV);
+        klogf(Log_info, "vfs", "invalid cross device hard link");
+        return -1;
+    }
+
+    struct device *dev = devices + pdev_id;
+    struct fs *fs = fst + dev->dev_fs;
+
+    return fs->fs_link(tino, pino, parent_end, &dev->dev_info);
+}
+
+int vfs_symlink(const char *path1, const char *path2) {
+    ino_t pino = cur_proc()->p_cino;
+    dev_t pdev_id = cur_proc()->p_dev;
+
+    const char *parent_end = strrchr(path2, '/');
+    if (!parent_end) {
+        parent_end = path2;
+    } else if (!vfs_find(path2, parent_end, &pdev_id, &pino)) {
+        set_errno(ENOENT);
+        klogf(Log_info, "vfs", "file '%s' dont exists", path2);
+        return -1;
+    } else ++parent_end; // skip '/'
+
+    struct device *dev = devices + pdev_id;
+    struct fs *fs = fst + dev->dev_fs;
+
+    return fs->fs_symlink(pino, parent_end, path1, &dev->dev_info);
+}
+
+int vfs_readlink(const char *path, char *buf, size_t len) {
+    ino_t ino = cur_proc()->p_cino;
+    dev_t dev_id = cur_proc()->p_dev;
+
+    if (!vfs_find(path, path + strlen(path), &dev_id, &ino)) {
+        set_errno(ENOENT);
+        return -1;
+    }
+
+    struct device *dev = devices + dev_id;
+    struct fs *fs = fst + dev->dev_fs;
+
+    return fs->fs_readlink(ino, buf, len, &dev->dev_info);
 }

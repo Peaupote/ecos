@@ -28,6 +28,10 @@ off_t    lseek(int fd, off_t offset, int whence);
 
 int      chdir(const char *fname);
 
+int      link(const char *path1, const char *path2);
+int      symlink(const char *path1, const char *path2);
+int      readlink(const char *path, char *buf, size_t len);
+
 pid_t    fork(void);
 pid_t    getpid(void);
 pid_t    getppid(void);

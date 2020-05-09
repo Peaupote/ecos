@@ -8,6 +8,7 @@
 
 static int flag_inode = 0;
 static int flag_long  = 0;
+static int flag_human = 0;
 
 #define MODE_LEN 10
 void sprint_mode(mode_t mode, char *buf) {
@@ -28,7 +29,7 @@ void sprint_mode(mode_t mode, char *buf) {
 }
 
 int list_files(const char *fname) {
-    struct dirp *dirp = opendir(fname);
+    DIR *dirp = opendir(fname);
     struct dirent *dir;
     struct stat st;
     char buf2[1024], bufmode[MODE_LEN + 1] = { 0 };
@@ -40,9 +41,9 @@ int list_files(const char *fname) {
         exit(1);
     }
 
-    while ((dir = readdir(dirp))) {
+    for (size_t i = 0; (dir = readdir(dirp)); ++i) {
         sprintf(buf2, "%s/%s", fname, dir->d_name);
-        rc = stat(buf2, &st);
+        rc = lstat(buf2, &st);
         if (rc < 0) {
             sprintf(buf2, "ls: '%s/%s'", fname, dir->d_name);
             perror(buf2);
@@ -50,15 +51,44 @@ int list_files(const char *fname) {
         }
 
         if (flag_inode) {
-            printf("%d ", st.st_ino);
+            printf("%4d ", st.st_ino);
         }
 
         if (flag_long) {
             sprint_mode(st.st_mode, bufmode);
-            printf("%s %d %d ", bufmode, st.st_size, st.st_nlink);
+            printf("%s ", bufmode);
+            if (flag_human) {
+                if (st.st_size < 1000) {
+                    printf("%4d ", st.st_size);
+                } else if (st.st_size < 1000000) {
+                    printf("%3dK ", st.st_size / 1000);
+                } else {
+                    printf("%3dM", st.st_size / 1000000);
+                }
+            } else {
+                printf("%5d ", st.st_size);
+            }
+
+            printf("%d ", st.st_nlink);
         }
 
-        printf("%s\n", dir->d_name);
+        printf("%s", dir->d_name);
+
+        if (flag_long && (st.st_mode&0xf000) == TYPE_SYM) {
+            char buf[256];
+            int rc = readlink(dir->d_name, buf, 255);
+            if (rc < 0) {
+                sprintf(buf, "ls: %s: readlink", buf);
+                perror(buf);
+                return 1;
+            }
+
+            buf[rc] = 0;
+            printf(" -> %s", buf);
+        }
+
+        if (flag_long || (i > 0 && (i&7) == 0)) printf("\n");
+        else printf("\t");
     }
 
     closedir(dirp);
@@ -70,6 +100,7 @@ void read_flags(const char *flags) {
         switch (*flags) {
         case 'i': flag_inode = 1; break;
         case 'l': flag_long  = 1; break;
+        case 'h': flag_human = 1; break;
         default:
             fprintf(stderr, "unknown flag %c\n", *flags);
             exit(1);

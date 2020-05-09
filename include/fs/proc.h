@@ -64,8 +64,9 @@ void     fs_proc_opench(ino_t, chann_adt_t*, struct mount_info*);
 void     fs_proc_open(ino_t, vfile_t*, struct mount_info*);
 void     fs_proc_close(ino_t, struct mount_info*);
 
-ino_t    fs_proc_readsymlink(ino_t, char*, struct mount_info *);
-
+ino_t    fs_proc_link(ino_t, ino_t, const char*, struct mount_info*);
+ino_t    fs_proc_symlink(ino_t, const char*, const char *, struct mount_info*);
+int      fs_proc_readlink(ino_t, char*, size_t, struct mount_info *);
 
 uint32_t fs_proc_mkdir(ino_t, const char*, uint16_t, struct mount_info*);
 ino_t    fs_proc_rm(ino_t ino, struct mount_info *);

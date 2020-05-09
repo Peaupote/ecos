@@ -18,8 +18,6 @@ ext2_lookup_free_inode(struct ext2_mount_info *info) {
     uint32_t g = 0;
     struct ext2_group_desc *group;
 
-    // TODO : adapt to make block contiguous
-
     for (group = info->bg + g; g < info->group_count; group++, g++) {
         if (group->g_free_inodes_count == 0) continue;
 
@@ -31,8 +29,6 @@ ext2_lookup_free_inode(struct ext2_mount_info *info) {
             if (inode != 0 && rem == 0) bitmap++;
             if (0 == (*bitmap & (1 << rem))) break;
         }
-
-        // assert (inode < info->sp->s_inodes_per_group)
 
         *bitmap |= 1 << rem;
         group->g_free_inodes_count--;
@@ -71,20 +67,26 @@ ext2_alloc_inode(uint16_t type, uint16_t uid,
 uint32_t *ext2_get_inode_block_ptr(uint32_t block,
                                    struct ext2_inode *inode,
                                    struct ext2_mount_info *info) {
-    uint32_t inf = 0;
-    uint32_t sup = EXT2_DIRECT_BLOCK;
     uint32_t *b; // indirection block
+    uint32_t bk = info->block_size >> 2; // number of block number per block
 
-    if (block < sup) return inode->in_block + block;
+    // no indirection
+    if (block < EXT2_DIRECT_BLOCK) return inode->in_block + block;
 
-    inf = sup;
-    sup += info->block_size >> 2;
-    if (block < sup) {
+    // one indirection
+    block -= EXT2_DIRECT_BLOCK;
+    if (block < bk) {
         b = ext2_get_block(inode->in_block[12], info);
-        return b + block - inf;
+        return b + block;
     }
 
-    return 0; // TODO : finish indirection
+    // two indirections
+    // two level of indirection is far from enough for our usage
+    block -= bk;
+    b = ext2_get_block(inode->in_block[13], info);
+    b += block / bk;
+    b = ext2_get_block(*b, info);
+    return b + (block % bk);
 }
 
 uint32_t ext2_get_inode_block_nb(uint32_t block,
