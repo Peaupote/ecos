@@ -234,26 +234,38 @@ void display_print_info() {
 }
 
 
-static bool modeb = false,
-			isdbg = false;
-
-static void switch_to_display(bool g) {
-	display_graph = g;
-	display_clear();
-	if (!g) tty_afficher_all();
-}
+static bool modeb = false;
 
 bool display_set_graph(bool g) {
 	if (g && is_egat()) return false;
 	modeb = g;
-	if (!isdbg) switch_to_display(g);
+	if (display_graph != modeb) {
+		if (modeb) {
+			if (tty_display_graph_rq(true)) {
+				display_clear();
+				display_graph = true;
+			}
+		} else {
+			display_graph = false;
+			display_clear();
+			tty_display_graph_rq(false);
+		}
+	}
 	return true;
 }
 void display_set_debug(bool d) {
-	isdbg = d;
-	bool nd = !d && modeb;
-	if (nd != display_graph)
-		switch_to_display(nd);
+	if (d) {
+		if (display_graph) {
+			display_clear();
+			display_graph = false;
+			tty_display_graph_rq(false);
+		}
+	} else if (modeb) {
+		if (tty_display_graph_rq(true)) {
+			display_clear();
+			display_graph = true;
+		}
+	}
 }
 
 static bool display_draw_rq(struct display_rq* rq) {

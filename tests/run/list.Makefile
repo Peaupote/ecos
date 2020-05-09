@@ -1,4 +1,4 @@
-CFILES0=test.c test2.c test3.c test_printf.c test_args.c test_display.c \
+CFILES0=test.c test2.c test3.c test_printf.c test_args.c test_live.c \
 		test_proc.c
 CFILES_MAT=demo/mat.c demo/fxm.c demo/graph.c
 OFILES_MAT=$(CFILES_MAT:.c=.o)
