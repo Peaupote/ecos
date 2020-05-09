@@ -64,20 +64,28 @@ void rm(buf_t *b) {
     if (b->cur1 > b->buf) --b->cur1;
 }
 
-void left(buf_t *b) {
+char left(buf_t *b) {
     if (b->cur1 > b->buf) {
-        b->cur2[0] = b->cur1[-1];
+        char r = b->cur1[-1];
+        b->cur2[0] = r;
         --b->cur1;
         --b->cur2;
+        return r;
     }
+
+    return 0;
 }
 
-void right(buf_t *b) {
+char right(buf_t *b) {
     if (b->cur2 + 1 < b->buf + b->size) {
-        b->cur1[0] = b->cur2[1];
+        char r = b->cur2[1];
+        b->cur1[0] = r;
         ++b->cur1;
         ++b->cur2;
+        return r;
     }
+
+    return 0;
 }
 
 bool save(buf_t *buf, const char *fname) {
@@ -110,20 +118,24 @@ buf_t *open_buf(const char *fname) {
     }
 
     int size = lseek(fd, 0, SEEK_END);
-    buf_t *b = create(size << 2); // make buffer twice as big as the file
+    buf_t *b = create(size << 1); // make buffer twice as big as the file
     if (!b) {
         char msg[256];
         sprintf(msg, "file %s too big", fname);
         print_msg(msg, ERR);
-        exit(42);
         return 0;
     }
 
     lseek(fd, 0, SEEK_SET);
-    read(fd, b->buf + b->size - size, b->size - size);
+    int rc = read(fd, b->buf + size, size);
+    if (rc < size) {
+        free(b);
+        print_msg("can't read file", ERR);
+        return 0;
+    }
 
     b->cur1 = b->buf;
-    b->cur2 = b->buf + (b->size - size - 1);
+    b->cur2 = b->buf + size - 1;
 
     close(fd);
 
@@ -138,6 +150,7 @@ typedef struct screen {
     buf_t *buf;
     char *fname;
 
+    unsigned int nline;
     unsigned int line;
     unsigned int col;
 
@@ -171,6 +184,7 @@ void open_screen(char *fname) {
     } else s->fname = 0;
 
     s->buf = b;
+    s->nline = 0;
     s->line = 0;
     s->col = 0;
 
@@ -197,6 +211,43 @@ void next_screen() {
     }
 
     curr = curr->nx;
+}
+
+void next_line() {
+    if (curr->line == curr->nline) return;
+
+    buf_t *b = curr->buf;
+    int col = curr->col;
+
+    char c;
+    while (c = right(b), c != '\n' && c != 0);
+    for (int i = 0; i < col; ++i) {
+        c = right(b);
+        if (c == '\n') {
+            left(b);
+            break;
+        }
+    }
+}
+
+void prev_line() {
+    if (curr->line <= 1) return;
+
+    buf_t *b = curr->buf;
+    int col = curr->col;
+
+    char c;
+    while (c = left(b), c != '\n' && c != 0);
+    while (c = left(b), c != '\n' && c != 0);
+
+    if (c != 0) right(b);
+    for (int i = 0; i < col; ++i) {
+        c = right(b);
+        if (c == '\n') {
+            left(b);
+            break;
+        }
+    }
 }
 
 void display();
@@ -337,6 +388,8 @@ int main(int argc, char *argv[]) {
             case KEY_BACKSPACE:   rm(curr->buf);   break;
             case KEY_LEFT_ARROW:  left(curr->buf); break;
             case KEY_RIGHT_ARROW: right(curr->buf);break;
+            case KEY_DOWN_ARROW:  next_line(); break;
+            case KEY_UP_ARROW:    prev_line(); break;
             case KEY_ENTER:       put(&curr->buf, '\n'); break;
             default:
                 if (ev->ascii >= 20 && ev->ascii < 127)
