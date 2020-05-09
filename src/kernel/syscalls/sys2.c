@@ -32,7 +32,7 @@ int sys_open(const char *fname, int oflags, int perms) {
     chann_t *c = state.st_chann + cid;
     c->chann_vfile = vfs_load(fname, oflags);
     if (!c->chann_vfile) {
-        if (oflags&O_CREAT && vfs_create(fname, TYPE_REG|perms)) {
+        if (oflags&O_CREAT && vfs_create(fname, TYPE_REG|(perms&0x0fff))) {
             c->chann_vfile = vfs_load(fname, oflags);
             is_new_file   = 1;
             if (!c->chann_vfile) {
@@ -374,7 +374,7 @@ off_t sys_lseek(int fd, off_t off, int whence) {
 
     c->chann_pos = pos;
     set_errno(SUCC);
-    return off;
+    return pos;
 
 err_einval:
     set_errno(EINVAL);
