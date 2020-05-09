@@ -155,9 +155,9 @@ void test_rdwr() {
 
 void usage(char *name) {
     printf("usage: %s test_id\n", name);
-    printf("\t1  test concurrent reads on same channel");
-    printf("\t2  test concurrent writes on same channel");
-    printf("\t3  test concurrent writes and reads on differents channels");
+    printf("\t1  test concurrent reads on same channel\n");
+    printf("\t2  test concurrent writes on same channel\n");
+    printf("\t3  test concurrent writes and reads on differents channels\n");
 }
 
 #define NTEST 3

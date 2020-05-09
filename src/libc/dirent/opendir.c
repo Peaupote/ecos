@@ -14,7 +14,10 @@ struct dirp *opendir(const char *fname) {
     if (fd < 0) goto error;
 
     fstat(fd, &st);
-    if (!(st.st_mode&TYPE_DIR)) goto error;
+    if (!(st.st_mode&TYPE_DIR)) {
+        errno = ENOTDIR;
+        goto error;
+    }
 
     dirp = malloc(sizeof(struct dirp));
     if (!dirp) goto error;
@@ -23,7 +26,7 @@ struct dirp *opendir(const char *fname) {
     dirp->size      = st.st_size;
     dirp->pos       = 0;
     dirp->off       = 0;
-	dirp->bsz       = 0;
+    dirp->bsz       = 0;
     return dirp;
 
 error:

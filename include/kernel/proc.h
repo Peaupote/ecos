@@ -31,7 +31,7 @@ enum proc_state {
     BLOCR, // blocked by a syscall, in file to return
     RUN,   // running
     ZOMB,  // just terminated
-	STOP   // stopped
+    STOP   // stopped
 };
 extern char proc_state_char[7];
 
@@ -97,7 +97,7 @@ typedef struct proc {
     int              p_fds[NFD]; // table of file descriptors
     phy_addr         p_pml4;     // paging
     uint_ptr         p_brk;      // program break
-	uint_ptr         p_brkm;     // min program break
+    uint_ptr         p_brkm;     // min program break
     struct reg       p_reg;      // saved registers
     char             p_cmd[256]; // cmd to exec the process
 
@@ -108,7 +108,7 @@ typedef struct proc {
     struct proc_shnd p_shnd;
 
     int*             p_errno;    // pointer to errno of libc
-	int              p_werrno;   // waiting errno
+    int              p_werrno;   // waiting errno
 } proc_t;
 
 /**
@@ -122,9 +122,13 @@ typedef struct channel {
     // and current writing/reading position in the buffer
     vfile_t        *chann_vfile;
     size_t          chann_pos;
-	// emplacement pour stocker des données spécifiques 
-	// au système de fichier
-	chann_adt_t     chann_adt;
+    // emplacement pour stocker des données spécifiques
+    // au système de fichier
+    chann_adt_t     chann_adt;
+
+    // absolute path by which channel was open
+    // can't be recovered with ino and dev
+    char            chann_path[256];
 
     cid_t           chann_nxw;     // next chann waiting same file
                                    //  ~0 = last, self_cid = not waiting
@@ -150,8 +154,8 @@ struct scheduler {
 };
 
 enum proc_owng {
-	own_tty = 0, 
-	NB_OWNG = 1
+    own_tty = 0,
+    NB_OWNG = 1
 };
 
 /**
@@ -167,8 +171,8 @@ struct {
     proc_t      st_proc[NPROC];       // table containing all processes
     chann_t     st_chann[NCHAN];      // table containing all channels
     vfile_t     st_files[NFILE];      // table containing all opened files
-	pid_t       st_owng[NB_OWNG];     // processes owners of ressources
-	uint8_t     st_time_slice;
+    pid_t       st_owng[NB_OWNG];     // processes owners of ressources
+    uint8_t     st_time_slice;
 } state;
 
 // pointer to current proc registers

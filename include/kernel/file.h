@@ -150,6 +150,8 @@ bool vfs_find(const char* path, const char* pathend, dev_t* dev, ino_t* ino);
 vfile_t *vfs_load(const char *path, int flags);
 void     vfs_opench(vfile_t *vf, chann_adt_t* cdt);
 
+int vfs_absolute_path(ino_t ino, dev_t dev_id, char *dst, size_t len);
+
 void vfs_unblock(vfile_t* vfile);
 
 int   vfs_close(vfile_t *vfile);

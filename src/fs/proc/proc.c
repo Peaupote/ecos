@@ -396,7 +396,6 @@ static int pid_getents(fpd_dt_t* ddt,
 static int pid_fd_getents(fpd_dt_t* ddt,
         int rc, bool begin, cdt_t* dt, struct dirent* d, size_t sz) {
 
-
     proc_t* p = state.st_proc + ddt->pid;
 
     for(unsigned fd = begin ? 0 : dt->num; fd < NFD; ++fd) {
@@ -432,9 +431,17 @@ static int fdi_read(file_ins* ins __attribute__((unused)),
     //TODO: obtenir le chemin du fichier
     return -1;
 }
-static ino_t fdi_read_sym(file_ins* ins __attribute__((unused)),
-        char* d __attribute__((unused))) {
-    return 0;
+
+static ino_t fdi_readlink(file_ins* ins, char* d, size_t len) {
+    proc_t *p  = state.st_proc + ins->pid;
+    chann_t *c = state.st_chann + p->p_fds[ins->fd];
+
+    if (c->chann_mode == UNUSED) return -1;
+
+    len = len < 255 ? len : 255;
+    memcpy(d, c->chann_path, len);
+
+    return len;
 }
 
 // -- /<pid>/cmd --
@@ -547,7 +554,7 @@ struct fs_proc_file {
     uint32_t (*lookup)(file_ins*, ino_t, const char* fname);
     int      (*getdents)(file_ins*, ino_t, struct dirent*, size_t,
                             chann_adt_t*);
-    ino_t    (*readsymlink)(file_ins*, char*);
+    ino_t    (*readlink)(file_ins*, char*, size_t len);
 };
 
 static struct fs_proc_file
@@ -560,7 +567,7 @@ static struct fs_proc_file
             .write    = NULL,
             .lookup   = dir_lookup,
             .getdents = dir_getdents,
-            .readsymlink = NULL
+            .readlink = NULL
         },
     fun_fdi = {
             .opench   = NULL,
@@ -571,7 +578,7 @@ static struct fs_proc_file
             .write    = NULL,
             .lookup   = NULL,
             .getdents = NULL,
-            .readsymlink = fdi_read_sym
+            .readlink = fdi_readlink
     },
     fun_cmd = {
             .opench   = NULL,
@@ -582,7 +589,7 @@ static struct fs_proc_file
             .write    = NULL,
             .lookup   = NULL,
             .getdents = NULL,
-            .readsymlink = NULL
+            .readlink = NULL
     },
     fun_stat = {
             .opench   = NULL,
@@ -593,7 +600,7 @@ static struct fs_proc_file
             .write    = NULL,
             .lookup   = NULL,
             .getdents = NULL,
-            .readsymlink = NULL
+            .readlink = NULL
     },
     fun_ttyi = {
             .opench   = NULL,
@@ -604,7 +611,7 @@ static struct fs_proc_file
             .write    = ttyi_write,
             .lookup   = NULL,
             .getdents = NULL,
-            .readsymlink = NULL
+            .readlink = NULL
     },
     fun_pipei = {
             .opench   = NULL,
@@ -615,7 +622,7 @@ static struct fs_proc_file
             .write    = pipei_write,
             .lookup   = NULL,
             .getdents = NULL,
-            .readsymlink = NULL
+            .readlink = NULL
     },
     fun_null = {
             .opench   = NULL,
@@ -626,7 +633,7 @@ static struct fs_proc_file
             .write    = null_write,
             .lookup   = NULL,
             .getdents = NULL,
-            .readsymlink = NULL
+            .readlink = NULL
     },
     fun_displ = {
             .opench   = NULL,
@@ -637,7 +644,7 @@ static struct fs_proc_file
             .write    = displ_write,
             .lookup   = NULL,
             .getdents = NULL,
-            .readsymlink = NULL
+            .readlink = NULL
     };
 
 static inline fpd_dt_t* set_dir_dt(file_ins* ins, ino_t p, dir_getents e) {
@@ -808,13 +815,6 @@ ino_t fs_proc_symlink(ino_t parent __attribute__((unused)),
     return 0;
 }
 
-int fs_proc_readlink(ino_t ino __attribute__((unused)),
-                     char *buf __attribute__((unused)),
-                     size_t len __attribute__((unused)),
-                     struct mount_info *info __attribute__((unused))) {
-    return 0;
-}
-
 GEN_RRTV(opench, VAH(chann_adt_t* cdt), VAH(cdt))
 GEN_RRTV(open,   VAH(vfile_t* vf), VAH(vf))
 GEN_RRTV(close,  VAH(), VAH())
@@ -824,6 +824,8 @@ GEN_RRT(int, write, -1, VAH(void* d, off_t o, size_t s), VAH(d,o,s))
 GEN_RRT(int, getdents, -1,
         VAH(struct dirent* d, size_t sz, chann_adt_t* cdt),
         VAH(ino, d, sz, cdt))
+
+GEN_RRT(int, readlink, -1, VAH(char *b, size_t l), VAH(b, l))
 
 #undef VAH
 #undef GEN_RRT

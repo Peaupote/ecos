@@ -312,6 +312,59 @@ void vfs_opench(vfile_t *vf, chann_adt_t* cdt) {
     return fs->fs_opench(vf->vf_stat.st_ino, cdt, &dev->dev_info);
 }
 
+int vfs_absolute_path(ino_t ino, dev_t dev_id, char *dst, size_t len) {
+    ino_t root_root_dev = devices[ROOT_DEV].dev_info.root_ino;
+    ino_t pino;
+
+    size_t pos = len;
+    struct dirent dir;
+
+    struct device *dev;
+    struct fs *fs;
+
+    dev = devices + dev_id;
+    fs  = fst + dev->dev_fs;
+
+    while (dev_id != ROOT_DEV || ino != root_root_dev) {
+        pino = fs->fs_lookup(ino, "..", &dev->dev_info);
+
+        // root of filesystem
+        // jump to parent filesystem
+        if (pino == ino) {
+            dev_id = dev->dev_parent_dev;
+            pino = dev->dev_parent_ino;
+            ino = dev->dev_parent_red;
+            dev = devices + dev_id;
+            fs  = fst + dev->dev_fs;
+            continue;
+        }
+
+        int rc, off = 0;
+        while ((rc = fs->fs_read(pino, &dir, off, DIRENT_OFF,
+                                &dev->dev_info)) > 0) {
+            if (dir.d_ino == ino) {
+                off += DIRENT_OFF;
+                break;
+            }
+
+            off += dir.d_rec_len;
+        }
+
+        kAssert(dir.d_ino == ino);
+
+        pos -= dir.d_name_len + 1;
+        dst[pos + dir.d_name_len] = '/';
+        fs->fs_read(pino, dst + pos, off, dir.d_name_len, &dev->dev_info);
+
+        ino = pino;
+    }
+
+    dst[--pos] = '/';
+
+    if (pos > 0) memmove(dst, dst + pos, len - pos);
+    return len - pos;
+}
+
 int vfs_read(vfile_t *vfile, void *buf, off_t pos, size_t len) {
     dev_t dev_id = vfile->vf_stat.st_dev;
     struct device *dev = devices + dev_id;
@@ -628,5 +681,6 @@ int vfs_readlink(const char *path, char *buf, size_t len) {
     struct device *dev = devices + dev_id;
     struct fs *fs = fst + dev->dev_fs;
 
-    return fs->fs_readlink(ino, buf, len, &dev->dev_info);
+    int rc = fs->fs_readlink(ino, buf, len, &dev->dev_info);
+    return rc;
 }

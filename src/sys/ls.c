@@ -76,9 +76,10 @@ int list_files(const char *fname) {
 
         if (flag_long && (st.st_mode&0xf000) == TYPE_SYM) {
             char buf[256];
-            int rc = readlink(dir->d_name, buf, 255);
+            sprintf(buf2, "%s/%s", fname, dir->d_name);
+            int rc = readlink(buf2, buf, 255);
             if (rc < 0) {
-                sprintf(buf, "ls: %s: readlink", buf);
+                sprintf(buf, "ls: %s: readlink", dir->d_name);
                 perror(buf);
                 return 1;
             }
@@ -88,7 +89,7 @@ int list_files(const char *fname) {
         }
 
         if (flag_long || (i > 0 && (i&7) == 0)) printf("\n");
-        else printf("\t");
+        else printf("    ");
     }
 
     closedir(dirp);
