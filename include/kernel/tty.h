@@ -1,6 +1,8 @@
 #ifndef _TTY_H
 #define _TTY_H
 
+#include <headers/tty.h>
+
 #include <stddef.h>
 #include <stdint.h>
 #include <stdbool.h>
@@ -34,6 +36,7 @@ void   tty_set_mode(enum tty_mode);
 void   tty_set_owner(pid_t p);
 bool   tty_input(scancode_byte scb, key_event ev);
 void   tty_on_pit();
+bool   tty_display_graph_rq(bool g);
 
 // L'affichage du prompt doit être mis à jour avant
 // (tty_update_prompt)

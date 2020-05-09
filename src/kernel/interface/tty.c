@@ -40,7 +40,7 @@ static int      ib_printed;// -1 if input_msg not printed
 static size_t   input_height;
 static size_t   input_top_line;
 static size_t   input_cursor;
-static uint8_t  input_cursor_clock;
+static uint8_t  cursor_clock;
 
 static char     input_msg[IM_LENGTH];
 static uint16_t input_msg_len;
@@ -69,8 +69,18 @@ static size_t   cur_ln_x;
 static int      buf_all_clock = 0;
 static int      buf_all_st    = 0;
 
+static tty_pos_t tty_wcurs = {.x = ~(size_t)0, .y = ~(size_t)0};
+static tty_pos_t tty_dcurs = {.x = ~(size_t)0, .y = ~(size_t)0};
+static bool display_buf = true;
+static enum {CRS_NO, CRS_IN, CRS_SC} cursor_ty = CRS_NO;
+static uint16_t cursor_sc_char = 0;
+
 
 // --Affichage--
+
+static bool is_in_screen(tty_pos_t* p) {
+	return p->x < tty_width && p->y < tty_height;
+}
 
 static inline void putat(char c, uint8_t col, tty_pos_t pos) {
     display_echar_at(pos.x, pos.y, vga_entry(c, col));
@@ -119,7 +129,7 @@ void tty_afficher_buffer_range(
 		size_t idx_bg, size_t x_bg,
 		size_t idx_ed,   size_t x_ed) {
 
-	if (display_graph) return;
+	if (!display_buf) return;
 
 	size_t r_b = 0;
 	if (idx_bg > sb_ashift)
@@ -162,7 +172,7 @@ void tty_afficher_buffer_range(
 }
 
 static void tty_afficher_buffer_all_do() {
-	if (display_graph) return;
+	if (!display_buf) return;
 
     size_t r_b = sb_rel_im_bg();
     size_t r_e = sb_rel_im_ed();
@@ -318,8 +328,7 @@ tty_pos_t tty_input_at(size_t p) {
 }
 
 static void redraw_input_cursor() {
-	if (input_cursor_clock < TTY_CURSOR_T / 2
-			&& ~input_cursor && ~input_top_line) {
+	if (cursor_clock < TTY_CURSOR_T / 2 && cursor_ty == CRS_IN) {
 		tty_pos_t cpos = tty_input_at(input_cursor);
 		display_cursor_at(cpos.x, cpos.y);
 	}
@@ -333,7 +342,7 @@ static void set_input_cursor(size_t nc) {
 		putat(ibuffer[input_cursor], input_color, cpos);
 	}
 	if (~nc) {
-		input_cursor_clock = 0;
+		cursor_clock = 0;
 		tty_pos_t cpos = tty_input_at(nc);
 		display_cursor_at(cpos.x, cpos.y);
 	}
@@ -464,6 +473,7 @@ void tty_init(enum tty_mode m) {
 }
 
 void tty_set_mode(enum tty_mode m) {
+	cursor_clock = 0;
     switch (m) {
     case ttym_prompt:
         prompt_color = vga_entry_color (
@@ -480,9 +490,11 @@ void tty_set_mode(enum tty_mode m) {
         input_lmargin = 0;
         break;
 	case ttym_live:
-		tty_mode = ttym_live;
+		tty_mode       = ttym_live;
 		tty_erase_prompt();
+		cursor_ty      = CRS_SC;
 		input_top_line =  ~(size_t)0;
+		display_buf    = false;
 		return;
     case ttym_panic:
         prompt_color = vga_entry_color (
@@ -510,6 +522,13 @@ void tty_set_mode(enum tty_mode m) {
     input_min_height = max_size_t(1, input_msg_height);
     input_msg_cs += input_msg_height * input_width;
 
+	if (!~input_cursor) input_cursor = 0;
+	cursor_ty   = CRS_IN;
+	display_buf = !display_graph;
+	if (tty_mode == ttym_live && !display_graph) {
+		display_clear();
+		tty_afficher_all();
+	}
     tty_mode = m;
 
     if (~input_top_line) {
@@ -518,6 +537,19 @@ void tty_set_mode(enum tty_mode m) {
 			tty_afficher_buffer_all();
 	} else if(tty_new_prompt())
 		tty_afficher_all();
+}
+
+bool tty_display_graph_rq(bool g) {
+	if (g) {
+		if (tty_mode >= ttym_debug) return false;
+		cursor_ty   = CRS_NO;
+		display_buf = false;
+		return true;
+	} else {
+		tty_set_mode(tty_mode);
+		tty_afficher_all();
+		return true;
+	}
 }
 
 void tty_set_mode_to_b() {
@@ -545,6 +577,10 @@ void tty_afficher_all() {
 	tty_afficher_prompt(true);
 }
 
+static inline void tty_send_tty0(char* src, size_t len) {
+	if(fs_proc_write_tty(src, len) != len)
+		klogf(Log_error, "tty", "tty0 buffer saturated");
+}
 
 bool tty_input(scancode_byte s, key_event ev) {
     tty_seq_t sq;
@@ -557,8 +593,8 @@ bool tty_input(scancode_byte s, key_event ev) {
 			case KEY_TAB:
 				switch (tty_mode) {
 					case ttym_def: case ttym_prompt: case ttym_live:
-						tty_set_mode(ttym_debug);
 						display_set_debug(true);
+						tty_set_mode(ttym_debug);
 					break;
 					case ttym_debug:
 						tty_set_mode_to_b();
@@ -574,7 +610,7 @@ bool tty_input(scancode_byte s, key_event ev) {
 					on_tty0_action();
 					rt = true;
 				}
-			break;
+			goto end_input;
 			case KEY_Z:
 				if (~state.st_owng[own_tty]) {
 					sq.shift += tty_writestringl("^Z", 2, tty_def_color);
@@ -582,13 +618,12 @@ bool tty_input(scancode_byte s, key_event ev) {
 					on_tty0_action();
 					rt = true;
 				}
-			break;
+			goto end_input;
 			case KEY_D:
 				if (!~input_top_line) break;
 				if (ib_size) {
 					sq.shift += tty_input_to_buffer(false);
-					if(fs_proc_write_tty(ibuffer, ib_size) != ib_size)
-						klogf(Log_error, "tty", "in_buffer saturated");
+					tty_send_tty0(ibuffer, ib_size);
 					sq.shift += tty_new_prompt();
 				} else {
 					sq.shift += tty_writestringl("^D", 2, tty_def_color);
@@ -596,14 +631,18 @@ bool tty_input(scancode_byte s, key_event ev) {
 				}
 				on_tty0_action();
 				rt = true;
-			break;
+			goto end_input;
 		}
 	}
 
 	if (tty_mode == ttym_live) {
 		if (!ev.key) return false;
-		if(fs_proc_write_tty((char*)&ev, sizeof(ev)) != sizeof(ev))
-			klogf(Log_error, "tty", "in_buffer saturated");
+		tty_live_t lt;
+		lt.magic    = TTY_LIVE_MAGIC;
+		lt.ev.key   = ev.key;
+		lt.ev.ascii = ev.ascii;
+		lt.ev.flags = ev.flags;
+		tty_send_tty0((char*)&lt, sizeof(lt));
 		return true;
 	}
 
@@ -622,8 +661,7 @@ bool tty_input(scancode_byte s, key_event ev) {
             case ttym_def:
             case ttym_prompt:
                 ibuffer[ib_size] = '\n';
-                if(fs_proc_write_tty(ibuffer, ib_size + 1) != ib_size + 1)
-                    klogf(Log_error, "tty", "in_buffer saturated");
+				tty_send_tty0(ibuffer, ib_size + 1);
 				on_tty0_action();
 				rt = true;
                 break;
@@ -698,23 +736,29 @@ bool tty_input(scancode_byte s, key_event ev) {
 		break;
 		}
     }
+end_input:
     tty_seq_commit(&sq);
 	return rt;
 }
 
 void tty_on_pit() {
 	if (display_graph) return;
-	if (~input_cursor && ~input_top_line) {
-		input_cursor_clock = (input_cursor_clock + 1) % TTY_CURSOR_T;
-		if (input_cursor_clock == 0) {
+	cursor_clock = (cursor_clock + 1) % TTY_CURSOR_T;
+	if (cursor_ty == CRS_IN) {
+		if (cursor_clock == 0) {
 			tty_pos_t cpos = tty_input_at(input_cursor);
 			display_cursor_at(cpos.x, cpos.y);
-		} else if (input_cursor_clock == TTY_CURSOR_T / 2) {
+		} else if (cursor_clock == TTY_CURSOR_T / 2) {
 			tty_pos_t cpos = tty_input_at(input_cursor);
 			putat(ibuffer[input_cursor], input_color, cpos);
 		}
+	} else if (cursor_ty == CRS_SC && is_in_screen(&tty_dcurs)) {
+		if (cursor_clock == 0)
+			display_cursor_at(tty_dcurs.x, tty_dcurs.y);
+		else if (cursor_clock == TTY_CURSOR_T / 2)
+			puteat(cursor_sc_char, tty_dcurs.x, tty_dcurs.y);
 	}
-	if (++buf_all_clock >= TTY_BUFALL_T) {
+	if (display_buf && ++buf_all_clock >= TTY_BUFALL_T) {
 		buf_all_clock = 0;
 		if (buf_all_st == 2)
 			tty_afficher_buffer_all_do();
@@ -774,6 +818,44 @@ static void interpret_color_code(const char* str, size_t len) {
 	}
 }
 
+static size_t tty_writestringl0(const char* str, size_t len) {
+	if (tty_mode == ttym_live) {
+		if (display_graph) return 0;
+		for (size_t i = 0; i < len; ++i) {
+			if (tty_wcurs.x >= tty_width) {
+				tty_wcurs.x = 0;
+				++tty_wcurs.y;
+			}
+			if (tty_wcurs.y >= tty_height)
+				tty_wcurs.y = 0;
+			putat(str[i], buf_color, tty_wcurs);
+			++tty_wcurs.x;
+		}
+		return 0;
+	} else
+		return tty_writestringl(str, len, buf_color);
+}
+
+static bool parse_cursor(const char* str, size_t* i, size_t len,
+		unsigned* rt) {
+	bool is_y = false;
+	rt[0] = rt[1] = 0;
+	for (; *i < len; ++*i) {
+		if (str[*i] == ';') {
+			if (is_y) return true;
+			is_y = true;
+			++rt;
+		} else if ('0' <= str[*i] && str[*i] <= '9')
+			*rt = (*rt) * 10 + str[*i] - '0';
+		else {
+			klogf(Log_error, "tty", "fail on %c", str[*i]);
+			return false;
+		}
+	}
+	klogf(Log_error, "tty", "fail len");
+	return false;
+}
+
 size_t tty_writei(uint8_t num, const char* str, size_t len) {
 	tty_seq_t sq;
 	tty_seq_init(&sq);
@@ -782,8 +864,7 @@ size_t tty_writei(uint8_t num, const char* str, size_t len) {
 		for (size_t i = 0; i < len; ++i) {
 			if (str[i] == '\033') {
 				if (t_bg < i)
-					sq.shift += tty_writestringl(
-									str + t_bg, i - t_bg, buf_color);
+					sq.shift += tty_writestringl0(str + t_bg, i - t_bg);
 				size_t t_ed = i;
 				if (++i >= len) {
 					tty_seq_commit(&sq);
@@ -824,14 +905,61 @@ size_t tty_writei(uint8_t num, const char* str, size_t len) {
 						}
 						tty_seq_commit(&sq);
 						return t_ed;
-					break;
+					case 'c': {
+						unsigned pos[2];
+						++i;
+						if (parse_cursor(str, &i, len, pos)) {
+							tty_wcurs.x = pos[0];
+							tty_wcurs.y = pos[1];
+							goto end_eseq;
+						} else {
+							tty_seq_commit(&sq);
+							return t_ed;
+						}
+					}
+					case 'C': {
+						unsigned pos[2];
+						char nc;
+						if (++i < len && (nc=str[i++],
+									parse_cursor(str, &i, len, pos))) {
+							if (!display_graph)
+								puteat(cursor_sc_char, tty_dcurs.x,
+													   tty_dcurs.y);
+							tty_dcurs.x = pos[0];
+							tty_dcurs.y = pos[1];
+							cursor_sc_char = vga_entry(nc, buf_color);
+							cursor_clock = 0;
+							if (is_in_screen(&tty_dcurs))
+								puteat(cursor_sc_char, tty_dcurs.x,
+										               tty_dcurs.y);
+							goto end_eseq;
+						} else {
+							tty_seq_commit(&sq);
+							return t_ed;
+						}
+					}
+					case 'i': {
+						char buf[50];
+						int count = sprintf(buf, "i%u;%u;",
+											(unsigned)tty_width,
+											(unsigned)tty_height);
+						for (int i = 0; i < count; ++i) {
+							tty_live_t lt;
+							lt.magic    = TTY_LIVE_MAGIC;
+							lt.ev.key   = 0;
+							lt.ev.ascii = buf[i];
+							lt.ev.flags = 0;
+							tty_send_tty0((char*)&lt, sizeof(lt));
+						}
+						break;
+					}
 				}
 				end_eseq:
 				t_bg = i + 1;
 			}
 		}
 		if (t_bg < len)
-			sq.shift += tty_writestringl(str + t_bg, len - t_bg, buf_color);
+			sq.shift += tty_writestringl0(str + t_bg, len - t_bg);
 	} else
 		sq.shift += tty_writestringl(str, len, err_color);
 	tty_seq_commit(&sq);

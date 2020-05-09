@@ -13,13 +13,13 @@ typedef struct io_file {
     int   fd;     // file descriptor to open file
     int   flags;  // remember flags with which file was open
 
-    char *read_ptr;  // current read pointer
-    char *read_end;  // end data
-    char *read_buf;
+    unsigned char *read_ptr;  // current read pointer
+    unsigned char *read_end;  // end data
+    unsigned char *read_buf;
 
-    char *write_ptr; // current write ptr
-    char *write_end; // end data
-    char *write_buf;
+    unsigned char *write_ptr; // current write ptr
+    unsigned char *write_end; // end data
+    unsigned char *write_buf;
 } FILE;
 
 FILE *fopen(const char *fname, const char *mode);
