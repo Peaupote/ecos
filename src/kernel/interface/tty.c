@@ -951,8 +951,11 @@ size_t tty_writei(uint8_t num, const char* str, size_t len) {
 							lt.ev.flags = 0;
 							tty_send_tty0((char*)&lt, sizeof(lt));
 						}
+					} break;
+					case 'x':
+						if (tty_mode == ttym_live)
+							display_clear();
 						break;
-					}
 				}
 				end_eseq:
 				t_bg = i + 1;

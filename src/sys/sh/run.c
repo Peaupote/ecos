@@ -621,7 +621,7 @@ int exec_cmd_3_bg(const cmd_3_t* c3, bool print_pid) {
 		exit(1);
 	} else if (rf1) { // enfant 0
 		if (print_pid) {
-			printf("\033\n|%d|\t", rf1);
+			printf("\033d\033\n|%d|\t", rf1);
 			pp_cmd_3(stdout, 'c', c3);
 			printf("\n");
 		}
@@ -791,7 +791,7 @@ bool run_fg(int* st) {
 			do {
 				if (int_tstp) {
 					fgc = NULL;
-					printf("\n[%d]\tstopped\n", ecmd->st->num);
+					printf("\033d\033\n[%d]\tstopped\n", ecmd->st->num);
 					return false;
 				}
 			} while(!~(wpid = wait(&rs)));

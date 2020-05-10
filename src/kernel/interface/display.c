@@ -161,7 +161,7 @@ void display_char_at(size_t x, size_t y, char c, rgbcolor_t fg, rgbcolor_t bg) {
 	unsigned left = x * char_width,
 	          top = y * char_height;
 	if (c <= 0x20 || c >= 0x7f)
-		display_draw_rect(left, top, char_width, char_height, 0);
+		display_draw_rect(left, top, char_width, char_height, bg);
 	else {
 		uint8_t* char_data = font_data + (c - 0x21) * char_width * char_height;
 		for (unsigned ry = 0; ry < char_height; ++ry)

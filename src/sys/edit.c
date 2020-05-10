@@ -279,17 +279,8 @@ void print_bar() {
     write(STDOUT_FILENO, buf, sz);
 }
 
-// TODO fast clean
 void clean() {
-    cursor_at(0, 0);
-
-    printf("\033[0m");
-    for (unsigned int i = 0; i < H; ++i) {
-        for (unsigned int j = 0; j < W; ++j) {
-            fputc(' ', stdout);
-        }
-    }
-    fflush(stdout);
+	write(STDOUT_FILENO, "\033x", 2);
 }
 
 void display() {

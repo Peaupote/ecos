@@ -2,12 +2,11 @@ Le tty possède un flux de lecture (`tty0`) et deux flux d'écriture (`tty1` et 
 
 - `tty1` est utilisé pour la sortie standard des applications.
   Les applications peuvent utiliser cette sortie pour contrôler le tty
-  via des séquences précédés du caractère `\033` (`\e`, `\x1B`):
+  via des séquences précédés du caractère `\033` (`\e`, `\x1B`).
+  Ces séquences ne doivent pas êtres séparées en plusieurs apppels à `write`.
   - `\033d`: passe le tty en mode défaut
   - `\033p__prompt_msg__\033;`: passe le tty en mode prompt
-  - `\033l`: passe le tty en mode `live`: les entrés claviers sont envoyées
-    directement sur tty0 au format binaire de la structure `tty_live_t`
-	l'affichage doit se faire en utilisant le curseur d'écriture
+  - `\033l`: passe le tty en mode `live`
   - `\033\n`: nouvelle ligne si la ligne actuelle n'est pas vide
   - `\033[__colors__m`: change la couleur, `__colors__` est une liste de codes
     séparés par `;`:
@@ -31,7 +30,16 @@ Le tty possède un flux de lecture (`tty0`) et deux flux d'écriture (`tty1` et 
     ```
 	i__width__;__height__;
 	```
-  - `\033c__x__;__y__;`: déplace le curseur d'écriture à la position `x`, `y`
-  - `\033Cc__x__;__y__;`: déplace le curseur affiché, avec `c` comme caractère
 
 - `tty2` est utilisé pour afficher les erreurs
+
+### Mode live
+
+Lorsque le tty est en mode `live`, les entrés claviers sont envoyées
+directement sur tty0 au format binaire de la structure `tty_live_t`.
+L'affichage se fait en utilisant un curseur d'écriture.
+Les séquences suivantes sont alors disponibles:
+
+  - `\033c__x__;__y__;`: déplace le curseur d'écriture à la position `x`, `y`
+  - `\033Cc__x__;__y__;`: déplace le curseur affiché, avec `c` comme caractère en dessous
+  - `\033x`: efface l'écran en utilisant la couleur de fond par défaut
