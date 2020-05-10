@@ -11,12 +11,20 @@
 #include <headers/display.h>
 #include <headers/keyboard.h>
 
-enum msg_kind {
+enum edit_mode {
+    BUFFER,
+    QUERY
+};
+
+enum bar_status {
+    NONE,
     INFO,
     ERR
 };
 
-void print_msg(const char *msg, enum msg_kind kind);
+void display();
+void make_query(const char *query, void (*callback)(char *));
+void print_msg(const char *msg, enum bar_status st);
 
 /**
  * Gap buffer
@@ -25,9 +33,50 @@ void print_msg(const char *msg, enum msg_kind kind);
  */
 typedef struct {
     char *cur1, *cur2;
+    int saved;
     size_t size;
     char   buf[];
 } buf_t;
+
+
+/**
+ * Visual
+ */
+
+typedef struct screen {
+    buf_t *buf;
+    char *fname;
+
+    unsigned int nline;
+    unsigned int line;
+    unsigned int col;
+
+    struct screen *nx, *pv;
+} screen_t;
+
+unsigned int W, H;
+
+void cursor_at(int l, int c) {
+    char cmd[50];
+    int ccmd = sprintf(cmd, "\033c%u;%u;", l, c);
+    write(STDOUT_FILENO, cmd, ccmd);
+}
+
+enum edit_mode mode = BUFFER;
+
+char query[256];                    // question asked
+buf_t *input;                       // buffer were to write answer
+void (*query_callback)(char *) = 0; // function to call after press enter
+
+screen_t *fst_screen = 0; // first screen in linked list
+screen_t *curr;       // current screen
+char msg[256];
+enum bar_status bar_status;
+int msg_count = 0;
+
+void close_current_screen();
+
+// ------ buffer
 
 buf_t *create(size_t size) {
     buf_t *b = malloc(offsetof(buf_t, buf) + size);
@@ -40,28 +89,66 @@ buf_t *create(size_t size) {
     return b;
 }
 
-void put(buf_t **b, char c) {
+void buffer_to_string(buf_t *buf, char *dst) {
+    for (size_t i = 0; i < buf->size; ++i) {
+        char *ptr = buf->buf + i;
+        if (ptr < buf->cur1 || ptr > buf->cur2) *dst++ = *ptr;
+    }
+
+    *dst = 0;
+}
+
+int is_empty_buffer(buf_t *buf) {
+    return buf->cur1 == buf->buf && buf->cur2 == buf->buf + buf->size - 1;
+}
+
+void empty_buffer(buf_t *buf) {
+    buf->cur1 = buf->buf;
+    buf->cur2 = buf->buf + buf->size - 1;
+}
+
+char put(buf_t **b, char c) {
     if ((*b)->cur1 == (*b)->cur2) { // realloc in a twice bigger buffer
         buf_t *n = create((*b)->size << 1);
+        if (!n) {
+            print_msg("can't alloc bigger buffer", ERR);
+            exit(42);
+            return 0;
+        }
 
-        size_t off1 = (*b)->cur1 - (*b)->buf, off2 = (*b)->cur2 - (*b)->buf;
-        memcpy(n->buf, (*b)->buf, off1);
+        /**
+         * xxxxxxxxx|xxxxxxxx
+         * ^ buf    ^ cur1 = cur2
+         */
 
-        size_t sz = (*b)->size - off2;
-        memcpy(n->buf + (n->size - sz), (*b)->cur2, sz);
 
-        n->cur1 = n->buf + off1;
+        // BUG
+
+        size_t off = (*b)->cur1 - (*b)->buf;
+        memcpy(n->buf, (*b)->buf, off);
+
+        size_t sz = (*b)->size - off - 1;
+        memcpy(n->buf + (n->size - sz), (*b)->cur2+1, sz);
+
+        n->cur1 = n->buf + off;
         n->cur2 = n->buf + n->size - sz - 1;
 
         free(*b);
         *b = n;
     }
 
+    (*b)->saved = 0;
     *(*b)->cur1++ = c;
+    return c;
 }
 
-void rm(buf_t *b) {
-    if (b->cur1 > b->buf) --b->cur1;
+char rm(buf_t *b) {
+    if (b->cur1 > b->buf) {
+        b->saved = 0;
+        return *b->cur1--;
+    }
+
+    return 0;
 }
 
 char left(buf_t *b) {
@@ -88,27 +175,44 @@ char right(buf_t *b) {
     return 0;
 }
 
-bool save(buf_t *buf, const char *fname) {
+void save(char *fname) {
     int fd = open(fname, O_WRONLY|O_TRUNC|O_CREAT);
     if (fd < 0) {
         char msg[256];
         sprintf(msg, "can't open %s\n", fname);
         print_msg(msg, ERR);
-        return false;
+        return;
     }
 
+    buf_t *buf = curr->buf;
     int rc = write(fd, buf->buf, buf->cur1 - buf->buf);
     if (rc < 0) {
         close(fd);
-        return false;
+        return;
     }
 
     rc = write(fd, buf->cur2, buf->size - (buf->cur2 - buf->buf));
+    if (rc < 0) print_msg("error while saving", ERR);
+    else print_msg("file saved !\n", INFO);
     close(fd);
 
-    print_msg("file saved !\n", INFO);
+    buf->saved = 1;
+    if (curr->fname) free(curr->fname);
+    curr->fname = malloc(strlen(fname)+1);
+    strcpy(curr->fname, fname);
+}
 
-    return rc >= 0;
+void save_and_close(char *fname) {
+    save(fname);
+    close_current_screen();
+}
+
+void save_close(char *ans) {
+    if (!strcmp("yes" , ans)) {
+        if (curr->fname) save_and_close(curr->fname);
+        else make_query("filename ? ", &save_and_close);
+    } else if (!strcmp("no", ans)) close_current_screen();
+    else print_msg("please answer by yes or no", ERR);
 }
 
 buf_t *open_buf(const char *fname) {
@@ -142,32 +246,7 @@ buf_t *open_buf(const char *fname) {
     return b;
 }
 
-/**
- * Visual
- */
-
-typedef struct screen {
-    buf_t *buf;
-    char *fname;
-
-    unsigned int nline;
-    unsigned int line;
-    unsigned int col;
-
-    struct screen *nx, *pv;
-} screen_t;
-
-unsigned int W, H;
-
-void cursor_at(int l, int c) {
-    char cmd[50];
-    int ccmd = sprintf(cmd, "\033c%u;%u;", l, c);
-    write(STDOUT_FILENO, cmd, ccmd);
-}
-
-screen_t *fst_screen = 0; // first screen in linked list
-screen_t *curr;       // current screen
-int msg_col;
+// --- visual
 
 void open_screen(char *fname) {
     buf_t *b = fname ? open_buf(fname) : create(1024);
@@ -195,6 +274,24 @@ void open_screen(char *fname) {
     curr = s;
 }
 
+void close_current_screen() {
+    // if only screen then exit
+    if (!curr->nx && !curr->pv) exit(0);
+
+    screen_t *s = curr;
+    if (curr->pv) {
+        curr = curr->pv;
+        curr->nx = s->nx;
+    } else {
+        curr = curr->nx;
+        curr->pv = s->pv;
+    }
+
+    free(s->buf);
+    free(s->fname);
+    free(s);
+}
+
 void prev_screen() {
     if (!curr->pv) {
         print_msg("no buffer on the left", INFO);
@@ -213,8 +310,8 @@ void next_screen() {
     curr = curr->nx;
 }
 
-void next_line() {
-    if (curr->line == curr->nline) return;
+char next_line() {
+    if (curr->line == curr->nline) return 0;
 
     buf_t *b = curr->buf;
     int col = curr->col;
@@ -228,10 +325,12 @@ void next_line() {
             break;
         }
     }
+
+    return 1;
 }
 
-void prev_line() {
-    if (curr->line <= 1) return;
+char prev_line() {
+    if (curr->line <= 1) return 0;
 
     buf_t *b = curr->buf;
     int col = curr->col;
@@ -248,28 +347,39 @@ void prev_line() {
             break;
         }
     }
+
+    return 1;
 }
 
-void display();
 
-void print_msg(const char *msg, enum msg_kind kind) {
-    cursor_at(msg_col, H-1);
-
-    switch (kind) {
-    case INFO: printf("\033[0m"); break;
-    case ERR : printf("\033[31m error: "); break;
-    }
-
-    unsigned int w = printf("%s", msg);
-    while (w < W) fputc(' ', stdout), ++w;
-    fflush(stdout);
+void print_msg(const char *new_msg, enum bar_status st) {
+    bar_status = st;
+    msg_count  = 1;
+    strcpy(msg, new_msg);
 }
 
 void print_bar() {
     cursor_at(0, H-1);
-    msg_col = printf("buffer: ");
-    if (curr->fname) msg_col += printf("%s ", curr->fname);
-    else msg_col += printf("<no file> ");
+    switch (bar_status) {
+    case NONE:
+    case INFO: fputs("\033[47;30m", stdout); break;
+    case ERR:  fputs("\033[41;37m", stdout); break;
+    }
+
+    for (unsigned int i = 0; i < W; ++i) fputc(' ', stdout);
+    fflush(stdout);
+
+    cursor_at(0, H-1);
+    fputs("buffer: ", stdout);
+    if (curr->fname) fputs(curr->fname, stdout);
+    else fputs("<no file>", stdout);
+
+    if (msg_count > 0) {
+        fputs("    ", stdout);
+        fputs(msg, stdout);
+        if (--msg_count == 0) bar_status = NONE;
+    }
+
     fflush(stdout);
 
     char buf[256];
@@ -277,22 +387,46 @@ void print_bar() {
                      curr->buf->size - (curr->buf->cur2 - curr->buf->cur1 + 1));
     cursor_at(W - sz - 1, H-1);
     write(STDOUT_FILENO, buf, sz);
+
+    printf("\033[0m"); fflush(stdout);
+}
+
+void print_query_bar() {
+    cursor_at(0, H-1);
+    printf("\033[47;30m");
+    for (unsigned int i = 0; i < W; ++i) fputc(' ', stdout);
+    fflush(stdout);
+
+    cursor_at(0, H-1);
+    fputs(query, stdout);
+    for (size_t i = 0; i < input->size; ++i) {
+        char *ptr = input->buf + i;
+        if (ptr < input->cur1 || ptr > input->cur2) {
+            fputc(*ptr, stdout);
+            if (ptr == input->cur2+1) fputs("\033[47;30m", stdout);
+        } else if (ptr == input->cur1) fputs("\033[0m", stdout);
+    }
+
+    fputs(" \033[0m", stdout);
+    fflush(stdout);
 }
 
 void clean() {
-	write(STDOUT_FILENO, "\033x", 2);
+    write(STDOUT_FILENO, "\033x", 2);
 }
 
-void display() {
-    clean();
-    cursor_at(0, 0);
+void display_buffer() {
+    clean(); // TODO update
 
+    // print buffer
+    cursor_at(0, 0);
     buf_t *buf = curr->buf;
     unsigned int line = 1, col = 0, off = 0;
     for (size_t i = 0; i < buf->size; ++i) {
         char *ptr = buf->buf + i;
         if (ptr < buf->cur1 || ptr > buf->cur2) {
             if (buf->buf[i] == '\n') {
+                if (ptr == buf->cur2 + 1) printf(" \033[0m");
                 fflush(stdout);
                 cursor_at(0, off + line++);
                 col = 0;
@@ -300,17 +434,38 @@ void display() {
             else {
                 if (++col == W+1) ++off;
                 fputc(buf->buf[i], stdout);
+                if (ptr == buf->cur2 + 1) printf("\033[0m");
             }
         } else if (ptr == buf->cur1) {
             curr->line = line;
             curr->col = col;
-            printf("*");
+            printf("\033[47;30m");
         }
     }
 
-    fflush(stdout);
+    printf(" \033[0m");
 
-    print_bar();
+    fflush(stdout);
+}
+
+void display() {
+    switch (mode) {
+    case BUFFER:
+        display_buffer();
+        print_bar();
+        break;
+
+    case QUERY:
+        print_query_bar();
+        break;
+    }
+}
+
+void make_query(const char *q, void (*callback)(char*)) {
+    mode = QUERY;
+    query_callback = callback;
+    strcpy(query, q);
+    empty_buffer(input);
 }
 
 bool get_live(tty_live_t* rt) {
@@ -344,12 +499,16 @@ int main(int argc, char *argv[]) {
     // switch to live mode
     printf("\033l\n", stdout);
 
+    // alloc command input buffer
+    input = create(16);
+
     for (int i = 1; i < argc; ++i) {
         open_screen(argv[i]);
     }
 
     if (argc == 1) open_screen(0);
 
+    clean();
     display();
 
     while (get_live(&lt)) {
@@ -359,36 +518,58 @@ int main(int argc, char *argv[]) {
             == (KEY_FLAG_CTRL | KEY_FLAG_PRESSED)) {
             switch(ev->ascii) {
             case 's':
-                // TODO ask filename
-                if (curr->fname) save(curr->buf, curr->fname);
+                if (!curr->fname) make_query("save to file ? ", &save);
+                else save(curr->fname);
                 break;
             case 'n': open_screen(0); break;
-            // TODO case 'o': break; open fname
+            case 'o': make_query("open file ? ", &open_screen); break;
+            case 'k':
+                if (!curr->buf->saved)
+                    make_query("save before closing ? (yes/no) ", save_close);
+                else close_current_screen();
+                break;
             case 'q': exit(0); break;
 
-            default: // TODO clean switch
+            default:
                 switch (ev->key) {
-                case KEY_LEFT_ARROW: next_screen(); break;
-                case KEY_RIGHT_ARROW: prev_screen(); break;
+                case KEY_RIGHT_ARROW: next_screen(); break;
+                case KEY_LEFT_ARROW:  prev_screen(); break;
                 }
             }
 
             display();
         } else if (ev->flags & KEY_FLAG_PRESSED) {
+            char c;
+            buf_t *t = mode == BUFFER ? curr->buf : input;
+
             switch (ev->key) {
-            case KEY_BACKSPACE:   rm(curr->buf);   break;
-            case KEY_LEFT_ARROW:  left(curr->buf); break;
-            case KEY_RIGHT_ARROW: right(curr->buf);break;
-            case KEY_DOWN_ARROW:  next_line(); break;
-            case KEY_UP_ARROW:    prev_line(); break;
-            case KEY_ENTER:       put(&curr->buf, '\n'); break;
+            case KEY_BACKSPACE:
+                if (mode == QUERY && is_empty_buffer(input)) mode = BUFFER;
+                else c = rm(t);
+                break;
+
+            case KEY_LEFT_ARROW:  c = left(t); break;
+            case KEY_RIGHT_ARROW: c = right(t);break;
+            case KEY_DOWN_ARROW:  c = next_line(); break;
+            case KEY_UP_ARROW:    c = prev_line(); break;
+            case KEY_ENTER:
+                switch (mode) {
+                case BUFFER: c = put(&t, '\n'); break;
+                case QUERY:
+                    buffer_to_string(input, query);
+                    mode = BUFFER;
+                    query_callback(query);
+                    break;
+                }
+                break;
+
             default:
                 if (ev->ascii >= 20 && ev->ascii < 127)
-                    put(&curr->buf, ev->ascii);
+                    c = put(&t, ev->ascii);
                 break;
             }
 
-            display();
+            if (c) display();
         }
     }
 

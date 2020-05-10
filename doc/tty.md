@@ -10,26 +10,26 @@ Le tty possède un flux de lecture (`tty0`) et deux flux d'écriture (`tty1` et 
   - `\033\n`: nouvelle ligne si la ligne actuelle n'est pas vide
   - `\033[__colors__m`: change la couleur, `__colors__` est une liste de codes
     séparés par `;`:
-	 - `0`: restaure les valeurs par défaut
-	 - `1`: utilise des couleurs plus claires (affecte les prochaines couleurs)
-	 - `3x`: change la couleur du texte
-	 - `4x`: change la couleur du fond
-	
-	     | `x` | couleur |
-	     |:---:|:------- |
-	     | 0   | noir    |
-	     | 1   | rouge   |
-	     | 2   | vert    |
-	     | 3   | marron  |
-	     | 4   | bleu    |
-	     | 5   | magenta |
-	     | 6   | cyan    |
-	     | 7   | blanc   |
+     - `0`: restaure les valeurs par défaut
+     - `1`: utilise des couleurs plus claires (affecte les prochaines couleurs)
+     - `3x`: change la couleur du texte
+     - `4x`: change la couleur du fond
+
+         | `x` | couleur |
+         |:---:|:------- |
+         | 0   | noir    |
+         | 1   | rouge   |
+         | 2   | vert    |
+         | 3   | marron  |
+         | 4   | bleu    |
+         | 5   | magenta |
+         | 6   | cyan    |
+         | 7   | blanc   |
   - `\033i`: infos, le tty envoie la séquence suivante sur `tty0` via des
     `tty_live_t` de `key` nulles:
     ```
-	i__width__;__height__;
-	```
+    i__width__;__height__;
+    ```
 
 - `tty2` est utilisé pour afficher les erreurs
 

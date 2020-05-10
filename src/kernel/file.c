@@ -449,7 +449,7 @@ ino_t vfs_create(const char *fullname, mode_t perm) {
         filename = fullname;
     else if (!vfs_find(fullname, parent_end, &par_dev, &par_ino)) {
         set_errno(ENOENT);
-        klogf(Log_error, "vfs", "can't find parent of %s", fullname);
+        klogf(Log_info, "vfs", "can't find parent of %s", fullname);
         return 0;
     }
 
@@ -459,8 +459,9 @@ ino_t vfs_create(const char *fullname, mode_t perm) {
     fs->fs_stat(par_ino, &st, &dev->dev_info);
 
     if (!(st.st_mode & TYPE_DIR)) {
-        klogf(Log_error, "vfs", "alloc: %s parent is not a directory",
-                fullname);
+        set_errno(ENOTDIR);
+        klogf(Log_info, "vfs", "alloc: %s parent is not a directory",
+              fullname);
         return 0;
 
     }
@@ -482,7 +483,8 @@ int vfs_getdents(vfile_t *vf, struct dirent* dst, size_t sz,
                     chann_adt_t* cdt) {
 
     if (!(vf->vf_stat.st_mode & TYPE_DIR)) {
-        klogf(Log_error, "vfs", "getdents: file %d is not a directory",
+        set_errno(ENOTDIR);
+        klogf(Log_info, "vfs", "getdents: file %d is not a directory",
               vf->vf_stat.st_ino);
         vfs_close(vf);
         return -1;
