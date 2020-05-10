@@ -229,7 +229,7 @@ void save(char *fname) {
         return;
     }
 
-    rc = write(fd, buf->cur2+1, buf->size - (buf->cur2 - buf->buf));
+    rc = write(fd, buf->cur2+1, buf->size - (buf->cur2 - buf->buf) - 1);
     if (rc < 0) print_msg("error while saving", ERR);
     else print_msg("file saved !\n", INFO);
     close(fd);
@@ -352,6 +352,8 @@ void open_screen(char *fname) {
     fst_screen = s;
     curr = s;
 
+    clean();
+
     char buf[256];
     if (fname) sprintf(buf, "open %s in new buffer", fname);
     else sprintf(buf, "open a new empty buffer");
@@ -395,6 +397,34 @@ void next_screen() {
 
     curr = curr->nx;
     clean();
+}
+
+void screen_up() {
+    if (curr->fst_line_nb == 1) {
+        print_msg("top of file", INFO);
+        return;
+    }
+
+    buf_t *buf = curr->buf;
+
+    --curr->fst_line_nb;
+    for(curr->fst_line -= 2;
+        curr->fst_line > buf->buf && *curr->fst_line != '\n';
+        --curr->fst_line);
+    if (*curr->fst_line == '\n') ++curr->fst_line;
+}
+
+void screen_down() {
+    if (curr->fst_line_nb + H - 3 == curr->buf->nline) {
+        print_msg("end of file", INFO);
+        return;
+    }
+
+    buf_t *buf = curr->buf;
+    ++curr->fst_line_nb;
+    while (curr->fst_line < buf->buf + buf->size && *curr->fst_line != '\n')
+        curr->fst_line++;
+    if (*curr->fst_line == '\n') ++curr->fst_line;
 }
 
 // --- visual
@@ -476,18 +506,8 @@ void display_buffer() {
     buf_t *buf = curr->buf;
 
     // adjust scrolling
-    if (buf->line < curr->fst_line_nb) {
-        --curr->fst_line_nb;
-        for(curr->fst_line -= 2;
-            curr->fst_line >= buf->buf && *curr->fst_line != '\n';
-            --curr->fst_line);
-        if (curr->fst_line > buf->buf) ++curr->fst_line;
-    } else if (buf->line > curr->fst_line_nb + H-3) {
-        ++curr->fst_line_nb;
-        while (curr->fst_line < buf->buf + buf->size && *curr->fst_line != '\n')
-            curr->fst_line++;
-        if (*curr->fst_line == '\n') ++curr->fst_line;
-    }
+    if (buf->line < curr->fst_line_nb) screen_up();
+    else if (buf->line > curr->fst_line_nb + H-3) screen_down();
 
     // print buffer
     unsigned int line = 1, col = 0, off = 0;
@@ -518,7 +538,7 @@ void display_buffer() {
     fputs(" \033[0m", stdout);
 
     // clean last 2 lines (in case one was deleted)
-    while (col++ < 2 * W) fputc(' ', stdout);
+    while (++col < 2 * W) fputc(' ', stdout);
     fflush(stdout);
 }
 
@@ -632,6 +652,8 @@ int main(int argc, char *argv[]) {
                 switch (ev->key) {
                 case KEY_RIGHT_ARROW: next_screen(); break;
                 case KEY_LEFT_ARROW:  prev_screen(); break;
+                case KEY_UP_ARROW:    screen_up(); break;
+                case KEY_DOWN_ARROW:  screen_down(); break;
                 }
             }
 
@@ -660,6 +682,7 @@ int main(int argc, char *argv[]) {
                 }
                 break;
 
+            case KEY_TAB: put(t, '\t'); break;
             default:
                 if (ev->ascii >= 20 && ev->ascii < 127)
                     put(t, ev->ascii);
