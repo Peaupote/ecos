@@ -27,6 +27,10 @@ void display();
 void make_query(const char *query, void (*callback)(char *));
 void print_msg(const char *msg, enum bar_status st);
 
+static inline void clean() {
+    write(STDOUT_FILENO, "\033x", 2);
+}
+
 /**
  * Gap buffer
  * Some text before the cursor [   (gap)   ] and some after
@@ -56,7 +60,10 @@ typedef struct {
 typedef struct screen {
     buf_t *buf;
     char *fname;
-    char *fst_line; // first line of buffer visible on screen
+
+    // first line of buffer visible on screen
+    char *fst_line;
+    unsigned int fst_line_nb;
 
     struct screen *nx, *pv;
 } screen_t;
@@ -337,6 +344,7 @@ void open_screen(char *fname) {
 
     s->buf = b;
     s->fst_line = b->buf;
+    s->fst_line_nb = 1;
 
     s->pv = 0;
     s->nx = fst_screen;
@@ -366,6 +374,7 @@ void close_current_screen() {
     free(s->buf);
     free(s->fname);
     free(s);
+    clean();
 }
 
 void prev_screen() {
@@ -375,6 +384,7 @@ void prev_screen() {
     }
 
     curr = curr->pv;
+    clean();
 }
 
 void next_screen() {
@@ -384,6 +394,7 @@ void next_screen() {
     }
 
     curr = curr->nx;
+    clean();
 }
 
 // --- visual
@@ -432,40 +443,55 @@ void print_bar() {
 
 void print_query_bar() {
     cursor_at(0, H-1);
-    printf("\033[47;30m");
-    for (unsigned int i = 0; i < W; ++i) fputc(' ', stdout);
-    fflush(stdout);
+    fputs("\033[47;30m", stdout);
 
-    cursor_at(0, H-1);
+    unsigned int col = strlen(query)+1;
     fputs(query, stdout);
-    for (size_t i = 0; i < input->size; ++i) {
-        char *ptr = input->buf + i;
-        if (ptr < input->cur1 || ptr > input->cur2) {
-            fputc(*ptr, stdout);
-            if (ptr == input->cur2+1) fputs("\033[47;30m", stdout);
-        } else if (ptr == input->cur1) fputs("\033[0m", stdout);
+    char *p = input->buf, *endp = input->buf + input->size;
+    while (col++ < W-1 && p < endp) {
+        if (p < input->cur1 || p > input->cur2) {
+            fputc(*p, stdout);
+            if (p == input->cur2 + 1) fputs("\033[47;30m", stdout);
+            ++p;
+        } else if (p == input->cur1) {
+            fputs("\033[0m", stdout);
+            p = input->cur2 + 1;
+        }
     }
 
     if (msg_count > 0) {
-        fputs("    ", stdout);
-        fputs(msg, stdout);
+        col += fputs("    ", stdout);
+        col += fputs(msg, stdout);
         if (--msg_count == 0) bar_status = NONE;
     }
 
-    fputs(" \033[0m", stdout);
+    fputs(" \033[47;30m", stdout);
+    while(col++ < W-1) fputc(' ', stdout);
+    fputs("\033[0m", stdout);
     fflush(stdout);
 }
 
-void clean() {
-    write(STDOUT_FILENO, "\033x", 2);
-}
-
 void display_buffer() {
-    // print buffer
     cursor_at(0, 0);
     buf_t *buf = curr->buf;
-    unsigned int line = 1, col = 0, off = 0;
 
+    // adjust scrolling
+    if (buf->line < curr->fst_line_nb) {
+        --curr->fst_line_nb;
+        for(curr->fst_line -= 2;
+            curr->fst_line >= buf->buf && *curr->fst_line != '\n';
+            --curr->fst_line);
+        if (curr->fst_line > buf->buf) ++curr->fst_line;
+    } else if (buf->line > curr->fst_line_nb + H-3) {
+        ++curr->fst_line_nb;
+        while (curr->fst_line < buf->buf + buf->size && *curr->fst_line != '\n')
+            curr->fst_line++;
+        if (*curr->fst_line == '\n') ++curr->fst_line;
+    }
+
+    // print buffer
+    unsigned int line = 1, col = 0, off = 0;
+    fputs("\033[0m", stdout);
     char *p = curr->fst_line, *endp = buf->buf + buf->size;
     while (line < H-1 && p < endp) {
         if (p < buf->cur1 || p > buf->cur2) {
@@ -477,7 +503,8 @@ void display_buffer() {
                 col = 0;
             } else {
                 if (col++ == W) ++off;
-                fputc(*p, stdout);
+                if (*p == '\t') fputs("    ", stdout);
+                else fputc(*p, stdout);
                 if (p == buf->cur2 + 1) fputs("\033[0m", stdout);
             }
 
@@ -491,7 +518,7 @@ void display_buffer() {
     fputs(" \033[0m", stdout);
 
     // clean last 2 lines (in case one was deleted)
-    while (col < 2 * W) fputc(' ', stdout), ++col;
+    while (col++ < 2 * W) fputc(' ', stdout);
     fflush(stdout);
 }
 
