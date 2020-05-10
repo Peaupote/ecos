@@ -81,9 +81,10 @@ void close_current_screen();
 buf_t *create(size_t size) {
     buf_t *b = malloc(offsetof(buf_t, buf) + size);
     if (b) {
-        b->size = size;
-        b->cur1 = b->buf;
-        b->cur2 = b->buf + size - 1;
+        b->saved = 0;
+        b->size  = size;
+        b->cur1  = b->buf;
+        b->cur2  = b->buf + size - 1;
     }
 
     return b;
@@ -120,9 +121,6 @@ char put(buf_t **b, char c) {
          * xxxxxxxxx|xxxxxxxx
          * ^ buf    ^ cur1 = cur2
          */
-
-
-        // BUG
 
         size_t off = (*b)->cur1 - (*b)->buf;
         memcpy(n->buf, (*b)->buf, off);
@@ -272,6 +270,11 @@ void open_screen(char *fname) {
     if (fst_screen) fst_screen->pv = s;
     fst_screen = s;
     curr = s;
+
+    char buf[256];
+    if (fname) sprintf(buf, "open %s in new buffer", fname);
+    else sprintf(buf, "open a new empty buffer");
+    print_msg(buf, INFO);
 }
 
 void close_current_screen() {
@@ -407,6 +410,12 @@ void print_query_bar() {
         } else if (ptr == input->cur1) fputs("\033[0m", stdout);
     }
 
+    if (msg_count > 0) {
+        fputs("    ", stdout);
+        fputs(msg, stdout);
+        if (--msg_count == 0) bar_status = NONE;
+    }
+
     fputs(" \033[0m", stdout);
     fflush(stdout);
 }
@@ -539,22 +548,22 @@ int main(int argc, char *argv[]) {
 
             display();
         } else if (ev->flags & KEY_FLAG_PRESSED) {
-            char c;
-            buf_t *t = mode == BUFFER ? curr->buf : input;
+            char c = 0;
+            buf_t **t = mode == BUFFER ? &curr->buf : &input;
 
             switch (ev->key) {
             case KEY_BACKSPACE:
                 if (mode == QUERY && is_empty_buffer(input)) mode = BUFFER;
-                else c = rm(t);
+                else c = rm(*t);
                 break;
 
-            case KEY_LEFT_ARROW:  c = left(t); break;
-            case KEY_RIGHT_ARROW: c = right(t);break;
+            case KEY_LEFT_ARROW:  c = left(*t); break;
+            case KEY_RIGHT_ARROW: c = right(*t);break;
             case KEY_DOWN_ARROW:  c = next_line(); break;
             case KEY_UP_ARROW:    c = prev_line(); break;
             case KEY_ENTER:
                 switch (mode) {
-                case BUFFER: c = put(&t, '\n'); break;
+                case BUFFER: c = put(t, '\n'); break;
                 case QUERY:
                     buffer_to_string(input, query);
                     mode = BUFFER;
@@ -565,7 +574,7 @@ int main(int argc, char *argv[]) {
 
             default:
                 if (ev->ascii >= 20 && ev->ascii < 127)
-                    c = put(&t, ev->ascii);
+                    c = put(t, ev->ascii);
                 break;
             }
 
