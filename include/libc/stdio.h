@@ -47,9 +47,13 @@ size_t fwrite(const void *ptr, size_t size, size_t nmem, FILE *stream);
 int fseek(FILE *stream, long offset, int whence);
 int fflush(FILE *stream);
 
-int  fprintf(FILE *stream, const char *fmt, ...);
-int  dprintf(int fd, const char *fmt, ...);
-int  printf(const char *fmt, ...);
+int fprintf(FILE *stream, const char *fmt, ...);
+int dprintf(int fd, const char *fmt, ...);
+int printf(const char *fmt, ...);
+
+int vprintf(const char *format, va_list ap);
+int vfprintf(FILE *stream, const char *format, va_list ap);
+int vsprintf(char *str, const char *format, va_list ap);
 
 int fgetc(FILE *stream);
 char *fgets(char *s, int size, FILE *stream);

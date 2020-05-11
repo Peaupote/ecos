@@ -246,6 +246,12 @@ int fprintf(FILE *stream, const char *fmt, ...) {
     return cnt;
 }
 
+int vfprintf(FILE *stream, const char *fmt, va_list ap) {
+    int cnt = fpprintf(&fprint, stream, fmt, ap);
+    if (strchr(fmt, '\n')) fflush(stream);
+    return cnt;
+}
+
 int printf(const char *fmt, ...) {
     va_list params;
     va_start(params, fmt);
@@ -255,13 +261,20 @@ int printf(const char *fmt, ...) {
     if (strchr(fmt, '\n')) fflush(stdout);
     return cnt;
 }
+
+int vprinf(const char *fmt, va_list ap) {
+    int cnt = fpprintf(&fprint, stdout, fmt, ap);
+    if (strchr(fmt, '\n')) fflush(stdout);
+    return cnt;
+}
+
 #endif
 
 static void
 nprint(void* none __attribute__((unused)),
-	const char *s __attribute__((unused)),
-	size_t    len __attribute__((unused))) {
-	return;
+    const char *s __attribute__((unused)),
+    size_t    len __attribute__((unused))) {
+    return;
 }
 static void
 sprint(void *ptr, const char *s, size_t len) {
@@ -273,18 +286,28 @@ sprint(void *ptr, const char *s, size_t len) {
 
 int sprintf(char *str, const char *fmt, ...) {
     if (!str) {
-		va_list params;
-		va_start(params, fmt);
-		int cnt = fpprintf(&nprint, NULL, fmt, params);
-		va_end(params);
-		return cnt;
-	}
+        va_list params;
+        va_start(params, fmt);
+        int cnt = fpprintf(&nprint, NULL, fmt, params);
+        va_end(params);
+        return cnt;
+    }
 
     va_list params;
     va_start(params, fmt);
-	int cnt = fpprintf(&sprint, &str, fmt, params);
+    int cnt = fpprintf(&sprint, &str, fmt, params);
     *str = 0;
     va_end(params);
 
+    return cnt;
+}
+
+int vsprintf(char *str, const char *fmt, va_list params) {
+    if (!str) {
+        return fpprintf(&nprint, NULL, fmt, params);
+    }
+
+    int cnt = fpprintf(&sprint, &str, fmt, params);
+    *str = 0;
     return cnt;
 }

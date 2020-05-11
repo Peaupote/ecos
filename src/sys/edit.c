@@ -25,7 +25,7 @@ enum bar_status {
 
 void display();
 void make_query(const char *query, void (*callback)(char *));
-void print_msg(const char *msg, enum bar_status st);
+void print_msg(enum bar_status st, const char *fmt, ...);
 
 static inline void clean() {
     write(STDOUT_FILENO, "\033x", 2);
@@ -98,7 +98,7 @@ buf_t *create(size_t size) {
         b->line  = 1;
         b->nline = 1;
         b->col   = 0;
-        b->saved = 0;
+        b->saved = 1;
         b->size  = size;
         b->cur1  = b->buf;
         b->cur2  = b->buf + size - 1;
@@ -130,8 +130,7 @@ char put(buf_t **b, char c) {
     if ((*b)->cur1 == (*b)->cur2) { // realloc in a twice bigger buffer
         buf_t *n = create((*b)->size << 1);
         if (!n) {
-            print_msg("can't alloc bigger buffer", ERR);
-            exit(42);
+            print_msg(ERR, "can't alloc bigger buffer");
             return 0;
         }
 
@@ -216,9 +215,7 @@ char right(buf_t *b) {
 void save(char *fname) {
     int fd = open(fname, O_WRONLY|O_TRUNC|O_CREAT);
     if (fd < 0) {
-        char msg[256];
-        sprintf(msg, "can't open %s\n", fname);
-        print_msg(msg, ERR);
+        print_msg(ERR, "can't open %s\n", fname);
         return;
     }
 
@@ -230,14 +227,15 @@ void save(char *fname) {
     }
 
     rc = write(fd, buf->cur2+1, buf->size - (buf->cur2 - buf->buf) - 1);
-    if (rc < 0) print_msg("error while saving", ERR);
-    else print_msg("file saved !\n", INFO);
+    if (rc < 0) print_msg(ERR, "error while saving %s", fname);
     close(fd);
 
     buf->saved = 1;
-    if (curr->fname) free(curr->fname);
-    curr->fname = malloc(strlen(fname)+1);
-    strcpy(curr->fname, fname);
+    char *pv = curr->fname;
+    curr->fname = strdup(fname);
+    free(pv);
+
+    print_msg(INFO, "%s saved !", curr->fname);
 }
 
 void save_and_close(char *fname) {
@@ -250,7 +248,7 @@ void save_close(char *ans) {
         if (curr->fname) save_and_close(curr->fname);
         else make_query("filename ? ", &save_and_close);
     } else if (!strcmp("no", ans)) close_current_screen();
-    else print_msg("please answer by yes or no", ERR);
+    else print_msg(ERR, "please answer by yes or no");
 }
 
 buf_t *open_buf(const char *fname) {
@@ -262,9 +260,7 @@ buf_t *open_buf(const char *fname) {
     int size = lseek(fd, 0, SEEK_END);
     buf_t *b = create(size << 1); // make buffer twice as big as the file
     if (!b) {
-        char msg[256];
-        sprintf(msg, "file %s too big", fname);
-        print_msg(msg, ERR);
+        print_msg(ERR, "file %s too big", fname);
         return 0;
     }
 
@@ -272,7 +268,7 @@ buf_t *open_buf(const char *fname) {
     int rc = read(fd, b->buf + size, size);
     if (rc < size) {
         free(b);
-        print_msg("can't read file", ERR);
+        print_msg(ERR, "can't read file %s", fname);
         return 0;
     }
 
@@ -333,7 +329,7 @@ void open_screen(char *fname) {
     screen_t *s = malloc(sizeof(screen_t));
     if (!s) {
         free(b);
-        print_msg("can't open a new screen", ERR);
+        print_msg(ERR, "can't open a new screen");
         return;
     }
 
@@ -354,10 +350,8 @@ void open_screen(char *fname) {
 
     clean();
 
-    char buf[256];
-    if (fname) sprintf(buf, "open %s in new buffer", fname);
-    else sprintf(buf, "open a new empty buffer");
-    print_msg(buf, INFO);
+    if (fname) print_msg(INFO, "open %s in new buffer", fname);
+    else print_msg(INFO, "open a new empty buffer");
 }
 
 void close_current_screen() {
@@ -381,7 +375,7 @@ void close_current_screen() {
 
 void prev_screen() {
     if (!curr->pv) {
-        print_msg("no buffer on the left", INFO);
+        print_msg(INFO, "no buffer on the left");
         return;
     }
 
@@ -391,7 +385,7 @@ void prev_screen() {
 
 void next_screen() {
     if (!curr->nx) {
-        print_msg("no buffer on the right", INFO);
+        print_msg(INFO, "no buffer on the right");
         return;
     }
 
@@ -401,7 +395,7 @@ void next_screen() {
 
 void screen_up() {
     if (curr->fst_line_nb == 1) {
-        print_msg("top of file", INFO);
+        print_msg(INFO, "top of file");
         return;
     }
 
@@ -416,7 +410,7 @@ void screen_up() {
 
 void screen_down() {
     if (curr->fst_line_nb + H - 3 == curr->buf->nline) {
-        print_msg("end of file", INFO);
+        print_msg(INFO, "end of file");
         return;
     }
 
@@ -429,10 +423,13 @@ void screen_down() {
 
 // --- visual
 
-void print_msg(const char *new_msg, enum bar_status st) {
+void print_msg(enum bar_status st, const char *fmt, ...) {
+    va_list params;
+    va_start(params, fmt);
     bar_status = st;
     msg_count  = 1;
-    strcpy(msg, new_msg);
+    vsprintf(msg, fmt, params);
+    va_end(params);
 }
 
 void print_bar() {
