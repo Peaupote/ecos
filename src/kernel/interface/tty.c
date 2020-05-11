@@ -34,7 +34,7 @@ static size_t   sb_nb_lines;
 static bool     sb_dtcd; // scroll détaché
 
 //Input Buffer
-static char     ibuffer[IB_LENGTH];
+static char     ibuffer[IB_LENGTH];//ibuffer[ib_size] = ' '
 static size_t   ib_size;
 static int      ib_printed;// -1 if input_msg not printed
 static size_t   input_height;
@@ -115,7 +115,7 @@ static inline size_t sb_rel_im_ed() {
             (tty_height - input_height + sb_display_shift)%tty_sb_height);
 }
 size_t sb_new_botlim(size_t bt) {
-    if (sb_dtcd) return 0;
+    if (sb_dtcd) return bt > input_top_line ? 0x10000 : 0;
     size_t old_ds = sb_display_shift;
     sb_display_shift = bt < sb_nb_lines
             		 ? sb_nb_lines - bt : 0;
@@ -327,13 +327,6 @@ tty_pos_t tty_input_at(size_t p) {
 	return rt;
 }
 
-static void redraw_input_cursor() {
-	if (cursor_clock < TTY_CURSOR_T / 2 && cursor_ty == CRS_IN) {
-		tty_pos_t cpos = tty_input_at(input_cursor);
-		display_cursor_at(cpos.x, cpos.y);
-	}
-}
-
 static void set_input_cursor(size_t nc) {
 	if (display_graph || !~input_top_line) return;
 
@@ -341,11 +334,7 @@ static void set_input_cursor(size_t nc) {
 		tty_pos_t cpos = tty_input_at(input_cursor);
 		putat(ibuffer[input_cursor], input_color, cpos);
 	}
-	if (~nc) {
-		cursor_clock = 0;
-		tty_pos_t cpos = tty_input_at(nc);
-		display_cursor_at(cpos.x, cpos.y);
-	}
+	if (~nc) cursor_clock = 0;
 	input_cursor = nc;
 }
 
@@ -363,12 +352,11 @@ size_t tty_update_prompt() {
 	if (nheight != input_height || ntop != input_top_line) {
 		input_height = nheight;
 
-		if (ntop > tty_height - nheight) {
+		if (ntop > tty_height - nheight)
 			ntop = tty_height - nheight;
-			rt   = sb_new_botlim(ntop);
-		}
 
 		if (ntop != input_top_line) {
+			rt = sb_new_botlim(ntop);
 			input_top_line = ntop;
 			ib_printed     = -1;
 		}
@@ -400,18 +388,26 @@ void tty_afficher_prompt(bool fill) {
     	pos = afficher_string(pos, 0, input_msg_len, input_msg, prompt_color);
 		ib_printed = 0;
 		fill = true;
-	} else
-		pos.x = input_lmargin  + (ib_printed + input_msg_cs) % input_width;
+	} else {
+		pos.x = (ib_printed + input_msg_cs) % input_width;
         pos.y = input_top_line + (ib_printed + input_msg_cs) / input_width;
+		if (pos.x || !ib_printed)
+			pos.x += input_lmargin;
+	}
 
-    pos = afficher_string(pos, input_lmargin, ib_size - ib_printed,
+    pos = afficher_string(pos, input_lmargin, ib_size + 1 - ib_printed,
                             ibuffer + ib_printed, input_color);
     if(fill)
         for(; pos.x < tty_width; ++pos.x)
             putat(' ', input_color, pos);
 
     ib_printed = ib_size;
-	redraw_input_cursor();
+
+	if (cursor_clock < TTY_CURSOR_T / 2 && cursor_ty == CRS_IN) {
+		tty_pos_t cpos = tty_input_at(input_cursor);
+		display_cursor_at(cpos.x, cpos.y,
+				vga_entry(ibuffer[input_cursor], input_color));
+	}
 }
 
 static void tty_erase_prompt() {
@@ -747,14 +743,15 @@ void tty_on_pit() {
 	if (cursor_ty == CRS_IN) {
 		if (cursor_clock == 0) {
 			tty_pos_t cpos = tty_input_at(input_cursor);
-			display_cursor_at(cpos.x, cpos.y);
+			display_cursor_at(cpos.x, cpos.y,
+					vga_entry(ibuffer[input_cursor], input_color));
 		} else if (cursor_clock == TTY_CURSOR_T / 2) {
 			tty_pos_t cpos = tty_input_at(input_cursor);
 			putat(ibuffer[input_cursor], input_color, cpos);
 		}
 	} else if (cursor_ty == CRS_SC && is_in_screen(&tty_dcurs)) {
 		if (cursor_clock == 0)
-			display_cursor_at(tty_dcurs.x, tty_dcurs.y);
+			display_cursor_at(tty_dcurs.x, tty_dcurs.y, cursor_sc_char);
 		else if (cursor_clock == TTY_CURSOR_T / 2)
 			puteat(cursor_sc_char, tty_dcurs.x, tty_dcurs.y);
 	}

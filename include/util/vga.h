@@ -35,4 +35,8 @@ static inline uint16_t vga_entry(unsigned char uc, uint8_t color)
     return (uint16_t) uc | (uint16_t) color << 8;
 }
 
+static inline uint16_t vga_entry_inv(uint16_t e) {
+	return (e & 0xff) | ((e & 0xf00)<<4) | ((e & 0xf000)>>4);
+}
+
 #endif

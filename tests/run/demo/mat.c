@@ -7,11 +7,14 @@
 
 #include <util/misc.h>
 
+#include <headers/tty.h>
+
 #include "fxm.h"
 #include "graph.h"
 
-#define MAX_PLOT_SUB 200
+#define MAX_PLOT_SUB 500
 #define MAX_PLOT_FUN 10
+#define MAX_PLOT3_SUB 100
 #define ERRL __LINE__
 #define ERR_MISSING 1
 #define ERR_TYPE    2
@@ -319,6 +322,18 @@ bool op_sqrt(stack_t* s) {
     UOP push_nb(s, fxm_sqrt(a));
     return true;
 }
+bool op_pi(stack_t* s) {
+	push_nb(s, FXM_PI);
+	return true;
+}
+bool op_cos(stack_t* s) {
+	UOP push_nb(s, fxm_cos(a));
+	return true;
+}
+bool op_sin(stack_t* s) {
+	UOP push_nb(s, fxm_sin(a));
+	return true;
+}
 #undef UOP
 #undef BOP
 
@@ -475,6 +490,7 @@ bool op_plot(stack_t* s) {
             (di.width  - d) / 2,
             (di.height - d) / 2,
             d, d);
+	graph_clear(g);
 
     stack_t stk;
     mk_stk(&stk);
@@ -547,6 +563,233 @@ err0:
     return false;
 }
 
+bool get_live(tty_live_t* rt) {
+	int c;
+	while ((c = fgetc(stdin)) != TTY_LIVE_MAGIC)
+		if (c == EOF) return false;
+	char* buf = (char*)rt;
+	buf[0] = TTY_LIVE_MAGIC;
+	for (size_t i = 1; i < sizeof(tty_live_t); ++i) {
+		if ((c = fgetc(stdin)) == EOF) return false;
+		buf[i] = c;
+	}
+	return true;
+}
+
+static inline void plot3_apply_rot(fxm_t rot[], unsigned axis, bool posi) {
+	fxm_t rot_v[3] = {0, 0, 0};
+	rot_v[axis] = posi ? FXM_PI / 16 : - FXM_PI / 16;
+	fxm_t arot[16];
+	fxm_t tmp [16];
+	fxm_mrot(arot, rot_v);
+	fxm_mmul(arot, rot, tmp, 4, 4, 4);
+	memcpy(rot, tmp, sizeof(tmp));
+}
+
+bool op_plot3(stack_t* s) {
+	fxm_t vals[MAX_PLOT3_SUB + 1][MAX_PLOT3_SUB + 1];
+	bool valid[MAX_PLOT3_SUB + 1][MAX_PLOT3_SUB + 1];
+    citem_t* f = NULL;
+	unsigned sub = 50;
+
+	{
+		size_t s_sub;
+		if (!pop_sz(s, &s_sub)) goto err0;
+		if (s_sub)
+			sub = min_size_t(MAX_PLOT3_SUB, s_sub);
+
+		item_t fi;
+		if (!pop_any(s, &fi)) goto err0;
+		if (!(f = exec_from_item(&fi))) {
+			s->err = ERRL;
+			destr_item(&fi);
+			goto err0;
+		}
+		destr_item(&fi);
+	}
+	{
+		stack_t stk;
+		mk_stk(&stk);
+		for (unsigned y = 0; y <= sub; ++y)
+			for (unsigned x = 0; x <= sub; ++x) {
+				push_nb(&stk, fxm_of_int(x) / sub);
+				push_nb(&stk, fxm_of_int(y) / sub);
+				valid[y][x] = exec_cmd(f, &stk)
+						    && pop_nb(&stk, vals[y] + x);
+				clear_stk(&stk);
+			}
+		free(stk.c);
+	}
+	free_cmd(f);
+
+    int fd = graph_open_display();
+    if (fd < 0) goto err1;
+    struct display_info di;
+    if (!graph_read_infos(fd, &di)) goto err2;
+
+    graph_buf_t* g = graph_make_buf(0, 0, di.width, di.height);
+
+	fxm_t proj[16],
+	      tr  [16],
+	      rot [16],
+		  tr0 [16],
+		  m_w [16],
+	      m_pw[16];
+	fxm_t zoom = fxm_one();
+
+	fxm_t tr0_v[3] = {-fxm_one()/2, -fxm_one()/2, -fxm_one()/2};
+	fxm_mtrl(tr0, tr0_v);
+	fxm_mid(rot, 4);
+	fxm_t tr_v[3] = {0, fxm_of_int(2), 0};
+
+	write(STDOUT_FILENO,"\033l", 2);
+
+redraw:
+	{
+		fxm_mtrl(tr,   tr_v);
+		fxm_t m_w0[16];
+		fxm_mmul(rot,  tr0,  m_w0, 4, 4, 4);
+		fxm_mmul(tr,   m_w0, m_w,  4, 4, 4);
+		fxm_mproj_h(proj, di.width, di.height, zoom, 0, fxm_of_int(4));
+		fxm_mmul(proj, m_w,  m_pw, 4, 4, 4);
+	}
+
+	graph_clear3(g);
+
+	fxm_t points[16];
+	for (unsigned k = 0; k < 4; ++k)
+		points[12 + k] = fxm_one();
+	const unsigned tri_index[2][3] = {{0, 1, 2}, {3, 2, 1}};
+
+	for (unsigned y = 0; y < sub; ++y)
+		for (unsigned x = 0; x < sub; ++x) {
+			if (!valid[y+1][x] || !valid[y][x+1])
+				continue;
+			for (unsigned dy = 0; dy < 2; ++dy)
+				for (unsigned dx = 0; dx < 2; ++dx) {
+					points[  2*dy + dx  ] = fxm_of_int(x + dx) / sub;
+					points[4 + 2*dy + dx] = fxm_of_int(y + dy) / sub;
+					points[8 + 2*dy + dx] = vals[y + dy][x + dx];
+				}
+			fxm_t spos[16];
+			fxm_t wpos[16];
+			fxm_mmul(m_pw, points, spos, 4, 4, 4);
+			fxm_mmul(m_w,  points, wpos, 4, 4, 4);
+
+			for (unsigned k = 0; k < 2; ++k) {
+				const unsigned* tri = tri_index[k];
+				if (!valid[y + (tri[0]>>1)][y + (tri[0] &1)])
+					continue;
+				int x[3], y[3];
+				fxm_t depth[3];
+				for (unsigned i = 0; i < 3; ++i) {
+					x[i] = fxm_to_int(spos[  tri[i]  ]);
+					y[i] = fxm_to_int(spos[4 + tri[i]]);
+					depth[i] = spos[8 + tri[i]];
+				}
+				fxm_t ssegs[2][2];
+				for (unsigned i = 0; i < 2; ++i) {
+					ssegs[0][i] = spos[4*i + tri[1]]
+						        - spos[4*i + tri[0]];
+					ssegs[1][i] = spos[4*i + tri[2]]
+						        - spos[4*i + tri[0]];
+				}
+				bool back_face = fxm_mul(ssegs[0][0],ssegs[1][1]) 
+							   > fxm_mul(ssegs[1][0], ssegs[0][1]);
+				rgbcolor_t color = back_face ? 0x00232c : 0x601414;
+				fxm_t wsegs[2][3];
+				fxm_t normal0[3], normal[3] = {0};
+				for (unsigned i = 0; i < 3; ++i) {
+					wsegs[0][i] = wpos[4*i + tri[1]]
+								- wpos[4*i + tri[0]];
+					wsegs[1][i] = wpos[4*i + tri[2]]
+								- wpos[4*i + tri[0]];
+				}
+				fxm_vprod(wsegs[0], wsegs[1], normal0);
+				fxm_normalize(normal0, normal, 3);
+				fxm_t dot = normal[0] - normal[1] + normal[2];
+				if (back_face) dot = -dot;
+				if (dot > 0) {
+					rgbcolor_t add = (dot * 0x20) & 0xff0000;
+					color += add | (add >> 8) | (add >> 16);
+				}
+				
+				graph_draw_tri(g, x, y, depth, color);
+			}
+		}
+
+    if (!graph_acq_display(fd)) goto err3;
+    if (!graph_display(fd, g))  goto err3;
+    
+	tty_live_t lt;
+    while (get_live(&lt)) {
+		if (lt.ev.key == KEY_ESCAPE) break;
+		if (lt.ev.flags & KEY_FLAG_PRESSED) {
+			switch (lt.ev.flags & KEY_FLAG_MODS) {
+				case 0: switch (lt.ev.key) {
+					case KEY_LEFT_ARROW:
+						tr_v[0] -= fxm_div(fxm_one(), zoom) / 4;
+						goto redraw;
+					case KEY_RIGHT_ARROW:
+						tr_v[0] += fxm_div(fxm_one(), zoom) / 4;
+						goto redraw;
+					case KEY_UP_ARROW:
+						tr_v[2] += fxm_div(fxm_one(), zoom) / 4;
+						goto redraw;
+					case KEY_DOWN_ARROW:
+						tr_v[2] -= fxm_div(fxm_one(), zoom) / 4;
+						goto redraw;
+				} break;
+				case KEY_FLAG_CTRL:{
+					switch (lt.ev.key) {
+					case KEY_LEFT_ARROW:
+						plot3_apply_rot(rot, 2, true);
+						goto redraw;
+					case KEY_RIGHT_ARROW:
+						plot3_apply_rot(rot, 2, false);
+						goto redraw;
+					case KEY_UP_ARROW:
+						plot3_apply_rot(rot, 0, true);
+						goto redraw;
+					case KEY_DOWN_ARROW:
+						plot3_apply_rot(rot, 0, false);
+						goto redraw;
+					}
+				} break;
+				case KEY_FLAG_SHIFT:{
+					switch (lt.ev.key) {
+					case KEY_LEFT_ARROW:
+						plot3_apply_rot(rot, 1, false);
+						goto redraw;
+					case KEY_RIGHT_ARROW:
+						plot3_apply_rot(rot, 1, true);
+						goto redraw;
+					case KEY_UP_ARROW:
+						zoom = fxm_mul(zoom, fxm_of_int(9)/8);
+						goto redraw;
+					case KEY_DOWN_ARROW:
+						zoom = fxm_mul(zoom, fxm_of_int(8)/9);
+						goto redraw;
+					}
+				} break;
+			}
+		}
+	}
+
+	free(g);
+	close(fd);	
+	return true;
+
+err3:
+    free(g);
+err2:
+    close(fd);
+err1:
+    s->err = ERRL;
+err0:
+    return false;
+}
+
 #define DEF_OP(N) {char buf[]=#N;fun_def_t def = {.next=0,.name=buf,\
                     .is_op=true,.op=op_##N};set_fun_def(&def);}
 void init_funs() {
@@ -556,8 +799,12 @@ void init_funs() {
     DEF_OP(exp)
     DEF_OP(ln)
     DEF_OP(sqrt)
+    DEF_OP(pi)
+    DEF_OP(cos)
+    DEF_OP(sin)
     DEF_OP(dup)
     DEF_OP(plot)
+    DEF_OP(plot3)
 }
 #undef DEF_OP
 

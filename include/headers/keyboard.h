@@ -1,6 +1,7 @@
 #ifndef _HD_KEYBOARD_H
 #define _HD_KEYBOARD_H
 
+#define KEY_ESCAPE	    0x01
 #define KEY_BACKSPACE	0x0E
 #define KEY_ENTER		0x1C
 #define KEY_LSHIFT		0x2A

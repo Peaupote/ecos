@@ -23,6 +23,14 @@ void fxm_print(FILE* f, fxm_t p, int d_lim) {
 	}
 }
 
+void fxm_mprint(FILE* f, fxm_t*  p, unsigned n, unsigned m, int d_lim) {
+	for (unsigned i = 0; i < n; ++i)
+		for (unsigned j = 0; j < m; ++p) {
+			fxm_print(f, *p, d_lim);
+			fprintf(f, ++j == m ? "\n": " ");
+		}
+}
+
 bool fxm_scanu(FILE* f, fxm_t* r) {
 	int c = fgetc(f);
 	bool hr = false;
@@ -108,9 +116,8 @@ fxm_t fxm_ln(fxm_t t) {
 		t >>= 1;
 	}
 
-	fxm_t l2 = fxm_ln_aux(fxm_of_int(2));
 	fxm_t  l = fxm_ln_aux(t);
-	l += n * l2;
+	l += n * (fxm_t)0xb172;//ln(2)
 	return inv ? -l : l;
 }
 
@@ -122,4 +129,49 @@ fxm_t fxm_sqrt(fxm_t x) {
 			rt = rt1;
 	}
 	return rt;
+}
+
+static const fxm_t cos_div[9] = {
+	0xb504, 0xec83, 0xfb14,
+	0xfec4, 0xffb1, 0xffec,
+	0xfffb, 0xfffe, 0xffff
+}; // cos (PI * 2^-n), 2 <= n <= 10
+
+fxm_t fxm_cos(fxm_t t) {
+	// 2 pi periodicite
+	t -= fxm_to_int(fxm_div(t, 2 * FXM_PI)) * 2 * FXM_PI;
+	// parité
+	if (t < 0) t = -t;
+	// on se ramène dans [0, pi/2]
+	if (t > FXM_PI)
+		t = 2 * FXM_PI - t;
+	bool ng = false;
+	if (t > FXM_PI / 2) {
+		ng = true;
+		t = FXM_PI - t;
+	}
+	if (t == FXM_PI / 2) return 0;
+
+	fxm_t a  = 0,   b = FXM_PI / 2;
+	fxm_t ca = fxm_one(), cb = 0;
+	for (unsigned i = 0; i < 9; ++i) {
+		fxm_t c  = (a + b) / 2;
+		// cos ((a+b)/2) = (cos(a) + cos(b)) / (2 cos((a-b) / 2))
+		fxm_t cc = fxm_div(ca + cb, 2 * cos_div[i]);
+		if (t == c) return ng ? -cc : cc;
+		if (t  > c) {
+			a  = c;
+			ca = cc;
+		} else {
+			b  = c;
+			cb = cc;
+		}
+	}
+
+	ca = (ca + cb) / 2;
+	return ng ? -ca : ca;
+}
+
+fxm_t fxm_sin(fxm_t t) {
+	return fxm_cos(FXM_PI / 2 - t);
 }

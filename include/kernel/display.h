@@ -20,7 +20,7 @@ size_t display_char_height();
 void   display_char_at(size_t x, size_t y, char c,
 				rgbcolor_t fg, rgbcolor_t bg);
 void   display_echar_at(size_t x, size_t y, uint16_t e);
-void   display_cursor_at(size_t x, size_t y);
+void   display_cursor_at(size_t x, size_t y, uint16_t e);
 
 bool   display_set_graph(bool);
 void   display_set_debug(bool);

@@ -99,6 +99,8 @@ static inline void swap_##T(T* a, T* b) {\
 	*b = tmp;\
 }
 GEN_SWAP(unsigned)
+GEN_SWAP(int)
+GEN_SWAP(uint32_t)
 #undef GEN_SWAP
 
 #endif
