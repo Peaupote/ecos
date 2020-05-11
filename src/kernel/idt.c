@@ -19,11 +19,14 @@
 
 #define GATE_INT  (IDT_ATTR_P|IDT_TYPE_INT)
 
+uint8_t write_eoi1_on_iret = 0;
+
 extern void irq_sys(void);
 extern void irq_sys_ring1(void);
 extern void irq_sys_ring1_call(void);
 extern void irq_keyboard(void);
 extern void irq_pit(void);
+extern void irq_spurious(void);
 
 extern const idt_handler int_handlers[NEXCEPTION_VEC];
 
@@ -42,11 +45,10 @@ void keyboard_hdl(void){
 		if (tty_input(ks, ev) && state.st_curr_pid == PID_IDLE) {
 			// Si le système était idle,
 			// on relance immédiatement un scheduling
-			write_eoi();
+			write_eoi1_on_iret = 1;
 			sched_from_idle();
 		}
     }
-    write_eoi();
 }
 
 #define NEXCEPTION 22
@@ -83,6 +85,16 @@ static inline void kill_cur_for_err(uint8_t errnum, uint64_t errcode) {
                         (int)state.st_curr_pid, desc, errcode);
     proc_t* p = cur_proc();
 
+	if (klog_level >= Log_error) {
+		uint64_t* stack_top = (uint64_t*)kernel_stack_top;
+		for (unsigned i = 0; i < 3; ++i) {
+			kprintf("-%02x: %p -%02x: %p\n",
+					i*16 + 8,   stack_top[-1],
+					(i+1) * 16, stack_top[-2]);
+			stack_top -= 2;
+		}
+	}
+
 	if (p->p_ring == 1) {
 		proc_t* pp = state.st_proc + p->p_ppid;
 		if (pp->p_stat == BLOCK && pp->p_reg.r.rax.ll == SYS_EXECVE) {
@@ -93,7 +105,7 @@ static inline void kill_cur_for_err(uint8_t errnum, uint64_t errcode) {
 		}
 	}
 
-    if (~p->p_fds[STDERR_FILENO]) { //TODO
+    if (~p->p_fds[STDERR_FILENO]) {
         chann_t *chann = &state.st_chann[p->p_fds[STDERR_FILENO]];
         vfile_t *vfile = chann->chann_vfile;
         if (chann->chann_mode == WRITE || chann->chann_mode == RDWR) {
@@ -116,9 +128,11 @@ static inline void kill_cur_for_err(uint8_t errnum, uint64_t errcode) {
 }
 
 void common_hdl(uint8_t num, uint64_t errcode) {
-	if (num == 0x8) // Double Fault
-		kpanicf("#DF", "errcode=%x", (int)errcode);
     kill_cur_for_err(num, errcode);
+}
+
+void irq8() {
+	kpanic("#DF");
 }
 
 // Processus partiellent sauvegardé
@@ -130,7 +144,7 @@ int pit_hdl(void) {
     if (!--state.st_time_slice) {
         pid_t pid = schedule_proc_ev();
         if (pid != state.st_curr_pid) {
-            state.st_curr_pid = pid;//cur reg sera set dans pit_hdl_switch
+            state.st_curr_pid = pid;// cur reg sera set dans pit_hdl_switch
             return 2;
         }
 	}
@@ -139,7 +153,6 @@ int pit_hdl(void) {
 	if (p->p_spnd & p->p_shnd.blk)
 		return 1;
 
-    write_eoi();
     return 0;
 }
 
@@ -151,7 +164,7 @@ void pit_hdl_switch(int ty) {
           state.st_sched.nb_proc + 1, state.st_curr_pid,
           p->p_reg.rip.p, p->p_reg.rsp.p);
 
-    write_eoi();
+    write_eoi1_on_iret = 1;
 	if (p->p_werrno) {
 		set_errno(p->p_werrno);
 		p->p_werrno = 0;
@@ -201,29 +214,26 @@ static inline void idt_int_asgn(int n, uint64_t addr, uint8_t attr,
 void idt_init(void) {
     // --PIC remapping--
     // start init seq
-    outb(PIC1_PORT, PIC_INIT_CODE);
-    outb(PIC2_PORT, PIC_INIT_CODE);
+    outb(PIC1_PORT, PIC_ICW1_INIT | PIC_ICW1_ICW4);
+    outb(PIC2_PORT, PIC_ICW1_INIT | PIC_ICW1_ICW4);
 
     // change vector offset
-    outb(PIC1_DATA, 0x20);
-    outb(PIC2_DATA, 0x28);
+    outb(PIC1_DATA, PIC1_OFFSET);
+    outb(PIC2_DATA, PIC2_OFFSET);
 
     // purple magic
-    outb(PIC1_DATA, 0x04);
-    outb(PIC2_DATA, 0x02);
-    outb(PIC1_DATA, 0x01);
-    outb(PIC2_DATA, 0x01);
+    outb(PIC1_DATA, 1 << PIC1_IRQ_PIC2);
+    outb(PIC2_DATA, PIC2_IDENT);
 
+    outb(PIC1_DATA, PIC_ICW4_8086);
+    outb(PIC2_DATA, PIC_ICW4_8086);
+    
     // -- PIT init --
     outb(PIT_CONF_PORT,  PIT_CHAN(0) | PIT_SQRGEN | PIT_LOBYTE | PIT_HIBYTE);
 	// low byte
     outb(PIT_DATA_PORT0, (PIT_FREQ0 / PIT_FREQ) & 0xff);
 	// high byte
     outb(PIT_DATA_PORT0, ((PIT_FREQ0 / PIT_FREQ) >> 8) & 0xff);
-
-    // -- masks --
-    outb(PIC1_DATA,0xfc);
-    outb(PIC2_DATA,0xff);
 
     // handlers for exceptions interruptions
     for (uint8_t n = 0; n < NEXCEPTION_VEC; n++)
@@ -236,10 +246,16 @@ void idt_init(void) {
     idt_int_asgn(SYSCALL_R1_CALL_VEC, (uint64_t)irq_sys_ring1_call,
             GATE_INT | IDT_ATTR_DPL(1), 0);
     idt_int_asgn(PIT_VEC,      (uint64_t)irq_pit,      GATE_INT, 0);
+    idt_int_asgn(SPURIOUS_VEC, (uint64_t)irq_spurious, GATE_INT, 0);
     idt_int_asgn(KEYBOARD_VEC, (uint64_t)irq_keyboard, GATE_INT, 0);
 
     struct idt_reg reg;
     reg.limit = IDT_ENTRIES * (sizeof(struct gate_desc)) - 1;
     reg.base  = idt;
     asm volatile("lidt %0; sti;"::"m" (reg) : "memory");
+	
+	// -- PIC masks --
+    outb(PIC1_DATA, ~((1 << PIC1_IRQ_PIT) | (1 << PIC1_IRQ_KEYB)));
+    outb(PIC2_DATA, ~0);
+
 }

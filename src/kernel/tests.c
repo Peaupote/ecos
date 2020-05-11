@@ -24,7 +24,7 @@ void test_print_statut(void) {
     asm("movq %%rsp, %0" : "=r"(rsp));
     asm("movw %%ss, %0" : "=r"(ss));
     kprintf("rsp=%p ss=%x\n", rsp, (unsigned int)ss);
-	kprintf("early err: %d\n", nb_early_error);
+	kprintf("early err: %llu\n", nb_early_error);
 }
 
 void test_kheap(void) {

@@ -27,7 +27,8 @@ int kprintf(const char *format, ...) {
 
 enum klog_level klog_level = Log_early;
 char klog_filtr[256] = "";
-int  nb_early_error  = 0;
+long long unsigned nb_early_error  = 0;
+long long unsigned nb_spurious_irq = 0;
 bool kpanic_is_early = true;
 
 bool klog_pass_filtr(enum klog_level lvl, const char* hd) {

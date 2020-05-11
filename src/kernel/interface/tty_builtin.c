@@ -126,7 +126,9 @@ static void builtin_info(char** tokpt) {
 	if (!arg) return;
 	if (!strcmp(arg, "mem"))      kmem_print_info();
 	else if (!strcmp(arg, "dis")) display_print_info();
-	else if (!strcmp(arg, "err")) kprintf("early err:%d\n", nb_early_error);
+	else if (!strcmp(arg, "err"))
+		kprintf("early_err:%llu spurious_irq:%llu\n",
+				nb_early_error, nb_spurious_irq);
 }
 
 void tty_built_in_exec(tty_seq_t* sq, char* cmd) {

@@ -234,19 +234,11 @@ static inline void proc_hndl_sigs() {
 __attribute__ ((noreturn))
 extern void iret_to_userspace(uint64_t cs_ze);
 
-__attribute__ ((noreturn))
-extern void eoi_iret_to_userspace(uint64_t cs_ze);
-
 extern reg_t continue_syscall();
 
 __attribute__ ((noreturn))
 static inline void iret_to_proc(const proc_t* p) {
     iret_to_userspace(gdt_ring_lvl(p->p_ring));
-}
-
-__attribute__ ((noreturn))
-static inline void eoi_iret_to_proc(const proc_t* p) {
-    eoi_iret_to_userspace(gdt_ring_lvl(p->p_ring));
 }
 
 __attribute__ ((noreturn))

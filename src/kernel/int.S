@@ -55,9 +55,9 @@ syscall_ring1c_tab:
 .global irq_sys_ring1_call
 .global irq_keyboard
 .global irq_pit
+.global irq_spurious
 
 .global iret_to_userspace
-.global eoi_iret_to_userspace
 
 .global pml4_to_cr3
 .global invalide_page
@@ -80,6 +80,13 @@ syscall_ring1c_tab:
 .extern panic_rsp
 .extern _schedule_proc
 .extern kernel_stack_top
+.extern write_eoi1_on_iret
+
+// Envoie EOI au PIC1, utilise %al
+.macro write_eoi1
+    movb $PIC_EOI_CODE, %al
+    outb %al, $PIC1_PORT
+.endm
 
 // Sauvegarde des registres associés au processus courant (st_curr_reg)
 // Utilise la valeur actuelle des registres ainsi qu'une structure d'iret
@@ -267,6 +274,7 @@ irq_keyboard:
     callq *%r10
 
     restore_data_segments
+	write_eoi1
     restore_c_reg
     iretq
 
@@ -291,8 +299,21 @@ irq_pit:
 
 irq_pit_remain:
     restore_data_segments
+	write_eoi1
     restore_c_reg
     iretq
+
+irq_spurious:
+	pushq  %r10
+	pushq  %r11
+	movabs $nb_spurious_irq, %r11
+	movq   (%r11), %r10
+	incq   %r10
+	movq   %r10,  (%r11)
+	popq   %r11
+	popq   %r10
+	// on n'envoie pas EOI
+	iretq
 
 irq_sys:
     save_data_segments16
@@ -375,14 +396,17 @@ irq14://#PF: Page Fault
 
 iret_to_userspace:
     setup_iret
+	movabs $write_eoi1_on_iret, %r10
+	movb   (%r10), %al
+	testb  %al, %al
+	jne    eoi1_iret_to_userspace
     restore_curr_proc_reg
     set_data_segments_from_iret
     iretq
 
-eoi_iret_to_userspace:
-    setup_iret
-    movb $PIC_EOI_CODE, %al
-    outb %al, $PIC1_PORT
+eoi1_iret_to_userspace:
+	movb   $0, (%r10)
+	write_eoi1
     restore_curr_proc_reg
     set_data_segments_from_iret
     iretq

@@ -16,6 +16,7 @@
 //Present
 #define IDT_ATTR_P            (1<<7)
 
+extern uint8_t write_eoi1_on_iret;
 
 /**
  * IDT gate description

@@ -25,7 +25,8 @@ enum klog_level {
 extern enum klog_level klog_level;
 extern char klog_filtr[256];
 
-extern int  nb_early_error;
+extern long long unsigned nb_early_error;
+extern long long unsigned nb_spurious_irq;
 extern bool kpanic_is_early;
 
 void klog (enum klog_level lvl, const char *head, const char *msg);
