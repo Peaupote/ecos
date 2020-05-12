@@ -127,7 +127,8 @@ begin:
             }
 
             fs->fs_stat(*ino, &st, &dv->dev_info);
-            if ((st.st_mode&0xf000) == TYPE_SYM) {
+			switch (st.st_mode & FTYPE_MASK) {
+			case TYPE_SYM:{
                 int rc = fs->fs_readlink(*ino, name, 255, &dv->dev_info);
                 kAssert(rc >= 0);
                 name[rc] = 0;
@@ -152,16 +153,21 @@ begin:
                     *ino = pino;
                     goto begin;
                 }
-            }
-
-            for (dev_t d = dv->dev_childs; ~d; d = devices[d].dev_sib)
-                if (devices[d].dev_parent_red == *ino) {
-                    *ino = devices[d].dev_info.root_ino;
-                    *dev = d;
-                    dv   = devices + *dev;
-                    fs   = fst + dv->dev_fs;
-                    break;
-                }
+            } break;
+			case TYPE_DIR:
+				for (dev_t d = dv->dev_childs; ~d; d = devices[d].dev_sib)
+					if (devices[d].dev_parent_red == *ino) {
+						*ino = devices[d].dev_info.root_ino;
+						*dev = d;
+						dv   = devices + *dev;
+						fs   = fst + dv->dev_fs;
+						break;
+					}
+			break;
+			default:
+				// On ne peut pas ajouter de '/' après un nom de fichier
+				return end_part == pathend;
+			}
         }
 
         path = end_part;

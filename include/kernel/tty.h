@@ -59,7 +59,8 @@ size_t tty_buffer_next_idx();
 size_t tty_new_buffer_line_idx(size_t* index);
 
 void   tty_force_new_line(void);
-size_t tty_writestringl(const char* s, size_t len, uint8_t color);
+size_t tty_writestringl(const char* s, size_t len,
+						uint8_t color, uint8_t ln_colors);
 void   tty_writer(void* shift, const char* str);
 
 

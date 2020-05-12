@@ -4,6 +4,8 @@
 #include <ctype.h>
 #include <string.h>
 #include <unistd.h>
+#include <signal.h>
+#include <errno.h>
 
 #include <util/misc.h>
 
@@ -392,6 +394,24 @@ struct fun_plot_p {
     size_t sub;
 };
 
+static int graph_fd = -1;
+static graph_buf_t* graph_g = NULL;
+
+void plot_sighdl(int signum) {
+	int sv_errno = errno;
+	if (signum == SIGTSTP) {
+		if (graph_fd >= 0)
+			graph_nacq_display(graph_fd);
+		kill(getpid(), SIGSTOP);
+	} else if (signum == SIGCONT) {
+		if (graph_fd >= 0 && graph_g) {
+			graph_acq_display(graph_fd);
+    		graph_display(graph_fd, graph_g);
+		}
+	}
+	errno = sv_errno;
+}
+
 bool op_plot(stack_t* s) {
     struct fun_plot_p funs[MAX_PLOT_FUN] = {0};
     size_t nb_funs = 1;
@@ -480,17 +500,17 @@ bool op_plot(stack_t* s) {
         goto err0;
     }
 
-    int fd = graph_open_display();
-    if (fd < 0) goto err1;
+    graph_fd = graph_open_display();
+    if (graph_fd < 0) goto err1;
     struct display_info di;
-    if (!graph_read_infos(fd, &di)) goto err2;
+    if (!graph_read_infos(graph_fd, &di)) goto err2;
 
     unsigned d = min_unsigned(di.width, di.height);
-    graph_buf_t* g = graph_make_buf(
+    graph_g = graph_make_buf(
             (di.width  - d) / 2,
             (di.height - d) / 2,
             d, d);
-	graph_clear(g);
+	graph_clear(graph_g);
 
     stack_t stk;
     mk_stk(&stk);
@@ -500,12 +520,12 @@ bool op_plot(stack_t* s) {
     int      axis_x_pos = fxm_to_int(fxm_div(ymax,  ymax - ymin) * (d-1)),
              axis_y_pos = fxm_to_int(fxm_div(-xmin, xmax - xmin) * (d-1));
     if (0 <= axis_x_pos && (unsigned)axis_x_pos < d)
-        graph_draw_line(g,
+        graph_draw_line(graph_g,
                 0,   axis_x_pos,
                 d-1, axis_x_pos,
                 0x777777);
     if (0 <= axis_y_pos && (unsigned)axis_y_pos < d)
-        graph_draw_line(g,
+        graph_draw_line(graph_g,
                 axis_y_pos, 0,
                 axis_y_pos, d-1,
                 0x777777);
@@ -531,7 +551,7 @@ bool op_plot(stack_t* s) {
 
         for (unsigned i = 0; i < f->sub; ++i)
             if (valid[i] && valid[i+1]) {
-                graph_draw_line(g,
+                graph_draw_line(graph_g,
                         i * (d-1) / f->sub, pts[i],
                         (i+1) * (d-1) / f->sub, pts[i + 1],
                         f->color);
@@ -540,20 +560,32 @@ bool op_plot(stack_t* s) {
     }
     free(stk.c);
 
-    if (!graph_acq_display(fd)) goto err3;
-    if (!graph_display(fd, g))  goto err3;
+	sighandler_t prev_sigtstp = signal(SIGTSTP, plot_sighdl),
+	             prev_sigcont = signal(SIGCONT, plot_sighdl);
+
+    if (!graph_acq_display(graph_fd))      goto err3;
+    if (!graph_display(graph_fd, graph_g)) goto err3;
 
     int c;
     while ((c = fgetc(stdin)) != EOF && c != '\n');
+	
+	signal(SIGTSTP, prev_sigtstp);
+	signal(SIGCONT, prev_sigcont);
 
-    free(g);
-    close(fd);
+    free(graph_g);
+	graph_g = NULL;
+    close(graph_fd);
+	graph_fd = -1;
     return true;
 
 err3:
-    free(g);
+	signal(SIGTSTP, prev_sigtstp);
+	signal(SIGCONT, prev_sigcont);
+    free(graph_g);
+	graph_g = NULL;
 err2:
-    close(fd);
+    close(graph_fd);
+	graph_fd = -1;
 err1:
     s->err = ERRL;
 err0:
@@ -574,6 +606,25 @@ bool get_live(tty_live_t* rt) {
 		buf[i] = c;
 	}
 	return true;
+}
+
+static bool plot3_redraw_part = false;
+
+void plot3_sighdl(int signum) {
+	int sv_errno = errno;
+	if (signum == SIGTSTP) {
+		if (graph_fd >= 0)
+			graph_nacq_display(graph_fd);
+		write(STDOUT_FILENO, "\033d", 2);
+		kill(getpid(), SIGSTOP);
+	} else if (signum == SIGCONT) {
+		write(STDOUT_FILENO, "\033l", 2);
+		if (graph_fd >= 0 && graph_g && !plot3_redraw_part) {
+			graph_acq_display(graph_fd);
+    		graph_display(graph_fd, graph_g);
+		}
+	}
+	errno = sv_errno;
 }
 
 static inline void plot3_apply_rot(fxm_t rot[], unsigned axis, bool posi) {
@@ -622,12 +673,12 @@ bool op_plot3(stack_t* s) {
 	}
 	free_cmd(f);
 
-    int fd = graph_open_display();
-    if (fd < 0) goto err1;
+    graph_fd = graph_open_display();
+    if (graph_fd < 0) goto err1;
     struct display_info di;
-    if (!graph_read_infos(fd, &di)) goto err2;
+    if (!graph_read_infos(graph_fd, &di)) goto err2;
 
-    graph_buf_t* g = graph_make_buf(0, 0, di.width, di.height);
+    graph_g = graph_make_buf(0, 0, di.width, di.height);
 
 	fxm_t proj[16],
 	      tr  [16],
@@ -642,9 +693,14 @@ bool op_plot3(stack_t* s) {
 	fxm_mid(rot, 4);
 	fxm_t tr_v[3] = {0, fxm_of_int(2), 0};
 
-	write(STDOUT_FILENO,"\033l", 2);
+	plot3_redraw_part = true;
+	
+	sighandler_t prev_sigtstp = signal(SIGTSTP, plot3_sighdl),
+	             prev_sigcont = signal(SIGCONT, plot3_sighdl);
 
+	write(STDOUT_FILENO,"\033l", 2);
 redraw:
+	plot3_redraw_part = true;
 	{
 		fxm_mtrl(tr,   tr_v);
 		fxm_t m_w0[16];
@@ -654,7 +710,7 @@ redraw:
 		fxm_mmul(proj, m_w,  m_pw, 4, 4, 4);
 	}
 
-	graph_clear3(g);
+	graph_clear3(graph_g);
 
 	fxm_t points[16];
 	for (unsigned k = 0; k < 4; ++k)
@@ -714,13 +770,15 @@ redraw:
 					color += add | (add >> 8) | (add >> 16);
 				}
 				
-				graph_draw_tri(g, x, y, depth, color);
+				graph_draw_tri(graph_g, x, y, depth, color);
 			}
 		}
 
-    if (!graph_acq_display(fd)) goto err3;
-    if (!graph_display(fd, g))  goto err3;
+    if (!graph_acq_display(graph_fd)) goto err3;
+    if (!graph_display(graph_fd, graph_g))  goto err3;
     
+	plot3_redraw_part = false;
+
 	tty_live_t lt;
     while (get_live(&lt)) {
 		if (lt.ev.key == KEY_ESCAPE) break;
@@ -776,17 +834,28 @@ redraw:
 		}
 	}
 
-	free(g);
-	close(fd);	
+	signal(SIGTSTP, prev_sigtstp);
+	signal(SIGCONT, prev_sigcont);
+
+	free(graph_g);
+	graph_g  = NULL;
+    close(graph_fd);
+	graph_fd = -1;
+	write(STDOUT_FILENO,"\033d", 2);
 	return true;
 
 err3:
-    free(g);
+	signal(SIGTSTP, prev_sigtstp);
+	signal(SIGCONT, prev_sigcont);
+    free(graph_g);
+	graph_g  = NULL;
 err2:
-    close(fd);
+    close(graph_fd);
+	graph_fd = -1;
 err1:
-    s->err = ERRL;
+    s->err   = ERRL;
 err0:
+	write(STDOUT_FILENO,"\033d", 2);
     return false;
 }
 

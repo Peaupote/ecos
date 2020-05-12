@@ -79,7 +79,7 @@ const char *error_desc[NEXCEPTION + 1] = {
 
 
 __attribute__ ((noreturn))
-static inline void kill_cur_for_err(uint8_t errnum, uint64_t errcode) {
+void kill_cur_for_err(uint8_t errnum, uint64_t errcode) {
     const char *desc = error_desc[errnum < NEXCEPTION ? errnum : NEXCEPTION];
     klogf(Log_error, "exception", "proc %d %s: error code %llx",
                         (int)state.st_curr_pid, desc, errcode);
@@ -125,10 +125,6 @@ static inline void kill_cur_for_err(uint8_t errnum, uint64_t errcode) {
     }
 
     kill_proc_nr(0x3300 + errnum);
-}
-
-void common_hdl(uint8_t num, uint64_t errcode) {
-    kill_cur_for_err(num, errcode);
 }
 
 void irq8() {

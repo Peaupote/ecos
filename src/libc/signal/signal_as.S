@@ -10,5 +10,6 @@ libc_sighandler:// rsp = 0 [16]
 	movq   sig_handlers(, %edi, 8), %rax
 	incl   %edi //sigid -> signum
 	callq  *%rax
+
 	movq   $SYS_SIGRT, %rax
 	int    $SYSCALL_VEC

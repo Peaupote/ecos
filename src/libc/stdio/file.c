@@ -112,6 +112,12 @@ int fflush(FILE *stream) {
     return rc < 0 ? -1 : 0;
 }
 
+static inline ssize_t read_aux(int fd, void* buf, size_t len) {
+	ssize_t rt = 0;
+	while ((rt = read(fd, buf, len)) < 0 && errno == EINTR);
+	return rt;
+}
+
 size_t fread(void *ptr, size_t size, size_t nmem, FILE *s) {
     if (!size || !s || !(s->flags&READ)) {
         errno = EINVAL;
@@ -123,7 +129,7 @@ size_t fread(void *ptr, size_t size, size_t nmem, FILE *s) {
 
     while (byte_size > 0) {
         if (s->read_ptr == s->read_end) {
-            int rc = read(s->fd, s->read_buf, FILE_BUF_SIZE);
+            ssize_t rc = read_aux(s->fd, s->read_buf, FILE_BUF_SIZE);
             if (rc < 0) return 0;
             else if (rc == 0) break;
             s->read_ptr = s->read_buf;
@@ -205,7 +211,7 @@ int fgetc(FILE *s) {
     }
 
     if (s->read_ptr == s->read_end) {
-        int rc = read(s->fd, s->read_buf, FILE_BUF_SIZE);
+        ssize_t rc = read_aux(s->fd, s->read_buf, FILE_BUF_SIZE);
         if (rc < 0) return EOF;
 
         s->read_ptr = s->read_buf;

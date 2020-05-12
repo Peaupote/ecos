@@ -56,9 +56,8 @@ int test_1(int ac __attribute__((unused)),
 }
 
 int test_2(int ac, char** av) {
-	long long int itv = 0;
-	if (ac < 4 || sscanf(av[3], "%lld", &itv) != 1
-			   || itv <= 0)
+	long long int itv = 50000000;
+	if (ac < 3 || (ac >= 4 && (sscanf(av[3], "%lld", &itv) != 1 || itv <= 0)))
 		return 2;
 	unsigned a = 0, b = 1;
 	long long int r = itv;

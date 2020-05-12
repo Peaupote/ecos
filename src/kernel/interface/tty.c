@@ -246,7 +246,8 @@ static size_t string_to_buffer(
     return rt;
 }
 
-size_t tty_writestringl(const char* str, size_t len, uint8_t color) {
+size_t tty_writestringl(const char* str, size_t len, uint8_t color,
+		uint8_t ln_color) {
     const char* end = str + len;
     size_t rt = 0;
     char c = *str;
@@ -262,7 +263,7 @@ loop_enter:
         for(; x < tty_width && str!=end; c = *(++str)) {
             if(c == '\n') {
                 for(;x < tty_width; ++x)
-                    line[x] = vga_entry(' ', color);
+                    line[x] = vga_entry(' ', ln_color);
                 c = *(++str);
                 break;
             } else if (c == '\t')
@@ -280,7 +281,8 @@ loop_enter:
 }
 
 void tty_writer(void* shift, const char *str) {
-    *((size_t*)shift) = tty_writestringl(str, strlen(str), tty_def_color);
+    *((size_t*)shift) = tty_writestringl(str, strlen(str),
+							tty_def_color, tty_def_color);
 }
 
 void tty_seq_init(tty_seq_t* s) {
@@ -290,7 +292,8 @@ void tty_seq_init(tty_seq_t* s) {
 }
 
 void tty_seq_write(void* seq, const char* s, size_t len) {
-    ((tty_seq_t*)seq)->shift += tty_writestringl(s, len, tty_def_color);
+    ((tty_seq_t*)seq)->shift += tty_writestringl(s, len,
+									tty_def_color, tty_def_color);
 }
 
 void tty_seq_commit(tty_seq_t* s) {
@@ -311,7 +314,7 @@ static inline size_t tty_input_to_buffer(bool nl) {
 			size_t idx;
 			return tty_new_buffer_line_idx(&idx);
 		}
-        rt = tty_writestringl(ibuffer, ib_size, tty_def_color);
+        rt = tty_writestringl(ibuffer, ib_size, tty_def_color, tty_def_color);
 	} else
         rt = tty_prompt_to_buffer(ib_size);
 	if (nl) tty_force_new_line();
@@ -601,7 +604,8 @@ bool tty_input(scancode_byte s, key_event ev) {
 			return false;
 			case KEY_C:
 				if (~state.st_owng[own_tty]) {
-					sq.shift += tty_writestringl("^C", 2, tty_def_color);
+					sq.shift += tty_writestringl("^C", 2,
+									tty_def_color, tty_def_color);
 					send_sig_to_proc(state.st_owng[own_tty], SIGINT - 1);
 					on_tty0_action();
 					rt = true;
@@ -609,7 +613,8 @@ bool tty_input(scancode_byte s, key_event ev) {
 			goto end_input;
 			case KEY_Z:
 				if (~state.st_owng[own_tty]) {
-					sq.shift += tty_writestringl("^Z", 2, tty_def_color);
+					sq.shift += tty_writestringl("^Z", 2,
+									tty_def_color, tty_def_color);
 					send_sig_to_proc(state.st_owng[own_tty], SIGTSTP - 1);
 					on_tty0_action();
 					rt = true;
@@ -622,7 +627,8 @@ bool tty_input(scancode_byte s, key_event ev) {
 					tty_send_tty0(ibuffer, ib_size);
 					sq.shift += tty_new_prompt();
 				} else {
-					sq.shift += tty_writestringl("^D", 2, tty_def_color);
+					sq.shift += tty_writestringl("^D", 2,
+									tty_def_color, tty_def_color);
 					fs_proc_send0_tty();
 				}
 				on_tty0_action();
@@ -710,12 +716,30 @@ bool tty_input(scancode_byte s, key_event ev) {
             }
         break;
 		case KEY_LEFT_ARROW:
-			if (input_cursor > 0)
-				set_input_cursor(input_cursor - 1);
+			if (input_cursor > 0) {
+				if (ev.flags & KEY_FLAG_SHIFT)
+					set_input_cursor(0);
+				else if (ev.flags & KEY_FLAG_CTRL) {
+					size_t curs = input_cursor - 1;
+					while (curs > 0 && ibuffer[  curs  ] == ' ') --curs;
+					while (curs > 0 && ibuffer[curs - 1] != ' ') --curs;
+					set_input_cursor(curs);
+				} else
+					set_input_cursor(input_cursor - 1);
+			}
 		break;
 		case KEY_RIGHT_ARROW:
-			if (input_cursor < ib_size)
-				set_input_cursor(input_cursor + 1);
+			if (input_cursor < ib_size) {
+				if (ev.flags & KEY_FLAG_SHIFT)
+					set_input_cursor(ib_size);
+				else if (ev.flags & KEY_FLAG_CTRL) {
+					size_t curs = input_cursor;
+					while (curs < ib_size && ibuffer[curs] != ' ') ++curs;
+					while (curs < ib_size && ibuffer[curs] == ' ') ++curs;
+					set_input_cursor(curs);
+				} else
+					set_input_cursor(input_cursor + 1);
+			}
 		break;
 		default:
 			if (ev.flags & (KEY_FLAG_CTRL | KEY_FLAG_ALT))
@@ -830,7 +854,7 @@ static size_t tty_writestringl0(const char* str, size_t len) {
 		}
 		return 0;
 	} else
-		return tty_writestringl(str, len, buf_color);
+		return tty_writestringl(str, len, buf_color, tty_def_color);
 }
 
 static bool parse_cursor(const char* str, size_t* i, size_t len,
@@ -961,7 +985,7 @@ size_t tty_writei(uint8_t num, const char* str, size_t len) {
 		if (t_bg < len)
 			sq.shift += tty_writestringl0(str + t_bg, len - t_bg);
 	} else
-		sq.shift += tty_writestringl(str, len, err_color);
+		sq.shift += tty_writestringl(str, len, err_color, tty_def_color);
 	tty_seq_commit(&sq);
 	return len;
 }

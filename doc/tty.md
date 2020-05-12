@@ -1,3 +1,5 @@
+# TTY
+
 Le tty possède un flux de lecture (`tty0`) et deux flux d'écriture (`tty1` et `tty2`).
 
 - `tty1` est utilisé pour la sortie standard des applications.

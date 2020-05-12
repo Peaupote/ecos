@@ -10,7 +10,7 @@ typedef int32_t sigset_t;
 
 // 1 <= signum <= SIG_COUNT
 // 0 <= sigid = signum - 1 < SIG_COUNT
-#define SIG_COUNT 31
+#define SIG_COUNT 32
 
 // masques de sigid
 #define SIG_NOTCTB 0x00010100 // SIGKILL + SIGSTOP

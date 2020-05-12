@@ -65,14 +65,17 @@ void proc_hndl_sig_i(int sigid) {
 		return;
 
 	if (contain_id(p->p_shnd.dfl, sigid)) {
+
 		if ((SIG_DFLKIL >> sigid) & 1)
 			kill_proc_nr((sigid+1) * 0x100);
+
 		if (contain_id(SIG_DFLSTP, sigid)) {
 			abort_syscalls(p);
 			p->p_stat = STOP;
 			schedule_proc();
 		}
-		return; //ignore
+
+		return; // pas d'action par défaut à ce stade
 	}
 
 	// User handler
@@ -125,16 +128,13 @@ int8_t send_sig_to_proc(pid_t pid, int sigid) {
 		return 1;
 
 	} else if (!contain_id(p->p_shnd.ign, sigid)
-			&&  contain_id(p->p_shnd.dfl, sigid)) {
-
-		if (contain_id(SIG_DFLCNT, sigid)) {
-			if (p->p_stat == STOP) {
-				p->p_stat = RUN;
-				sched_add_proc(pid);
-			}
-			return 0;
+			&& contain_id(SIG_DFLCNT, sigid)) {
+		// Un signal CONT relance le processus même si un handler
+		// est installé
+		if (p->p_stat == STOP) {
+			p->p_stat = RUN;
+			sched_add_proc(pid);
 		}
-
 	}
 	p->p_spnd |= ((sigset_t)1) << sigid;
 	if (p->p_stat == BLOCK)

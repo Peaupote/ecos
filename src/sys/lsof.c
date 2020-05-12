@@ -38,7 +38,7 @@ void list_files(pid_t pid) {
 
         sprintf(buf, "/proc/%d/fd/%s", pid, dir->d_name);
         stat(buf, &statbuf);
-        printf("%15s ", cmd);
+        printf("%-15s ", cmd);
         switch (statbuf.st_mode&0xf000) {
         case TYPE_FIFO: printf("FIFO "); break;
         case TYPE_CHAR: printf("CHAR "); break;

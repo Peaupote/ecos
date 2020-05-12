@@ -18,7 +18,8 @@ int graph_open_display();
 
 bool graph_read_infos(int fd, struct display_info* di);
 
-bool graph_acq_display(int fd);
+bool graph_acq_display (int fd);
+bool graph_nacq_display(int fd);
 
 graph_buf_t* graph_make_buf(unsigned margin_left, unsigned margin_top,
 		unsigned w, unsigned h);

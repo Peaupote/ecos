@@ -889,9 +889,11 @@ bool start_fg(const cmd_3_t* c3, int* st) {
 
 bool continue_fg(int* st) {
 	fgc = ecmd_llist;
+	int_tstp = int_sint = false;
 	sighandler_t
 		prev_hnd_int  = signal(SIGINT,  &int_handler),
 		prev_hnd_tstp = signal(SIGTSTP, &tstp_handler);
+	if (prev_hnd_tstp == SIG_ERR) fprintf(stderr, "err set tstp\n");
 
 	broadcast(SIGCONT);
 	bool rt = run_fg(st);

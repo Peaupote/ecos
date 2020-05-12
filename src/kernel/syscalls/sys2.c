@@ -236,7 +236,7 @@ ssize_t sys_read(int fd, uint8_t *d, size_t len) {
     case TYPE_DIR:
         rc = vfs_getdents(vfile, (struct dirent*)d, len,
                 &chann->chann_adt);
-        if (rc < 0) goto err_overflow; //TODO
+        if (rc < 0) goto err_fs;
         goto succ;
     case TYPE_REG:
         if (chann->chann_pos >= vfile->vf_stat.st_size) {
@@ -245,8 +245,7 @@ ssize_t sys_read(int fd, uint8_t *d, size_t len) {
         }
 
         rc = vfs_read(vfile, d, chann->chann_pos, len);
-        if (rc < 0)
-            goto err_overflow; // TODO correct
+        if (rc < 0) goto err_fs;
 
         chann->chann_pos += rc;
         klogf(Log_verb, "syscall", "%d char readed (pos %d)",
@@ -261,8 +260,7 @@ ssize_t sys_read(int fd, uint8_t *d, size_t len) {
         rc = vfs_read(vfile, d, 0, len);
         if (rc == -2)
             wait_file(state.st_curr_pid, cid);
-        else if (rc < 0)
-            goto err_overflow; //TODO
+        else if (rc < 0) goto err_fs;
 
         goto succ;
 
@@ -274,13 +272,13 @@ succ:
     set_errno(SUCC);
     return rc;
 
-err_overflow:
-    set_errno(EOVERFLOW);
-    return -1;
-
 err_badf:
     set_errno(EBADF);
     return -1;
+
+err_fs:
+	set_errno(EIO);
+	return -1;
 }
 
 ssize_t sys_write(int fd, uint8_t *s, size_t len) {

@@ -23,6 +23,11 @@ bool graph_acq_display(int fd) {
 	rq.type = display_rq_acq;
 	return write(fd, &rq, sizeof(rq)) == sizeof(rq);
 }
+bool graph_nacq_display(int fd) {
+	struct display_rq rq;
+	rq.type = display_rq_nacq;
+	return write(fd, &rq, sizeof(rq)) == sizeof(rq);
+}
 
 graph_buf_t* graph_make_buf(unsigned margin_left, unsigned margin_top,
 		unsigned w, unsigned h) {
