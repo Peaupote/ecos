@@ -79,22 +79,25 @@ ecmd_2_t** find_exd_num(int num) {
             return cmdr;
     return NULL;
 }
-ecmd_2_t** on_child_end(pid_t pid, int st) {
+ecmd_2_t** on_child_ev(pid_t pid, int st) {
     struct ecmdp_ref rf = find_exd_proc(pid);
     if (!rf.cmd) {
         printf("couldn't find %d\n", (int)pid);
         return NULL;
     }
     ecmd_2_t* cmd          = *rf.cmd;
-    cmd->procs[rf.num].pid = PID_NONE;
 	cmd->procs[rf.num].st  = st;
-    --cmd->nb_alive;
+	if (WIFEXITED(st) || WIFSIGNALED(st)) {
+		cmd->procs[rf.num].pid = PID_NONE;
+		--cmd->nb_alive;
+	}
+    --cmd->nb_run;
     return rf.cmd;
 }
 
 // --Gestion des interruptions--
 
-bool int_tstp, int_sint;
+bool int_sint, int_tstp;
 static ecmd_2_t* fgc = NULL; // = ecmd_llist ou NULL
 
 void broadcast_e(ecmd_2_t* e, int signum) {
@@ -110,12 +113,16 @@ static void broadcast(int signum) {
 }
 
 void int_handler(int signum __attribute__((unused))) {
+	int sv_errno = errno;
 	broadcast(SIGINT);
 	int_sint = true;
+	errno = sv_errno;
 }
 void tstp_handler(int signum __attribute__((unused))) {
+	int sv_errno = errno;
 	broadcast(SIGTSTP);
-    int_tstp = true;
+	int_tstp = true;
+	errno = sv_errno;
 }
 
 void sub_int_handler(int signum __attribute__((unused))) {
@@ -123,12 +130,15 @@ void sub_int_handler(int signum __attribute__((unused))) {
 	sh_exit(1);
 }
 void sub_tstp_handler(int signum __attribute__((unused))) {
+	int sv_errno = errno;
 	broadcast(SIGTSTP);
-	int_tstp = true;
+	kill(getpid(), SIGSTOP);
+	errno = sv_errno;
 }
 void sub_cont_handler(int signum __attribute__((unused))) {
+	int sv_errno = errno;
 	broadcast(SIGCONT);
-	int_tstp = false;
+	errno = sv_errno;
 }
 
 // --Exécution--
@@ -430,12 +440,13 @@ ecmd_2_t* exec_cmd_2(const cmd_3_t* c3, ecmd_st* st) {
 	size_t cmdc = c2->cmdc;
 	ecmd_2_t* ecmd = malloc(offsetof(ecmd_2_t, procs) 
 								+ cmdc * sizeof(ecmdp_t));
+	ecmd->nb_run   = 0;
 	ecmd->nb_alive = 0;
 	ecmd->st       = st;
 	ecmd->c        = c3;
 	for (size_t ic = 0; ic < cmdc; ++ic) {
 		ecmd->procs[ic].pid = PID_NONE;
-		ecmd->procs[ic].st  = 66;
+		ecmd->procs[ic].st  = -1;
 	}
 	fgc = ecmd;
 	ecmd->next = ecmd_llist;
@@ -581,6 +592,7 @@ ecmd_2_t* exec_cmd_2(const cmd_3_t* c3, ecmd_st* st) {
 
         } else { // parent
 			ecmd->procs[ic].pid = rf;
+			++ecmd->nb_run;
 			++ecmd->nb_alive;
         }
 
@@ -611,7 +623,7 @@ int exec_cmd_3_bg(const cmd_3_t* c3, bool print_pid) {
 		while (true) {
 			while (!~(wpid = wait(&rs)));
 			if (wpid == rf0) return rs;
-			on_child_end(wpid, rs);
+			on_child_ev(wpid, rs);
 		}
 	}
 	// enfant 0: permet le rattachement à INIT
@@ -782,26 +794,42 @@ ecmd_2_t* continue_job(ecmd_2_t* e, int* st) {
 	return exec_cmd_3_up(c3, e->st, st, *st);
 }
 
+static inline bool run_wait() {
+	pid_t wpid;
+	int rs;
+	while(!~(wpid = waitpid(-1, &rs))) {
+		if (errno != EINTR && errno != SUCC) {
+			perror("sh:wait");
+			return false;
+		}
+	}
+	on_child_ev(wpid, rs);
+	return true;
+}
+
 bool run_fg(int* st) {
     ecmd_2_t* ecmd = ecmd_llist;
 	do {
-		int rs;
-		pid_t wpid;
-		while (ecmd->nb_alive > 0) {
-			do {
-				if (int_tstp) {
-					fgc = NULL;
-					printf("\033d\033\n[%d]\tstopped\n", ecmd->st->num);
-					return false;
-				}
-			} while(!~(wpid = wait(&rs)));
-			on_child_end(wpid, rs);
+		while (ecmd->nb_run > 0) {
+			if (!run_wait()) {
+				fgc = NULL;
+				return false;
+			}
 		}
 
 		fgc = NULL;
+
+		for (size_t i = 0; i < ecmd->c->cm2.cmdc; ++i)
+			if (~ecmd->procs[i].pid) {
+				printf("\033d\033\n[%d]\tstopped\n", ecmd->st->num);
+				int_tstp = false;
+				return false;
+			}
+
 		ecmd_llist = ecmd->next;
 
 		if (int_sint) {
+			int_sint = false;
 			cmd_3_t* d3 = (cmd_3_t*)cmd_top(ecmd->c);
 			destr_cmd_3(d3);
 			free(d3);
@@ -821,19 +849,17 @@ bool run_fg(int* st) {
 int run_sub(ecmd_2_t* ecmd) {
 	int st;
 	do {
-		int rs;
-		pid_t wpid;
 		while (ecmd->nb_alive > 0) {
-			while (!~(wpid = wait(&rs)));
-			on_child_end(wpid, rs);
+			if (!run_wait()) {
+				broadcast_e(ecmd, SIGINT);
+				exit(1);
+			}
 		}
 
 		fgc = NULL;
 		ecmd_llist = ecmd->next;
 
 		if (int_sint) return 0;
-
-		while (int_tstp) pause();
 
 		ecmd_2_t* necmd = continue_job(ecmd, &st);
 		free(ecmd);
@@ -865,14 +891,25 @@ int start_sub(const cmd_3_t* c3, bool keep_stdin) {
 		close(nfd);
 	}
 
+	sighandler_t
+		prev_hnd_int  = signal(SIGINT,  &sub_int_handler),
+		prev_hnd_tstp = signal(SIGTSTP, &sub_tstp_handler),
+		prev_hnd_cont = signal(SIGCONT, &sub_cont_handler);
+
 	int st;
 	ecmd_2_t* ecmd = exec_cmd_3_down(c3, 
 						mk_ecmd_st(next_cmd_num++), &st);
-	return ecmd ? run_sub(ecmd) : st;
+	if (ecmd) st = run_sub(ecmd);
+	
+	signal(SIGINT,  prev_hnd_int);
+	signal(SIGTSTP, prev_hnd_tstp);
+	signal(SIGCONT, prev_hnd_cont);
+
+	return st;
 }
 
 bool start_fg(const cmd_3_t* c3, int* st) {
-	int_tstp = int_sint = false;
+	int_sint = int_tstp = false;
 	sighandler_t
 		prev_hnd_int  = signal(SIGINT,  &int_handler),
 		prev_hnd_tstp = signal(SIGTSTP, &tstp_handler);
@@ -883,19 +920,26 @@ bool start_fg(const cmd_3_t* c3, int* st) {
 
 	signal(SIGINT,  prev_hnd_int);
 	signal(SIGTSTP, prev_hnd_tstp);
-	int_sint = int_tstp = false;
 	return rt;
 }
 
 bool continue_fg(int* st) {
-	fgc = ecmd_llist;
-	int_tstp = int_sint = false;
+	ecmd_2_t* ecmd = fgc = ecmd_llist;
+	int_sint = int_tstp = false;
 	sighandler_t
 		prev_hnd_int  = signal(SIGINT,  &int_handler),
 		prev_hnd_tstp = signal(SIGTSTP, &tstp_handler);
-	if (prev_hnd_tstp == SIG_ERR) fprintf(stderr, "err set tstp\n");
 
-	broadcast(SIGCONT);
+	size_t cmdc = ecmd->c->cm2.cmdc;
+    for (size_t i = 0; i < cmdc; ++i)
+        if (~ecmd->procs[i].pid) {
+			if (kill(ecmd->procs[i].pid, SIGCONT)) {
+				if (errno != ESRCH) // déjà mort
+					perror("error broadcasting signal");
+			} else
+				++ecmd->nb_run;
+		}
+
 	bool rt = run_fg(st);
 
 	signal(SIGINT,  prev_hnd_int);

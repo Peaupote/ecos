@@ -129,9 +129,10 @@ typedef struct {
 } ecmdp_t;
 typedef struct ecmd_2 {
 	ecmd_st*       st;
-	const cmd_3_t *c;// C_CM2
+	const cmd_3_t *c;      // C_CM2
 	struct ecmd_2 *next;
-	int            nb_alive;
+	int            nb_run, // non significant si subshell
+				   nb_alive;
 	ecmdp_t        procs[];
 } ecmd_2_t;
 
@@ -139,7 +140,7 @@ extern ecmd_2_t* ecmd_llist;
 extern int       next_cmd_num;
 extern bool      update_cwd;
 extern bool      is_subsh;
-extern bool int_tstp, int_sint;
+extern bool      int_sint, int_tstp;
 
 typedef struct var {
 	char* name;

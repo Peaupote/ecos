@@ -7,6 +7,7 @@
 #include <sys/stat.h>
 #include <dirent.h>
 #include <signal.h>
+#include <errno.h>
 
 #include <util/misc.h>
 
@@ -19,8 +20,10 @@ static char cwd[256]     = "";
 static bool parse_only   = false;
 
 void sh_exit(int st) {
-	for (ecmd_2_t* e = ecmd_llist; e; e = e->next)
+	for (ecmd_2_t* e = ecmd_llist; e; e = e->next) {
+		broadcast_e(e, SIGCONT);
 		broadcast_e(e, SIGHUP);
+	}
 	exit(st);
 }
 void hup_handler(int signum __attribute__((unused))) {
@@ -91,10 +94,19 @@ int run_prompt() {
 		buf = line;
 
 		printf("\033p%s> \033;", cwd); fflush(stdout);
+		bool input_first_line = true;
 		while (true) {
 			int rc = read(STDIN_FILENO, buf, rem);
 			if (rc == 0) return 0;
 			if (rc < 0) {
+				if (errno == EINTR) {
+					if (input_first_line)
+						printf("\033p%s> \033;", cwd);
+					else
+						printf("\033p.. \033;");
+					fflush(stdout);
+					continue;
+				}
 				perror("sh - input");
 				return 1;
 			}
@@ -108,7 +120,8 @@ int run_prompt() {
 				++buf;
 			}
 			rem -= rc;
-			printf("\033p\033;"); fflush(stdout);
+			input_first_line = false;
+			printf("\033p.. \033;"); fflush(stdout);
 		}
 end_input_read:;	
 		

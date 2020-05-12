@@ -14,6 +14,8 @@
 #include "memory/kmem.h"
 #include "memory/shared_pages.h"
 
+#include <libc/errno.h>
+
 // Emplacement de la pile des processus
 #define USER_STACK_PD ((((uint_ptr)PML4_END_USPACE)<<(2*9)) - 1)
 // Taille de la pile des processus
@@ -82,6 +84,8 @@ typedef struct proc {
         pid_t        p_nxwl;     // if BLOCK:     next waiting list
         pid_t        p_nxfr;     // if FREE:      next free
         pid_t        p_nxzb;     // if ZOMB:      next ZOMB sibling
+		int          p_stps;     // if STOP:      stop status, bit 8 à 0
+		                         //               si waitpid par le parent
     };
     union {
         pid_t*       p_prpf;     // if in a file: ref in priority file
@@ -370,5 +374,23 @@ static inline void proc_self_block(proc_t* p) {
     p->p_nxwl = PID_NONE;
     p->p_prwl = &p->p_nxwl;
 }
+
+// On doit être dans le paging du processus
+static inline void set_proc_errno(proc_t *p, int e) {
+    if (p->p_errno) *p->p_errno = e;
+}
+static inline void set_errno(int e) {
+    set_proc_errno(cur_proc(), e);
+}
+static inline void proc_abort_syscalls(proc_t* p) {
+	if (p->p_stat == BLOCR) {
+		// Si un appel système est en cours il est interrompu et renvoi -1
+		p->p_stat         = RUN;
+		p->p_reg.r.rax.rd = ~(reg_data_t)0;
+		set_proc_errno(p, EINTR);
+	}
+}
+
+void proc_stop(int signum);
 
 #endif

@@ -47,15 +47,6 @@ void sys_sigreturn() {
 	iret_to_proc(p);
 }
 
-static inline void abort_syscalls(proc_t* p) {
-	if (p->p_stat == BLOCR) {
-		// Si un appel système est en cours il est interrompu et renvoi -1
-		p->p_stat         = RUN;
-		p->p_reg.r.rax.rd = ~(reg_data_t)0;
-		set_proc_errno(p, EINTR);
-	}
-}
-
 void proc_hndl_sig_i(int sigid) {
 	klogf(Log_info, "sig", "hndl: i%d -> %d", sigid, state.st_curr_pid);
 	proc_t* p  = cur_proc();
@@ -67,11 +58,10 @@ void proc_hndl_sig_i(int sigid) {
 	if (contain_id(p->p_shnd.dfl, sigid)) {
 
 		if ((SIG_DFLKIL >> sigid) & 1)
-			kill_proc_nr((sigid+1) * 0x100);
+			kill_proc_nr(WSTATUS_SIGNALED|(sigid+1));
 
 		if (contain_id(SIG_DFLSTP, sigid)) {
-			abort_syscalls(p);
-			p->p_stat = STOP;
+			proc_stop(sigid + 1);
 			schedule_proc();
 		}
 
@@ -80,7 +70,7 @@ void proc_hndl_sig_i(int sigid) {
 
 	// User handler
 
-	abort_syscalls(p);
+	proc_abort_syscalls(p);
 
 	uint_ptr sv_loc = (uint_ptr)p->p_reg.rsp.p;
 	sv_loc &= ~(uint_ptr)0xf; //align 16
@@ -124,7 +114,7 @@ int8_t send_sig_to_proc(pid_t pid, int sigid) {
 			}
 			switch_proc(pid);
 		}
-		kill_proc(SIGKILL * 0x100);
+		kill_proc(WSTATUS_SIGNALED|SIGKILL);
 		return 1;
 
 	} else if (!contain_id(p->p_shnd.ign, sigid)

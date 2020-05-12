@@ -348,7 +348,8 @@ static inline bool is_waiting_me(proc_t* pp, pid_t mpid) {
     return pp->p_stat == BLOCK && (
                 pp->p_reg.r.rax.ll == SYS_WAIT
             || (pp->p_reg.r.rax.ll == SYS_WAITPID
-                && pp->p_reg.r.rdi.pid_t == mpid)
+                && (pp->p_reg.r.rdi.pid_t == mpid
+					|| pp->p_reg.r.rdi.pid_t == PID_NONE))
             );
 }
 
@@ -496,7 +497,7 @@ void kill_proc_nr(int status) {
 }
 
 void kill_proc(int status) {
-    proc_t  *p = state.st_proc + state.st_curr_pid;
+    proc_t  *p = cur_proc();
     pid_t ppid = p->p_ppid;
     proc_t *pp = state.st_proc + ppid;
 
@@ -504,4 +505,23 @@ void kill_proc(int status) {
     if (is_waiting_me(pp, state.st_curr_pid))
         proc_blocr(ppid, pp);
     kill_proc_2zb(p, pp, status);
+}
+
+static inline bool is_waiting_me_stop(proc_t* pp, pid_t mpid) {
+    return pp->p_stat == BLOCK 
+		&& pp->p_reg.r.rax.ll == SYS_WAITPID
+        && (pp->p_reg.r.rdi.pid_t == mpid
+					|| pp->p_reg.r.rdi.pid_t == PID_NONE);
+}
+
+void proc_stop(int signum) {
+	proc_t  *p = cur_proc();
+	proc_abort_syscalls(p);
+	p->p_stat = STOP;
+	p->p_stps = 0x100|signum;
+    
+    pid_t ppid = p->p_ppid;
+    proc_t *pp = state.st_proc + ppid;
+	if (is_waiting_me_stop(pp, state.st_curr_pid))
+		proc_blocr(ppid, pp);
 }

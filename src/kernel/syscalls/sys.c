@@ -20,7 +20,7 @@ void sys_exit(int status) {
     klogf(Log_info, "syscall", "exit pid %d with status %d",
           state.st_curr_pid, status);
 
-    kill_proc_nr(status);
+    kill_proc_nr(WSTATUS_EXITED|(status&0xff));
 }
 
 pid_t sys_getpid() {
@@ -51,6 +51,10 @@ static inline void rem_child_Z0(proc_t* p, proc_t* cp) {
 }
 
 pid_t sys_wait(int* rt_st) {
+	if (rt_st && !check_argW(rt_st, sizeof(int))) {
+		set_errno(EINVAL);
+		return -1;
+	}
     klogf(Log_verb, "syscall", "wait");
     proc_t *p = &state.st_proc[state.st_curr_pid];
     if (~p->p_fchd) {
@@ -84,10 +88,51 @@ pid_t sys_wait(int* rt_st) {
 }
 
 pid_t sys_waitpid(pid_t cpid, int* rt_st) {
-    if (cpid == PID_NONE) return sys_wait(rt_st);
-
-    pid_t mpid = state.st_curr_pid;
+	if (rt_st && !check_argW(rt_st, sizeof(int))) {
+		set_errno(EINVAL);
+		return -1;
+	}
+	
+	pid_t mpid = state.st_curr_pid;
     proc_t  *p = state.st_proc + mpid;
+
+    if (cpid == -1) {
+		cpid = p->p_fchd;
+		proc_t* cp = state.st_proc + cpid;
+		if (~cpid) {
+			if (cp->p_stat == ZOMB) {
+				// Il y a des ZOMB
+
+				if (rt_st)
+					*rt_st = cp->p_reg.r.rdi.i;
+
+				rem_child_Z0(p, cp);
+
+				--p->p_nchd;
+				free_pid(cpid);
+				return cpid;
+
+			} else {
+				// Il n'y a pas de ZOMB, on cherche des STOP
+				for (; ~cpid; cpid = cp->p_nxsb) {
+					cp = state.st_proc + cpid;
+					if (cp->p_stat == STOP && cp->p_stps & 0x100) {
+						cp->p_stps &= 0xff;
+						if (rt_st) *rt_st = WSTATUS_STOPPED|cp->p_stps;
+						return cpid;
+					}
+				}
+
+				proc_self_block(p);
+				schedule_proc();
+			}
+		} else {
+			// Pas d'enfant
+			set_errno(ECHILD);
+			return -1;
+		}
+	}
+
     proc_t *cp = state.st_proc + cpid;
     if (cp->p_ppid == mpid) {
 
@@ -105,13 +150,17 @@ pid_t sys_waitpid(pid_t cpid, int* rt_st) {
             --p->p_nchd;
             free_pid(cpid);
             return cpid;
-        }
+    
+		} else if (cp->p_stat == STOP && cp->p_stps & 0x100) {
+			cp->p_stps &= 0xff;
+			if (rt_st) *rt_st = WSTATUS_STOPPED|cp->p_stps;
+			return cpid;
+		}
 
         proc_self_block(p);
         klogf(Log_info, "syscall", "process %d wait child %d",
                 mpid, cpid);
         schedule_proc();
-        never_reached return 0;
 
     } else {
         klogf(Log_info, "syscall", "process %d is not %d's child",

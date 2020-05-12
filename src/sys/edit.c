@@ -6,6 +6,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
+#include <signal.h>
 #include <errno.h>
 
 #include <headers/tty.h>
@@ -559,37 +560,29 @@ void make_query(const char *q, void (*callback)(char*)) {
     empty_buffer(input);
 }
 
-static inline void switch_back() {
-    write(STDOUT_FILENO, "\033l", 2);
-    clean();
-    display();
+void sighdl(int signum) {
+	int sv_errno = errno;
+	if (signum == SIGTSTP) {
+		write(STDIN_FILENO, "\033d", 2);
+		kill(getpid(), SIGSTOP);
+	} else if (signum == SIGCONT) {
+		write(STDOUT_FILENO, "\033l", 2);
+		clean();
+		display();
+	}
+	errno = sv_errno;
 }
 
 bool get_live(tty_live_t* rt) {
     int c;
-again:
     while ((c = fgetc(stdin)) != TTY_LIVE_MAGIC) {
-        if (c == EOF) {
-            if (errno == EINTR) {
-                switch_back();
-                goto again;
-            }
-
-            return false;
-        }
+        if (c == EOF) return false;
     }
 
     char* buf = (char*)rt;
     buf[0] = TTY_LIVE_MAGIC;
     for (size_t i = 1; i < sizeof(tty_live_t); ++i) {
-        if ((c = fgetc(stdin)) == EOF) {
-            if (errno == EINTR) {
-                switch_back();
-                goto again;
-            }
-
-            return false;
-        }
+        if ((c = fgetc(stdin)) == EOF) return false;
         buf[i] = c;
     }
 
@@ -611,6 +604,8 @@ int main(int argc, char *argv[]) {
     while (get_live(&lt) && !lt.ev.key && lt.ev.ascii != ';')
         H = H * 10 + lt.ev.ascii - '0';
 
+	signal(SIGTSTP, sighdl);
+	signal(SIGCONT, sighdl);
     // switch to live mode
     write(STDOUT_FILENO, "\033l", 2);
 

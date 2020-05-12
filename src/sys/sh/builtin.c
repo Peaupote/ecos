@@ -88,9 +88,8 @@ int blti_read(int argc, char **args, int fd_in) {
 			seg = cbuf_mkn(&buf, 256);
 		}
 
-		if (is_subsh && rc < 0 && errno == EINTR) 
-			while (int_tstp && !int_sint) pause();
-		else break;
+		if (errno != EINTR || int_sint || (!is_subsh && int_tstp))
+			break;
 	}
 	cbuf_destr(&buf);
 	return 1;

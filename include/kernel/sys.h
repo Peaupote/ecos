@@ -7,18 +7,9 @@
 
 #include <headers/types.h>
 #include <headers/signal.h>
-#include <libc/errno.h>
 
 #include "proc.h"
 #include "memory/shared_pages.h"
-
-static inline void set_proc_errno(proc_t *p, int e) {
-    if (p->p_errno) *p->p_errno = e;
-}
-
-static inline void set_errno(int e) {
-    set_proc_errno(cur_proc(), e);
-}
 
 static inline bool check_arg_ubound(uint_ptr bg, uint64_t sz) {
     return bg + sz >= bg

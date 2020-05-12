@@ -124,7 +124,7 @@ void kill_cur_for_err(uint8_t errnum, uint64_t errcode) {
         }
     }
 
-    kill_proc_nr(0x3300 + errnum);
+    kill_proc_nr(WSTATUS_SIGNALED|0x80|errnum);
 }
 
 void irq8() {

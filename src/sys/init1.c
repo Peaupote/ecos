@@ -3,6 +3,7 @@
 #include <stdio.h>
 #include <sys/wait.h>
 #include <sys/ressource.h>
+#include <signal.h>
 #include <libc/sys.h>
 #include <stdbool.h>
 
@@ -32,7 +33,13 @@ int main() {
 		r1_ttyown(rf);
 
 		int st;
-		while (waitpid(rf, &st) < 0);
+		while (true) {
+			while (waitpid(rf, &st) < 0);
+			if (!WIFSTOPPED(st)) break;
+			printf("\033\nsh stopped with status %d\n"
+				   "sending SIGCONT...\n", st);
+			kill(rf, SIGCONT);
+		}
 		if (st)
 			printf("\033\nsh exited with status %d\n", st);
 		printf("\033\n\nrestarting sh...\n");

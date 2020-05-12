@@ -12,6 +12,17 @@ typedef int32_t  pid_t;
 
 #define PID_NONE (~((pid_t)0))
 
+// status
+#define WSTATUS_EXITED   0x000
+#define WSTATUS_SIGNALED 0x100
+#define WSTATUS_STOPPED  0x200
+#define WIFEXITED(S)     (((S) & 0xf00) == WSTATUS_EXITED)
+#define WIEXITSTATUS(S)  ((S)  & 0xff)
+#define WIFSIGNALED(S)   (((S) & 0xf00) == WSTATUS_SIGNALED)
+#define WTERMSIG(S)      ((S)  & 0xff)
+#define WIFSTOPPED(S)    (((S) & 0xf00) == WSTATUS_STOPPED)
+#define WSTOPSIG(S)      ((S)  & 0xff)
+
 typedef uint8_t  priority_t;
 typedef int32_t  cid_t;
 
