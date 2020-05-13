@@ -12,7 +12,7 @@ void* malloc(size_t dsize);
 void  free(void* ptr);
 #include <src/libc/stdlib/malloc.c>
 
-#define TEST_BUFFER_SIZE 0x2000
+#define TEST_BUFFER_SIZE 0x3000
 #define TEST_NB_ALLOC    50
 #define TEST_ALLOC_SIZE  100
 #define TEST_REP0        100

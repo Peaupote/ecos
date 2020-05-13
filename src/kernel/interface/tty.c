@@ -59,6 +59,7 @@ static enum tty_mode tty_mode;
 static enum tty_mode tty_bmode;
 static char     input_msg_b[IM_LENGTH];
 static uint16_t input_msg_len_b;
+static char     promptb_color;
 
 bool            tty_do_kprint = false;
 
@@ -104,6 +105,62 @@ static tty_pos_t afficher_string(tty_pos_t pos, uint8_t lmrg,
     }
     return pos;
 }
+
+static const uint8_t code_to_vga[2][8] = {
+		{
+			VGA_COLOR_BLACK,
+			VGA_COLOR_RED,
+		 	VGA_COLOR_GREEN,
+		 	VGA_COLOR_BROWN,
+		 	VGA_COLOR_BLUE,
+		 	VGA_COLOR_MAGENTA,
+		 	VGA_COLOR_CYAN,
+		 	VGA_COLOR_LIGHT_GREY
+		 },
+		{
+			VGA_COLOR_BLACK,
+			VGA_COLOR_LIGHT_RED,
+		 	VGA_COLOR_LIGHT_GREEN,
+		 	VGA_COLOR_LIGHT_BROWN,
+		 	VGA_COLOR_LIGHT_BLUE,
+		 	VGA_COLOR_LIGHT_MAGENTA,
+		 	VGA_COLOR_LIGHT_CYAN,
+		 	VGA_COLOR_WHITE
+		 }
+	};
+
+static void interpret_color_code(const char* str, size_t len) {
+	if (len == 1) {
+		switch (str[0]) {
+			case '0':
+				is_buf_bright = false;
+				buf_color = tty_def_color;
+			break;
+			case '1': is_buf_bright = true; break;
+		}
+	} else if (len == 2) {
+		if ((str[0] == '3' || str[0] == '4') 
+				&& (str[1] >= '0' || str[1] <= '7')) {
+			uint8_t cl = code_to_vga[is_buf_bright ? 1 : 0][str[1] - '0'];
+			if (str[0] == '3') {
+				buf_color &= 0xf0;
+				buf_color |= cl;
+			} else {
+				buf_color &= 0x0f;
+				buf_color |= cl << 4;
+			}
+		}
+	}
+}
+
+static uint8_t prompt_color_of_char(char c, bool bright) {
+	return vga_entry_color(
+			('0' <= c && c <= '7')
+			? code_to_vga[bright ? 1 : 0][c - '0']
+			: VGA_COLOR_LIGHT_GREY,
+			VGA_COLOR_BLACK);
+}
+
 
 // --Screen Buffer--
 
@@ -475,17 +532,9 @@ void tty_set_mode(enum tty_mode m) {
 	cursor_clock = 0;
     switch (m) {
     case ttym_prompt:
-        prompt_color = vga_entry_color (
-                    VGA_COLOR_LIGHT_BLUE, VGA_COLOR_BLACK);
-        vprompt_color = vga_entry_color (
-                    VGA_COLOR_BLUE, VGA_COLOR_BLACK);
         input_lmargin = 2;
         break;
     case ttym_def:
-        prompt_color = vga_entry_color (
-                    VGA_COLOR_WHITE, VGA_COLOR_BLACK);
-        vprompt_color = vga_entry_color (
-                    VGA_COLOR_LIGHT_GREY, VGA_COLOR_BLACK);
         input_lmargin = 0;
         break;
 	case ttym_live:
@@ -554,10 +603,15 @@ bool tty_display_graph_rq(bool g) {
 void tty_set_mode_to_b() {
 	memcpy(input_msg, input_msg_b, input_msg_len_b);
 	input_msg_len = input_msg_len_b;
+	prompt_color  = prompt_color_of_char(promptb_color, true);
+	vprompt_color = prompt_color_of_char(promptb_color, false);
 	tty_set_mode(tty_bmode);
 }
 
 void tty_set_bmode(enum tty_mode m, uint16_t msg_len, const char* msg) {
+	if ((tty_bmode == ttym_live) != (m == ttym_live))
+		fs_proc_clear_tty0();
+
 	tty_bmode = m;
 	memcpy(input_msg_b, msg, msg_len);
 	input_msg_len_b = msg_len;
@@ -792,53 +846,6 @@ void tty_set_owner(pid_t p) {
     state.st_owng[own_tty] = p;
 }
 
-static const uint8_t code_to_vga[2][8] = {
-		{
-			VGA_COLOR_BLACK,
-			VGA_COLOR_RED,
-		 	VGA_COLOR_GREEN,
-		 	VGA_COLOR_BROWN,
-		 	VGA_COLOR_BLUE,
-		 	VGA_COLOR_MAGENTA,
-		 	VGA_COLOR_CYAN,
-		 	VGA_COLOR_LIGHT_GREY
-		 },
-		{
-			VGA_COLOR_BLACK,
-			VGA_COLOR_LIGHT_RED,
-		 	VGA_COLOR_LIGHT_GREEN,
-		 	VGA_COLOR_LIGHT_BROWN,
-		 	VGA_COLOR_LIGHT_BLUE,
-		 	VGA_COLOR_LIGHT_MAGENTA,
-		 	VGA_COLOR_LIGHT_CYAN,
-		 	VGA_COLOR_WHITE
-		 }
-	};
-
-static void interpret_color_code(const char* str, size_t len) {
-	if (len == 1) {
-		switch (str[0]) {
-			case '0':
-				is_buf_bright = false;
-				buf_color = tty_def_color;
-			break;
-			case '1': is_buf_bright = true; break;
-		}
-	} else if (len == 2) {
-		if ((str[0] == '3' || str[0] == '4') 
-				&& (str[1] >= '0' || str[1] <= '7')) {
-			uint8_t cl = code_to_vga[is_buf_bright ? 1 : 0][str[1] - '0'];
-			if (str[0] == '3') {
-				buf_color &= 0xf0;
-				buf_color |= cl;
-			} else {
-				buf_color &= 0x0f;
-				buf_color |= cl << 4;
-			}
-		}
-	}
-}
-
 static size_t tty_writestringl0(const char* str, size_t len) {
 	if (tty_mode == ttym_live) {
 		if (display_graph) return 0;
@@ -898,19 +905,24 @@ size_t tty_writei(uint8_t num, const char* str, size_t len) {
 					case 'l':
 						tty_set_bmode(ttym_live, 0, NULL);
 						break;
-					case 'p':
-						for (++i; i < len; ++i) {
-							if (str[i] == '\033'
-									&& ++i < len && str[i]==';')
-								goto set_p_mode;
+					case 'p': {
+						char pcl;
+						if (i + 1 < len) {
+							pcl = str[++i];
+							for (++i; i < len; ++i) {
+								if (str[i] == '\033'
+										&& ++i < len && str[i]==';')
+									goto set_p_mode;
+							}
 						}
 						tty_seq_commit(&sq);
 						return t_ed;
 					set_p_mode:
+						promptb_color = pcl;
 						tty_set_bmode(ttym_prompt,
-								min_uint16_t(IB_LENGTH, (i - 1) - (t_ed + 2)),
-								str + t_ed + 2);
-					break;
+								min_uint16_t(IB_LENGTH, (i - 1) - (t_ed + 3)),
+								str + t_ed + 3);
+					} break;
 					case '\n':
 						if (cur_ln_x) tty_force_new_line();
 					break;

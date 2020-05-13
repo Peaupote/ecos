@@ -794,10 +794,10 @@ ecmd_2_t* continue_job(ecmd_2_t* e, int* st) {
 	return exec_cmd_3_up(c3, e->st, st, *st);
 }
 
-static inline bool run_wait() {
+static inline bool run_wait(bool dead_only) {
 	pid_t wpid;
 	int rs;
-	while(!~(wpid = waitpid(-1, &rs))) {
+	while(!~(wpid = dead_only ? wait(&rs) : waitpid(-1, &rs))) {
 		if (errno != EINTR && errno != SUCC) {
 			perror("sh:wait");
 			return false;
@@ -811,7 +811,7 @@ bool run_fg(int* st) {
     ecmd_2_t* ecmd = ecmd_llist;
 	do {
 		while (ecmd->nb_run > 0) {
-			if (!run_wait()) {
+			if (!run_wait(false)) {
 				fgc = NULL;
 				return false;
 			}
@@ -850,7 +850,7 @@ int run_sub(ecmd_2_t* ecmd) {
 	int st;
 	do {
 		while (ecmd->nb_alive > 0) {
-			if (!run_wait()) {
+			if (!run_wait(true)) {
 				broadcast_e(ecmd, SIGINT);
 				exit(1);
 			}

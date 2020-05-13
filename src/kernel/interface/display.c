@@ -177,20 +177,20 @@ void display_char_at(size_t x, size_t y, char c, rgbcolor_t fg, rgbcolor_t bg) {
 
 static rgbcolor_t colors[16] = {
 	0x000000, // black
-	0x0000ff, // blue
-	0x00ff00, // green
-	0x00ffff, // cyan
-	0xff0000, // red
-	0xff00ff, // magenta
-	0x813c12, // brown
-	0xcccccc, // light grey
+	0x0000a8, // blue
+	0x00a800, // green
+	0x00a8a8, // cyan
+	0xa80000, // red
+	0xa800a8, // magenta
+	0xa85700, // brown
+	0xa8a8a8, // light grey
 	0x333333, // dark grey
-	0x7777ff, // light blue
-	0x72ff72, // light green
-	0x55bebe, // light cyan
-	0xff7777, // light red
-	0xbe55be, // light magenta
-	0xbf510d, // light brown
+	0x5757ff, // light blue
+	0x57ff57, // light green
+	0x57ffff, // light cyan
+	0xff5757, // light red
+	0xff57ff, // light magenta
+	0xffb10f, // light brown
 	0xffffff  // white
 };
 

@@ -1023,7 +1023,7 @@ int run(FILE* f, bool prompt) {
     char       buf[256];
     while (true) {
         if (prompt) {
-            printf(new ? "\033pmat> \033;" : "\033p.. \033;");
+            printf(new ? "\033p3mat> \033;" : "\033p3.. \033;");
             fflush(stdout);
         }
         int c = get_nblank(f);

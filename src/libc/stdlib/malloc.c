@@ -66,18 +66,40 @@ struct free_bloc {
 
 // fin du dernier bloc, qui est nécessairement alloué
 static uint_ptr    up_lim;
+// valeur de brk
+static uint_ptr    sbrk_lim;
 static free_bloc_t root;
+
+static void* malloc_sbrk_add(size_t inc) {
+	void* rt = (void*)up_lim;
+	if (up_lim + inc > sbrk_lim) {
+		// alloc par page
+		uint_ptr new_brk = (up_lim + inc + 0x1000 - 1) & ~(uint_ptr)0xfff;
+		sbrk((intptr_t)new_brk - sbrk_lim);
+		sbrk_lim = new_brk;
+	}
+	up_lim += inc;
+	return rt;
+}
+static void malloc_sbrk_sub(size_t inc) {
+	up_lim -= inc;
+	uint_ptr new_brk = (up_lim + 0x1000 - 1) & ~(uint_ptr)0xfff;
+	if (new_brk < sbrk_lim) {
+		sbrk(((intptr_t)new_brk) - (intptr_t)sbrk_lim);
+		sbrk_lim = new_brk;
+	}
+}
 
 void _malloc_init() {
 #ifdef MALLOC_CHECK
 	malloc_check_nb = 0;
 #endif
-    up_lim    = (uint_ptr) sbrk(0);
+    up_lim = sbrk_lim = (uint_ptr) sbrk(0);
     if (up_lim % MALLOC_ALIGN != MALLOC_ALIGN - MALLOC_HD_SZ) {
         uint_ptr  add = (2 * MALLOC_ALIGN - MALLOC_HD_SZ
 							- (up_lim % MALLOC_ALIGN)) % MALLOC_ALIGN;
         up_lim += add;
-        sbrk((intptr_t)add);
+		malloc_sbrk_add((intptr_t)add);
     }
     root.next = root.prev = &root;
 }
@@ -152,9 +174,8 @@ void* TEST_U(malloc)(size_t dsize) {
         }
     }
 
-    void *rt_hd       = sbrk((intptr_t)size);
+    void *rt_hd       = malloc_sbrk_add(size);
     *(uint32_t*)rt_hd = size;
-    up_lim            = (uint_ptr)rt_hd + size;
 #ifdef MALLOC_PRINT
 	fprintf(stderr, "%d: malloc rt(1)=%p\n", getpid(),
 			(void*)(MALLOC_HD_SZ + (uint_ptr)rt_hd));
@@ -199,10 +220,9 @@ void TEST_U(free)(void* ptr) {
         bsz += MBLOC_SIZE_MASK & pb_hd;
     }
 
-    if ((bsz +  (uint_ptr)b) >= up_lim) {
-        sbrk(-(intptr_t)bsz);
-        up_lim -= bsz;
-    } else {
+    if ((bsz +  (uint_ptr)b) >= up_lim)
+		malloc_sbrk_sub(bsz);
+    else {
         uint32_t* nhd = (uint32_t*)(bsz + (uint_ptr)bloc_head(b));
         *bloc_head(b) = *(nhd - 1) = bsz | MBLOC_FREE;
         *nhd         |= MBLOC_PREV_FREE;

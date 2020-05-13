@@ -93,7 +93,7 @@ int run_prompt() {
 		int rem = 512 - buf_rem;
 		buf = line;
 
-		printf("\033p%s> \033;", cwd); fflush(stdout);
+		printf("\033p4%s> \033;", cwd); fflush(stdout);
 		bool input_first_line = true;
 		while (true) {
 			int rc = read(STDIN_FILENO, buf, rem);
@@ -101,9 +101,9 @@ int run_prompt() {
 			if (rc < 0) {
 				if (errno == EINTR) {
 					if (input_first_line)
-						printf("\033p%s> \033;", cwd);
+						printf("\033p4%s> \033;", cwd);
 					else
-						printf("\033p.. \033;");
+						printf("\033p4.. \033;");
 					fflush(stdout);
 					continue;
 				}
@@ -121,7 +121,7 @@ int run_prompt() {
 			}
 			rem -= rc;
 			input_first_line = false;
-			printf("\033p.. \033;"); fflush(stdout);
+			printf("\033p4.. \033;"); fflush(stdout);
 		}
 end_input_read:;	
 		
@@ -281,6 +281,7 @@ int main(int argc, char* argv[]) {
 
 	init_parse();
 	signal(SIGHUP, &hup_handler);
+	signal(SIGINT, &hup_handler);
 
 	if (argi >= argc) {
 		if (display_msg) printf("ecos-shell\n");

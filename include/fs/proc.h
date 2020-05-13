@@ -104,5 +104,9 @@ static inline void fs_proc_send0_tty() {
         vfs_unblock(ttyin_vfile);
     }
 }
+static inline void fs_proc_clear_tty0() {
+	ttyin_buf.sz  = 0;
+	ttyin_buf.ofs = 0;
+}
 
 #endif

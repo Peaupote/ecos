@@ -7,26 +7,18 @@ Le tty possède un flux de lecture (`tty0`) et deux flux d'écriture (`tty1` et 
   via des séquences précédés du caractère `\033` (`\e`, `\x1B`).
   Ces séquences ne doivent pas êtres séparées en plusieurs apppels à `write`.
   - `\033d`: passe le tty en mode défaut
-  - `\033p__prompt_msg__\033;`: passe le tty en mode prompt
+  - `\033p__color____prompt_msg__\033;`: passe le tty en mode prompt où
+    `__color__` est un numéro de couleur
   - `\033l`: passe le tty en mode `live`
   - `\033\n`: nouvelle ligne si la ligne actuelle n'est pas vide
   - `\033[__colors__m`: change la couleur, `__colors__` est une liste de codes
     séparés par `;`:
+  
      - `0`: restaure les valeurs par défaut
      - `1`: utilise des couleurs plus claires (affecte les prochaines couleurs)
      - `3x`: change la couleur du texte
      - `4x`: change la couleur du fond
-
-         | `x` | couleur |
-         |:---:|:------- |
-         | 0   | noir    |
-         | 1   | rouge   |
-         | 2   | vert    |
-         | 3   | marron  |
-         | 4   | bleu    |
-         | 5   | magenta |
-         | 6   | cyan    |
-         | 7   | blanc   |
+  
   - `\033i`: infos, le tty envoie la séquence suivante sur `tty0` via des
     `tty_live_t` de `key` nulles:
     ```
@@ -34,6 +26,19 @@ Le tty possède un flux de lecture (`tty0`) et deux flux d'écriture (`tty1` et 
     ```
 
 - `tty2` est utilisé pour afficher les erreurs
+
+### Numéro des couleurs
+
+ | `x` | couleur |
+ |:---:|:------- |
+ | 0   | noir    |
+ | 1   | rouge   |
+ | 2   | vert    |
+ | 3   | marron  |
+ | 4   | bleu    |
+ | 5   | magenta |
+ | 6   | cyan    |
+ | 7   | blanc   |
 
 ### Mode live
 
