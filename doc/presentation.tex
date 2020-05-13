@@ -101,7 +101,7 @@
 
 \begin{frame}
   \frametitle{Mémoire}
-	Paging 4 niveaux: 48 bits d'adresse
+    Paging 4 niveaux: 48 bits d'adresse
 
   \vspace{1.0cm}
 
@@ -296,6 +296,34 @@
   \item le système de fichier à utiliser pour lire dans cette device
   \item des informations spécifique au point de montage.
   \end{itemize}
+
+  \begin{figure}
+    \begin{center}
+      \scalebox{.6}{
+      \begin{tikzpicture}
+        \draw (0,0) rectangle (10, 5);
+        \draw (9.95, 4.8) node[left] {ext2};
+        \draw (.2, 4.5) node[right] {/};
+        \draw (.2, 4) node[right] {/bin};
+
+        \draw (.1, 2) rectangle (9.9, 3.7);
+        \draw (9.9, 3.45) node[left] {procfs};
+        \draw (.2, 3.40) node[right] {/proc};
+        \draw (.2, 2.90) node[right] {/proc/tty};
+        \draw (.2, 2.40) node[right] {/proc/...};
+
+        \draw (.1, .1) rectangle (9.9, 1.9);
+        \draw (9.9, 1.7) node[left] {ext2};
+        \draw (.2, 1.65) node[right] {/home};
+        \draw (.2, 1.05) node[right] {/home/test/};
+        \draw (.2, .55) node[right] {/home/test/...};
+
+      \end{tikzpicture}
+      }
+      \caption{Hyérarchie des systèmes de fichiers dans notre projet}
+    \end{center}
+  \end{figure}
+
 \end{frame}
 
 \begin{frame}
@@ -408,6 +436,27 @@
   Pour éviter de dupliquer le code de la libc dans les binaires chargées dans le système de fichier, on la charge dynamiquement quand on lance le processus.
 
   De plus, grâce aux interfaces les plus communes de la libc, du code générique respectant les normes \textrm{POSIX} pourrait être executé sur notre système.
+
+\end{frame}
+
+\begin{frame}
+  \frametitle{Améliorations possibles}
+  \begin{itemize}
+  \item Gestion du hardware (devices et drivers)
+  \item Compléter notre implémentation de ext2fs
+  \item Toujours plus de systèmes de fichiers (tmpfs, devfs, ext3, \ldots)
+  \item Ajouter des utilisateurs
+  \item Les couches réseaux
+  \item Une interface grahique
+  \item Mode installation sur une clé bootable
+  \item Processus légers
+  \item Mémoire partagée
+  \end{itemize}
+
+  \thinspace{}
+  \begin{center}
+    \large{Merci pour votre attention !}
+  \end{center}
 
 \end{frame}
 
