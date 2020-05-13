@@ -103,8 +103,7 @@
   \frametitle{Mémoire}
 	Paging 4 niveaux: 48 bits d'adresse
 
-  \vspace{1.0cm}
-
+  \begin{figure}
   \begin{tikzpicture}
     \tikzset{
       table/.style={rectangle},
@@ -185,6 +184,9 @@
     \draw[style=<-] (pml4.260) arc (180:360:0.3cm);
 
   \end{tikzpicture}
+    \caption{Structure du paging}
+  \end{figure}
+
 \end{frame}
 
 \begin{frame}
@@ -409,6 +411,15 @@
 
   De plus, grâce aux interfaces les plus communes de la libc, du code générique respectant les normes \textrm{POSIX} pourrait être executé sur notre système.
 
+\end{frame}
+
+\begin{frame}
+	\frametitle{Conclusion et améliorations}
+	\begin{itemize}
+		\item bit d'adresse 47
+		\item amélioration des signaux
+		\item gestion des flottants
+	\end{itemize}
 \end{frame}
 
 \end{document}
