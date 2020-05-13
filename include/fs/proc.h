@@ -107,6 +107,8 @@ static inline void fs_proc_send0_tty() {
 static inline void fs_proc_clear_tty0() {
 	ttyin_buf.sz  = 0;
 	ttyin_buf.ofs = 0;
+    if (ttyin_vfile)
+        ttyin_vfile->vf_stat.st_size = 0;
 }
 
 #endif
