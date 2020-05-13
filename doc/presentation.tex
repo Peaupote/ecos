@@ -1,0 +1,39 @@
+\documentclass[10pt,a4paper]{beamer}
+\usepackage[utf8]{inputenc}
+\usepackage[french]{babel}
+\usepackage[T1]{fontenc}
+%% \usepackage{graphicx}
+%% \usepackage{lmodern}
+%% \usepackage{kpfonts}
+\author{Benjamin Bonneau \& Maxime Flin }
+\title{Projet de système d'exploitation \\ --- Rock and Roll ---}
+\begin{document}
+\maketitle
+
+\begin{frame}
+  Sommaire:
+  \begin{enumerate}
+  \item Introduction
+  \item Boot
+  \item Mémoire
+  \item Appels systèmes
+  \item Processus
+  \item Système de fichier
+  \item Libc
+  \item Conclusion et améliorations
+  \end{enumerate}
+\end{frame}
+
+\begin{frame}
+  \frametitle{Introduction}
+  \textrm{ecos} est un système d'exploitation. Il propose une interface très proche des normes \textrm{POSIX}. Il propose:
+  \begin{itemize}
+  \item une gestion de processus concurrent
+  \item un système de fichier
+  \item une implémentation de la librarie standard C
+  \item des programmes utilitaires courants (\textrm{cat}, \textrm{ls}, etc\ldots)
+  \item un shell
+  \end{itemize}
+\end{frame}
+
+\end{document}

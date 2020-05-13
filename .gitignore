@@ -15,3 +15,7 @@ isodir
 tests/run/home
 src/sys/root
 vars_local.Makefile
+*.aux
+*.nav
+*.snm
+*.toc
