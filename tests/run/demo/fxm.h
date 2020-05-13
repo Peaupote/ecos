@@ -157,9 +157,9 @@ static inline bool fxm_normalize(const fxm_t* a, fxm_t* rt, unsigned d) {
 		fxm_t b = fxm_div(a[i], mterm);
 		norm += fxm_mul(b, b);
 	}
-	norm = fxm_mul(mterm, fxm_sqrt(norm));
+	norm = fxm_sqrt(norm);
 	for (unsigned i = 0; i < d; ++i)
-		rt[i] = fxm_div(a[i], norm);
+		rt[i] = fxm_div(fxm_div(a[i], mterm), norm);
 	return true;
 }
 

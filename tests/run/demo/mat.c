@@ -321,7 +321,9 @@ bool op_ln(stack_t* s) {
     return true;
 }
 bool op_sqrt(stack_t* s) {
-    UOP push_nb(s, fxm_sqrt(a));
+    UOP
+	if (a < 0) return false;
+	push_nb(s, fxm_sqrt(a));
     return true;
 }
 bool op_pi(stack_t* s) {
@@ -343,11 +345,15 @@ bool op_pow(stack_t* s) {
     fxm_t x;
     int i;
     if (!pop_int(s, &i) || !pop_nb(s, &x)) return false;
-    if (x == 0 && i < 0) {
-        s->err = ERR_DOMAIN;
-        return false;
-    }
-    push_nb(s, fxm_pows(x, i));
+	if (i >= 0) push_nb(s, fxm_pow(x, i));
+	else {
+		fxm_t inv = fxm_pow(x, -i);
+		if (!inv) {
+			s->err = ERR_DOMAIN;
+			return false;
+		}
+		push_nb(s, fxm_div(fxm_one(), inv));
+	}
     return true;
 }
 
@@ -665,6 +671,7 @@ bool op_plot3(stack_t* s) {
 			for (unsigned x = 0; x <= sub; ++x) {
 				push_nb(&stk, fxm_of_int(x) / sub);
 				push_nb(&stk, fxm_of_int(y) / sub);
+				valid[y][x] = false;
 				valid[y][x] = exec_cmd(f, &stk)
 						    && pop_nb(&stk, vals[y] + x);
 				clear_stk(&stk);
@@ -734,7 +741,7 @@ redraw:
 
 			for (unsigned k = 0; k < 2; ++k) {
 				const unsigned* tri = tri_index[k];
-				if (!valid[y + (tri[0]>>1)][y + (tri[0] &1)])
+				if (!valid[y + (tri[1]>>1)][x + (tri[0] &1)])
 					continue;
 				int x[3], y[3];
 				fxm_t depth[3];

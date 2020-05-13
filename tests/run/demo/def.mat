@@ -4,6 +4,8 @@
 :max 0 1 0 1 2 4 dup - abs + + 2 /
 :min 0 1 0 1 2 4 dup +  2 0 1 3 3 dup  - abs - 2 /
 :tan 0 0 1 2 dup sin swap cos /
+:opp 0 swap -
+:inv 1 swap /
 
 :sq 2 pow
 :demo1 'id'   'ff0000'\
@@ -26,3 +28,9 @@
 
 :cosin 3 * cos swap 3 * sin *
 :demo4 'cosin' 100 plot3
+
+:dist2 .5 - 2 pow swap .5 - 2 pow +
+:dist dist2 sqrt
+:sphere dist2 .25 swap - sqrt
+
+:demos demo1 demo2 demo4
