@@ -247,41 +247,41 @@
 
   Pour éviter d'avoir à parcourir toute la table on a ajouté aux processus une structure de liste chainée.
 
-  \begin{figure}
-    \begin{center}
-      \begin{tikzpicture}
-        \draw[] (0,0) rectangle (2, 1) node[pos=.5] {\textrm{pid} 1};
-        \draw[] (2,0) rectangle (4, 1) node[pos=.5] {\textrm{pid} 2};
-        \draw[] (4,0) rectangle (6, 1) node[pos=.5] {\textrm{pid} 3};
-        \draw[] (6,0) rectangle (8, 1) node[pos=.5] {\textrm{pid} 4};
-        \draw[] (8,0) rectangle (10, 1) node[pos=.5] {\textrm{pid} 5};
-        \draw[] (10,0) -- (11, 0);
-        \draw[] (10, 1) -- (11, 1);
-        \draw[] (11, .5) node {\ldots};
+  %% \begin{figure}
+  %%   \begin{center}
+  %%     \begin{tikzpicture}
+  %%       \draw[] (0,0) rectangle (2, 1) node[pos=.5] {\textrm{pid} 1};
+  %%       \draw[] (2,0) rectangle (4, 1) node[pos=.5] {\textrm{pid} 2};
+  %%       \draw[] (4,0) rectangle (6, 1) node[pos=.5] {\textrm{pid} 3};
+  %%       \draw[] (6,0) rectangle (8, 1) node[pos=.5] {\textrm{pid} 4};
+  %%       \draw[] (8,0) rectangle (10, 1) node[pos=.5] {\textrm{pid} 5};
+  %%       \draw[] (10,0) -- (11, 0);
+  %%       \draw[] (10, 1) -- (11, 1);
+  %%       \draw[] (11, .5) node {\ldots};
 
-        \draw[] (0.5, 1) edge[out=60,in=120,->] (2, 1);
-        \draw[] (2.5, 1) edge[out=60,in=120,->] (6, 1);
-        \draw[] (6.5, 1) edge[out=60,in=120,->] (10, 1);
-        \draw[] (10.5, 1) edge[out=60,in=120,->] (14, 1);
+  %%       \draw[] (0.5, 1) edge[out=60,in=120,->] (2, 1);
+  %%       \draw[] (2.5, 1) edge[out=60,in=120,->] (6, 1);
+  %%       \draw[] (6.5, 1) edge[out=60,in=120,->] (10, 1);
+  %%       \draw[] (10.5, 1) edge[out=60,in=120,->] (14, 1);
 
-        \draw[] (4.2, 0) edge[out=-60,in=-120,->] (8, 0);
-        \draw[] (8.2, 0) edge[out=-60,in=-120,->] (12, 0);
-      \end{tikzpicture}
-      \caption{Table de processus avec la liste des enfants de 1 (en haut) et la liste des pid libres (en bas)}
-    \end{center}
-  \end{figure}
+  %%       \draw[] (4.2, 0) edge[out=-60,in=-120,->] (8, 0);
+  %%       \draw[] (8.2, 0) edge[out=-60,in=-120,->] (12, 0);
+  %%     \end{tikzpicture}
+  %%     \caption{Table de processus avec la liste des enfants de 1 (en haut) et la liste des pid libres (en bas)}
+  %%   \end{center}
+  %% \end{figure}
 \end{frame}
 
 \begin{frame}
   \frametitle{Ordonnacement des processus}
-  On utilise une file de priorité pour classer les processus en fonction de leurs états. Dans la file, on trouve tous les processus qui attente de pouvoir retravailler.
+  On a un table qui a un niveau de priorité associe une file de processus. L'ordonnanceur prend le premier processus de la file de priorité la plus élévée\footnote{la recherche de la priorité est optimisé avec une bitmap}.
 
-  Le noyau reçoit régulièrement des interruptions du PIT\footnote{Programmable Interval Timer} qui interrompent le processus en cours. Si celui-ci travaille déjà depuis plus d'une certaine unité de temps\footnote{définie dans kernel/params.h}, alors on laisse travailler un autre processus. De cette manière, on évite les famines.
+  Le noyau reçoit toutes les 10ms des interruptions du PIT\footnote{Programmable Interval Timer} qui interrompent le processus en cours. Si celui-ci travaille déjà depuis plus d'une certaine unité de temps\footnote{définie dans kernel/params.h}, alors on laisse travailler un autre processus. De cette manière, on évite les famines.
 
   On distingue deux processus particulers:
   \begin{itemize}
-  \item le processus \textrm{init}, de pid 1, est le premier processus lancé par le noyau au moment du boot. Il lance un shell et attend que celui-ci termine pour le relancer.
-  \item le processus \textrm{stop}, de pid 2, est utilisé en cas de panique du noyau.
+  \item le processus \textrm{idle}, de pid 0, est un processus de priorité minimale ; c'est le processus courant lorsqu'il n'y a rien à faire. Lorsqu'un processus demande à travailler, si c'est \textrm{idle} le processus courant, alors on attends pas le tic de PIT avant de changer le processus.
+  \item le processus \textrm{init}, de pid 1, est le premier processus lancé par le noyau au moment du boot. Il se fork en un \textrm{init1} (qui lance un shell) et attend de récupérer les processus zombies.
   \end{itemize}
 
 \end{frame}
@@ -322,7 +322,7 @@
 
       \end{tikzpicture}
       }
-      \caption{Hyérarchie des systèmes de fichiers dans notre projet}
+      \caption{Hiérarchie des systèmes de fichiers dans notre projet}
     \end{center}
   \end{figure}
 
@@ -367,11 +367,18 @@
         \foreach \i in {1,...,4}
         \draw (4,\i * .2) rectangle (5, \i * .2 + .2);
 
+        \draw[->] (3, .45) -- (4, 1);
+
         % 3
         \draw (6, 4) rectangle (7, 5);
         \draw (6, 2.7) rectangle (7, 3.7);
         \draw (6, 1.5) rectangle (7, 2.5);
         \draw (6, .2) rectangle (7, 1.2);
+
+        \draw[->] (5, .85) -- (6, 5);
+        \draw[->] (5, .65) -- (6, 3.7);
+        \draw[->] (5, .45) -- (6, 2.5);
+        \draw[->] (5, .25) -- (6, 1.2);
 
       \end{tikzpicture}
       \caption{représentation d'un inoeud}
@@ -402,26 +409,52 @@
 \end{frame}
 
 \begin{frame}
-  \frametitle{Système de fichier virtuel}
-
-  Pour que l'utilisateur puisse manipuler tous les fichiers du systèmes à travers une unique interface, on ajoute une couche d'indirection entre lui et les systèmes de fichiers.
-
-  C'est le système de fichier virtuel qui gère la hyérarchie entre les systèmes de fichier. Par exemple, dans notre démonstration \textrm{/} est une partition \textrm{ext2} qui contient un dossier \textrm{/bin} et deux autres systèmes de fichiers: \textrm{/proc} et \textrm{/home}.
-
-  On maintient une table de \textit{fichiers virtuels} qui représentent les fichiers ouverts par le système. On y conserve le numéro d'inoeud du fichier et la device à laquell il appartient.
-
-  Le même fichier peut être ouvert plusieurs fois a des endroits différents. Pour représenter ceci, les processus n'agissent pas directement sur des fichiers virtuels mais sur des channels qui référencent un fichier virtuel, un mode (écriture, lecture ou les deux) et une position dans le fichier.
-\end{frame}
-
-\begin{frame}
+  \frametitle{Système de fichiers virtuel}
   \begin{figure}
+    \scalebox{.75}{
+      \begin{tikzpicture}
+
+        \foreach \i in {0,...,9}
+        \draw (0,\i * .3 + 4) rectangle (2, \i * .3 + .3 + 4);
+        \draw (2, 3.2 + 4) node[left] {processus 1};
+
+        \draw[->] (2, 6.85) -- (3, 5);
+
+        \foreach \i in {0,...,9}
+        \draw (0,\i * .3) rectangle (2, \i * .3 + .3);
+        \draw (2, 3.2) node[left] {processus 2};
+
+        \draw[->] (2, 2.5) -- (3, 2);
+        \draw[->] (2, 1.55) -- (3, 3.5);
+
+        \draw (3, 1) rectangle (5, 6);
+        \draw (5, 6.2) node[left] {channels};
+        \draw (3, 1.5) rectangle (5, 2.5) node[pos=.5] {$pos=0$};
+        \draw (3, 3) rectangle (5, 4) node[pos=.5] {$pos=42$};
+        \draw (3, 4.5) rectangle (5, 5.5) node[pos=.5] {$pos=0$};
+
+        \draw[->] (5, 2) -- (6, 3);
+        \draw[->] (5, 5) -- (6, 3);
+        \draw[->] (5, 3.5) -- (6, 5);
+
+        \draw (6, 0) rectangle (9, 8);
+        \draw (9.1,8.2) node[left] {fichiers virtuels};
+        \draw (6, 2.5) rectangle (9, 3.5) node[pos=.5] {\textrm{/proc/tty/tty1}};
+        \draw (6, 4.5) rectangle (9, 5.5) node[pos=.5] {\textrm{/home/test/test.c}};
+
+        \draw[->] (9, 5) -- (10, 6);
+        \draw[->] (9, 3) -- (10, 2);
+
+        \draw (10, 1) rectangle (13, 3) node[pos=.5] {\textrm{/proc}};
+        \draw (13.1, 3.2) node[left] {\textrm{procfs}};
+
+        \draw (10, 5) rectangle (13, 7) node[pos=.5] {\textrm{/home}};
+        \draw (13.1, 7.2) node[left] {\textrm{ext2}};
+
+      \end{tikzpicture}
+    }
     \caption{Les différentes couches d'indirections entre le fichier et le processus}
   \end{figure}
-\end{frame}
-
-\begin{frame}
-  \frametitle{Libc et Libk}
-
 \end{frame}
 
 \begin{frame}
@@ -430,7 +463,7 @@
   \begin{itemize}
   \item des fonctions utilitaires (\textrm{strlen}, \textrm{malloc}\ldots)
   \item des abstractions au dessus des appels systèmes (\textrm{opendir}, \textrm{fopen}, \ldots)
-  \item les appels systèmes, qui se sont plus que des \textrm{int x80} précédé d'un \textrm{mov} de l'identifiant de de l'appel dans \textrm{\%rax}.
+  \item les appels systèmes, qui se sont plus que des interruptions.
   \end{itemize}
 
   Il y a également une séquence de controle qui permet d'initialiser la libc, de commencer son programme dans la fonction \textrm{main} et d'\textrm{exit} le programme au retour  de \textrm{main}.
@@ -447,6 +480,7 @@
   \item Bit d'adresse 47
   \item Amélioration des signaux
   \item Gestion des flottants
+  \item Le copy-on-write
   \item Gestion du hardware (devices et drivers)
   \item Compléter notre implémentation de ext2fs
   \item Toujours plus de systèmes de fichiers (tmpfs, devfs, ext3, \ldots)
