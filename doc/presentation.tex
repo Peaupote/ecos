@@ -46,9 +46,11 @@
       \draw[->] (5, 5.9) -- (5, 5.6);
       \draw[->] (5, 4.4) -- (5, 4.1);
 
-      \draw[] (0, 1) rectangle (8, 4) node[above] {kernel};
+      \draw[] (0, 1) rectangle (10, 4) node[above] {kernel};
       \draw[] (.1, 3) rectangle (3.9, 3.9) node[pos=0.5] { gestion des interruptions };
-      \draw[] (4.1, 1.1) rectangle (7.9, 3.9) node[pos=0.5] { ordonnanceur };
+      \draw[] (4.1, 1.1) rectangle (7.9, 1.9) node[pos=0.5] { ordonnanceur };
+      \draw[] (4.1, 2.1) rectangle (7.9, 3.9) node[pos=0.5] { processus };
+      \draw[] (8.1, 1.1) rectangle (9.9, 3.9) node[pos=0.5] { mémoire };
       \draw[] (.1, 2.1) rectangle (3.9, 2.9) node[pos=.5] { vfs };
       \draw[] (.1, 1.1) rectangle (2, 2) node[pos=.5] { ext2 };
       \draw[] (2.1, 1.1) rectangle (3.9, 2) node[pos=.5] { procfs };
@@ -67,11 +69,11 @@
       \draw[->] (7, 4.1) -- (7, 5.8) node[right, pos=.5] { interruptions };
 
       \draw[] (0, 0) rectangle (3.9, .5) node[pos=.5] { clavier };
-      \draw[] (4.1, 0) rectangle (8, .5) node[pos=.5] { horloge };
+      \draw[] (4.1, 0) rectangle (8, .5) node[pos=.5] { timer };
 
       \draw[->] (2, 0.6) -- (2, 0.85);
       \draw[->] (6, 0.6) -- (6, 0.85);
-      \draw[] (4,.7) node[pos=.5] { interruptions };
+      \draw[] (4,.7) node { interruptions };
 
     \end{tikzpicture}
     \caption{une vue globale du système}
