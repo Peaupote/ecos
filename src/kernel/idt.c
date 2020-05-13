@@ -217,7 +217,7 @@ void idt_init(void) {
     outb(PIC1_DATA, PIC1_OFFSET);
     outb(PIC2_DATA, PIC2_OFFSET);
 
-    // purple magic
+    // PIC layout
     outb(PIC1_DATA, 1 << PIC1_IRQ_PIC2);
     outb(PIC2_DATA, PIC2_IDENT);
 

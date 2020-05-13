@@ -3,7 +3,7 @@
 #include <stdio.h>
 #include <string.h>
 
-#define NB_TEST 5
+#define NB_TEST 6
 
 int test_0(int ac __attribute__((unused)),
 		char** av __attribute__((unused)) ) {
@@ -66,7 +66,7 @@ int test_2(int ac, char** av) {
 		a = b - a;
 		if (!--r) {
 			r = itv;
-			printf("%s: %11d\n", av[2], a);
+			printf("%s: %11u\n", av[2], a);
 		}
 	}
 }
@@ -91,8 +91,13 @@ int test_4(int ac, char**av) {
 	return 0;
 }
 
+int test_5(int ac __attribute__((unused)), char** av __attribute__((unused))) {
+	*((char*)&test_0) = 42;
+	return 0;
+}
+
 typedef int (*test_t)(int argc, char** argv);
-test_t tests[NB_TEST] = {test_0, test_1, test_2, test_3, test_4};
+test_t tests[NB_TEST] = {test_0, test_1, test_2, test_3, test_4, test_5};
 
 int main(int argc, char* argv[]) {
 	if (argc < 2) return 2;

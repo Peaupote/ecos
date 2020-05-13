@@ -8,6 +8,7 @@
 %% \usepackage{kpfonts}
 \author{Benjamin Bonneau \& Maxime Flin }
 \title{Projet de système d'exploitation \\ --- Rock and Roll ---}
+\date{14 mai 2020}
 \begin{document}
 \maketitle
 
@@ -100,7 +101,7 @@
 
 \begin{frame}
   \frametitle{Mémoire}
-  Paging 4 niveaux: 48 bits d'adresse
+	Paging 4 niveaux: 48 bits d'adresse
 
   \vspace{1.0cm}
 
@@ -116,7 +117,7 @@
         \textbf{PML4} \\
         47..39    \\
         \hline
-        0x1ff \\
+        0x0ff \\
         \hline
         ...   \\
         \hline
@@ -226,6 +227,7 @@
   \item marquage des pages à allouer lors de l'accès: .bss (initialisé à 0), pile
   \item ajout de la libc
   \item copie des arguments et paramêtres d'environnement
+  \item protection des pages en lecture seule
   \end{itemize}
 \end{frame}
 

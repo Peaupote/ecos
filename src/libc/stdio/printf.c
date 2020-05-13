@@ -184,7 +184,7 @@ int fpprintf(stringl_writer w, void* wi, const char* fmt, va_list ps) {
             len = itoa(buf, arg_int(mod, ps), decimal_digits, 10);
             goto print_buf;
         case 'u':
-            len = utoa(buf, arg_int(mod, ps), decimal_digits, 10);
+            len = utoa(buf, arg_uint(mod, ps), decimal_digits, 10);
             goto print_buf;
         case 'x':
             len = utoa(buf, arg_uint(mod, ps), hex_digits, 16);

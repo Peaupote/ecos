@@ -1,6 +1,8 @@
 # Paging
 
 On met en place un paging de 4 niveaux (*PML4*, *PDPT*, *PD* et *PT*).
+On n'utilise pas les entrées du PML4 au delà de `0x100` afin que le bit 47 soit
+nulle et que l'adresse soit complétée par des zéros en forme canonique.
 Chaque processus possède un *PML4*. Celui-ci est divisé en deux parties:
 
  - une première spécifique à chaque processus (adresses basses)

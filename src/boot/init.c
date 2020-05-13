@@ -33,7 +33,6 @@ extern uint8_t kba_bgn_krn[];
  * On initialise 2 pages de 2MB pour couvrir les adresses virtuelles du kernel:
  * KVA -- KVA + 0x3fffff
  *
- * TODO: erreur si bit 47 set
  */
 void init_paging_structs(void){
     uint32_t *st0[5] = {
