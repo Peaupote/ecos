@@ -46,9 +46,11 @@
       \draw[->] (5, 5.9) -- (5, 5.6);
       \draw[->] (5, 4.4) -- (5, 4.1);
 
-      \draw[] (0, 1) rectangle (8, 4) node[above] {kernel};
+      \draw[] (0, 1) rectangle (10, 4) node[above] {kernel};
       \draw[] (.1, 3) rectangle (3.9, 3.9) node[pos=0.5] { gestion des interruptions };
-      \draw[] (4.1, 1.1) rectangle (7.9, 3.9) node[pos=0.5] { ordonnanceur };
+      \draw[] (4.1, 1.1) rectangle (7.9, 1.9) node[pos=0.5] { ordonnanceur };
+      \draw[] (4.1, 2.1) rectangle (7.9, 3.9) node[pos=0.5] { processus };
+      \draw[] (8.1, 1.1) rectangle (9.9, 3.9) node[pos=0.5] { mémoire };
       \draw[] (.1, 2.1) rectangle (3.9, 2.9) node[pos=.5] { vfs };
       \draw[] (.1, 1.1) rectangle (2, 2) node[pos=.5] { ext2 };
       \draw[] (2.1, 1.1) rectangle (3.9, 2) node[pos=.5] { procfs };
@@ -67,7 +69,7 @@
       \draw[->] (7, 4.1) -- (7, 5.8) node[right, pos=.5] { interruptions };
 
       \draw[] (0, 0) rectangle (3.9, .5) node[pos=.5] { clavier };
-      \draw[] (4.1, 0) rectangle (8, .5) node[pos=.5] { horloge };
+      \draw[] (4.1, 0) rectangle (8, .5) node[pos=.5] { timer };
 
       \draw[->] (2, 0.6) -- (2, 0.85);
       \draw[->] (6, 0.6) -- (6, 0.85);
@@ -75,6 +77,156 @@
     \end{tikzpicture}
     \caption{une vue globale du système}
   \end{figure}
+\end{frame}
+
+\begin{frame}
+  \frametitle{Boot}
+  \textrm{src/boot}
+
+  \begin{itemize}
+  \item GRUB
+    \begin{itemize}
+    \item kernel (ELF)
+    \item carte de la mémoire
+    \item affichage
+    \end{itemize}
+  \item \textit{protected mode 32 bits} vers \textit{long mode 64 bits}
+  \item Control Registers
+  \item Paging
+  \item Global Descriptor Table
+  \item Chargement du kernel
+  \end{itemize}
+\end{frame}
+
+\begin{frame}
+  \frametitle{Mémoire}
+  Paging 4 niveaux: 48 bits d'adresse
+
+  \vspace{1.0cm}
+
+  \begin{tikzpicture}
+    \tikzset{
+      table/.style={rectangle},
+      link/.style={->}
+    }
+    \node[style=draw] (cr3) at (0, 2) {\textbf{CR3}};
+    \node[table] (pml4) at (0,0) {
+      \begin{tabular}{|c|}
+        \hline
+        \textbf{PML4} \\
+        47..39    \\
+        \hline
+        0x1ff \\
+        \hline
+        ...   \\
+        \hline
+        0x000 \\
+        \hline
+      \end{tabular}
+    };
+    \node at (0, -1.8) {\textit{loop}};
+    \node[table] (pdpt) at (2,0) {
+      \begin{tabular}{|c|}
+        \hline
+        \textbf{PDPT} \\
+        38..30    \\
+        \hline
+        0x1ff \\
+        \hline
+        ...   \\
+        \hline
+        0x000 \\
+        \hline
+      \end{tabular}
+    };
+    \node[table] (pd) at (4,0) {
+      \begin{tabular}{|c|}
+        \hline
+        \textbf{PD} \\
+        29..21    \\
+        \hline
+        0x1ff \\
+        \hline
+        ...   \\
+        \hline
+        0x000 \\
+        \hline
+      \end{tabular}
+    };
+    \node[table] (pt) at (6,0) {
+      \begin{tabular}{|c|}
+        \hline
+        \textbf{PT} \\
+        20..12    \\
+        \hline
+        0x1ff \\
+        \hline
+        ...   \\
+        \hline
+        0x000 \\
+        \hline
+      \end{tabular}
+    };
+    \node[table] (page) at (9, 0) {
+      \begin{tabular}{|c|}
+        \hline
+        \textbf{Page physique} \\
+        11..12        \\
+        offset		  \\
+        \hline
+      \end{tabular}
+    };
+    \draw[link] (cr3.south) -- (pml4.north);
+    \draw[link] (pml4.east) -- (pdpt.west);
+    \draw[link] (pdpt.east) -- (pd.west);
+    \draw[link] (pd.east)   -- (pt.west);
+    \draw[link] (pt.east)   -- (page.west);
+    \draw[style=<-] (pml4.260) arc (180:360:0.3cm);
+
+  \end{tikzpicture}
+\end{frame}
+
+\begin{frame}
+  \frametitle{Mémoire}
+  Allocation des pages physiques disponibles
+
+  \begin{itemize}
+  \item découpage de la mémoire en blocs de 2Mo
+  \item au niveau d'un bloc: arbre d'arité 8 (3 niveaux)
+  \item pour gérer l'ensemble des blocs:
+    2 arbres d'arité 64. Blocs entièrement libres et blocs partiellement libres.
+  \end{itemize}
+\end{frame}
+
+\begin{frame}
+  \frametitle{Mémoire}
+
+  \begin{itemize}
+  \item chaque processus dispose de son PML4
+  \item partie basse: userspace
+  \item partie haute: kernel
+  \item entrées spéciales dans la partie userspace:
+    \begin{itemize}
+    \item Pages partagées (libc)
+    \item Pages allouées lors de l'accès (.bss, pile)
+    \item Pages copiées lors de l'accès (fork)
+    \end{itemize}
+    actions effectuées lors de l'accès détecté par un page fault
+  \end{itemize}
+\end{frame}
+
+\begin{frame}
+  \frametitle{Execve}
+  \begin{itemize}
+  \item effectué par un processus auxiliaire avec privilèges de niveau 1
+  \item gestion des fichiers spécifiant un interpréteur (\texttt{\#!})
+  \item chargement de fichiers ELF
+  \item création d'un nouveau paging
+  \item allocation et chargement de sections depuis le fichier: .text, .data, .rodata
+  \item marquage des pages à allouer lors de l'accès: .bss (initialisé à 0), pile
+  \item ajout de la libc
+  \item copie des arguments et paramêtres d'environnement
+  \end{itemize}
 \end{frame}
 
 \begin{frame}

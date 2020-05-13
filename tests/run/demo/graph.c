@@ -154,8 +154,6 @@ static inline void graph_draw_trap(graph_buf_t* buf,
 	unsigned     y = y_bg;
 	fxm_t    depth = depth_ofs_bg;
 	rgbcolor_t* ln = buf->c + y_bg * buf->w;
-	/*fprintf(stderr, "draw trap %d - %d, %d(%d) - %d(%d)\n",
-			y_bg, y_ed, x[0], py[0], x[1], py[1]);*/
 	goto loop_enter;
 	do {
 		for (uint8_t k = 0; k < 2; ++k) {
@@ -199,25 +197,11 @@ void graph_draw_tri(graph_buf_t* buf,
 			fxm_of_int(x[2] - x[0]), fxm_of_int(y[2] - y[0])
 		};
 	fxm_t delta_depth[2] = {depth[1] - depth[0], depth[2] - depth[0]};
-	/*fprintf(stderr, "\ndepths: %d, %d, %d\n",
-			fxm_to_int(depth[0]),
-			fxm_to_int(depth[1]),
-			fxm_to_int(depth[2]));
-	fprintf(stderr, "delta pos\n");
-	fxm_mprint(stderr, delta_pos, 2, 2, 3);
-	fprintf(stderr, "delta depth\n");
-	fxm_mprint(stderr, delta_depth, 1, 2, 3);*/
 
 	fxm_t depth_lin[2];
 	if (!fxm_mslv2(delta_pos, delta_depth, depth_lin)) return;
 	
 	fxm_t depth_ofs = depth[0] - (depth_lin[0] * x[0] + depth_lin[1] * y[0]);
-	/*fxm_t test[4];
-	fxm_mmul(delta_pos, depth_lin, test, 2, 2, 1);
-	fprintf(stderr, "depth lin\n");
-	fxm_mprint(stderr, depth_lin, 1, 2, 3);
-	fprintf(stderr, "test\n");
-	fxm_mprint(stderr, test, 1, 2, 3);*/
 
 	for (uint8_t i = 0; i < 3; ++i) {
 		uint8_t j = i & 1;
@@ -249,13 +233,6 @@ void graph_draw_tri(graph_buf_t* buf,
 	int ys[2]   = {y[0], y[1]};
 	
 	while (true) {
-		/*fprintf(stderr, "%d <-> %d | %d,%d <-> %d,%d | %d,%d <-> %d,%d\n",
-					ys[0], ys[1],
-					sides[0][0].x, sides[0][0].y,
-					sides[0][1].x, sides[0][1].y,
-					sides[1][0].x, sides[1][0].y,
-					sides[1][1].x, sides[1][1].y
-				);*/
 		if (ys[0] >= (int)buf->h) return;
 		if (ys[1] >= 0) {
 			unsigned y0 = max_int(0, ys[0]);
