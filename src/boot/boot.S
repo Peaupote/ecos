@@ -95,33 +95,6 @@ _start:
 
     call init_paging_structs
 
-/*	movl (mb_info), %ebx
-    movl 72(%ebx),  %ebx
-
-	movw 14(%ebx),   %ax
-	movl (mb_info), %ebx
-	movw %ax, 80(%ebx)*/
-
-/*	movw %ds, %cx
-	ldsw 14(%ebx),   %bx
-
-	movl $0, %eax
-	jmp  loop_test
-loop_bg:
-	leaw 2(%bx), %bx
-	incl %eax
-loop_test:
-	mov  %bx, %dx
-	cmpw 0xFFFF, %dx
-	jne  loop_bg
-
-	movw %cx, %ds*/
-
-    /*
-     On charge le kernel ici afin d'être sûr de pouvoir accéder
-     aux données fournies par GRUB
-     On récupère l'adresse du kernel 64 bits dans kernel_entry_addr
-    */
     call load_kernel64
 
     /* --GDT-- */
