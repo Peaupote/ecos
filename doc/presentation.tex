@@ -2,6 +2,7 @@
 \usepackage[utf8]{inputenc}
 \usepackage[french]{babel}
 \usepackage[T1]{fontenc}
+\usepackage{tikz}
 %% \usepackage{graphicx}
 %% \usepackage{lmodern}
 %% \usepackage{kpfonts}
@@ -26,14 +27,55 @@
 
 \begin{frame}
   \frametitle{Introduction}
-  \textrm{ecos} est un système d'exploitation. Il propose une interface très proche des normes \textrm{POSIX}. Il propose:
+  \textrm{ecos} est un système d'exploitation conçu pour une architecture Intel \textrm{x86} 64 bits. Il propose une interface très proche des normes \textrm{POSIX} et fourni
   \begin{itemize}
   \item une gestion de processus concurrent
-  \item un système de fichier
+  \item une gestion de plusieurs systèmes de fichiers
   \item une implémentation de la librarie standard C
-  \item des programmes utilitaires courants (\textrm{cat}, \textrm{ls}, etc\ldots)
-  \item un shell
+  \item un shell avec des programmes utilitaires courants (\textrm{cat}, \textrm{ls}, etc\ldots)
   \end{itemize}
+\end{frame}
+
+\begin{frame}
+  \begin{figure}
+    \begin{tikzpicture}
+      \draw[] (0, 6) rectangle (8, 7) node[pos=0.5] {programmes utilisateur (\textrm{ls}, \textrm{cat}, \textrm{mat}, \textrm{edit}, \ldots)};
+      \draw[] (4, 4.5) rectangle (6, 5.5) node[pos=0.5] {libc};
+
+      \draw[->] (1, 5.8) -- (1, 4.1) node[right, pos=0.5] {appels systèmes};
+      \draw[->] (5, 5.9) -- (5, 5.6);
+      \draw[->] (5, 4.4) -- (5, 4.1);
+
+      \draw[] (0, 1) rectangle (8, 4) node[above] {kernel};
+      \draw[] (.1, 3) rectangle (3.9, 3.9) node[pos=0.5] { gestion des interruptions };
+      \draw[] (4.1, 1.1) rectangle (7.9, 3.9) node[pos=0.5] { ordonnanceur };
+      \draw[] (.1, 2.1) rectangle (3.9, 2.9) node[pos=.5] { vfs };
+      \draw[] (.1, 1.1) rectangle (2, 2) node[pos=.5] { ext2 };
+      \draw[] (2.1, 1.1) rectangle (3.9, 2) node[pos=.5] { procfs };
+
+      \draw[->] (3.9, 3.5) -- (4.2, 3.5);
+
+      \draw[->] (1.9, 3.1) -- (1.9, 2.8);
+      \draw[->] (2.1, 2.8) -- (2.1, 3.1);
+
+      \draw[->] (.9, 2.3) -- (.9, 1.8);
+      \draw[->] (1.1, 1.8) -- (1.1, 2.3);
+
+      \draw[->] (2.9, 2.3) -- (2.9, 1.8);
+      \draw[->] (3.1, 1.8) -- (3.1, 2.3);
+
+      \draw[->] (7, 4.1) -- (7, 5.8) node[right, pos=.5] { interruptions };
+
+      \draw[] (0, 0) rectangle (3.9, .5) node[pos=.5] { clavier };
+      \draw[] (4.1, 0) rectangle (8, .5) node[pos=.5] { horloge }
+
+      \draw[->] (2, 0.6) -- (2, 0.85);
+      \draw[->] (6, 0.6) -- (6, 0.85);
+      \draw[] (4,.7) node[center] { interruptions };
+
+    \end{tikzpicture}
+    \caption{une vue globale du système}
+  \end{figure}
 \end{frame}
 
 \end{document}
