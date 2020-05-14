@@ -547,7 +547,6 @@ int sys_execve(reg_t fname, reg_t argv, reg_t env) {
     state.st_curr_pid = epid;
     st_curr_reg = &ep->p_reg;
     iret_to_proc(ep);
-    never_reached return 0;
 }
 
 // Ring 1

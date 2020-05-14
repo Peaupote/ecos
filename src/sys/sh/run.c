@@ -366,7 +366,7 @@ bool expand_var_split(const char** src, pbuf_t* b0, cbuf_t* b1, bool b1w) {
 
 void expand_escpd_char(char e, const char** src, cbuf_t* b) {
 	char c = *++*src;
-	if (e ? c == e || c == '\\' : getctype(c) != CT_NRM)
+	if (e ? c == e || c == '\\' || c == '$' : getctype(c) != CT_NRM)
 		cbuf_put(b, c);
 	else {
 		char buf[2] = {'\\', c};

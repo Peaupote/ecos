@@ -30,6 +30,7 @@
 :demo4 'cosin' 100 plot3
 
 :dist2 .5 - 2 pow swap .5 - 2 pow +
+:dist21 4 * 2 - 2 pow swap 4 * 2 - 2 pow +
 :dist dist2 sqrt
 :sphere dist2 .25 swap - sqrt
 
