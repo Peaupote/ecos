@@ -32,7 +32,7 @@
   \begin{itemize}
   \item une gestion de processus concurrent
   \item une gestion de plusieurs systèmes de fichiers
-  \item une implémentation de la librarie standard C
+  \item une implémentation de la library standard C
   \item un shell avec des programmes utilitaires courants (\textrm{cat}, \textrm{ls}, etc\ldots)
   \end{itemize}
 \end{frame}
@@ -228,7 +228,7 @@
   \item allocation et chargement de sections depuis le fichier: .text, .data, .rodata
   \item marquage des pages à allouer lors de l'accès: .bss (initialisé à 0), pile
   \item ajout de la libc
-  \item copie des arguments et paramêtres d'environnement
+  \item copie des arguments et paramètres d'environnement
   \item protection des pages en lecture seule
   \end{itemize}
 \end{frame}
@@ -239,7 +239,7 @@
   On maintient une tables de processus dans laquelle on sauvegarde pour chaque pid toutes les informations dont on pourrait avoir besoin:
 
   \begin{itemize}
-  \item le status du processus associé (\textrm{Libre}, \textrm{Zombie}, \textrm{Endormi}, \textrm{Run}, \ldots)
+  \item le statut du processus associé (\textrm{Libre}, \textrm{Zombie}, \textrm{Endormi}, \textrm{Run}, \ldots)
   \item l'état des registres lors de la dernière interruption
   \item l'identifiant du paging
   \item la table des descripteurs de fichiers
@@ -273,12 +273,12 @@
 \end{frame}
 
 \begin{frame}
-  \frametitle{Ordonnacement des processus}
-  On a un table qui a un niveau de priorité associe une file de processus. L'ordonnanceur prend le premier processus de la file de priorité la plus élévée\footnote{la recherche de la priorité est optimisé avec une bitmap}.
+  \frametitle{Ordonnancement des processus}
+  On a une table qui a un niveau de priorité associe une file de processus. L'ordonnanceur prend le premier processus de la file de priorité la plus élevée\footnote{la recherche de la priorité est optimisé avec une bitmap}.
 
   Le noyau reçoit toutes les 10ms des interruptions du PIT\footnote{Programmable Interval Timer} qui interrompent le processus en cours. Si celui-ci travaille déjà depuis plus d'une certaine unité de temps\footnote{définie dans kernel/params.h}, alors on laisse travailler un autre processus. De cette manière, on évite les famines.
 
-  On distingue deux processus particulers:
+  On distingue deux processus particuliers:
   \begin{itemize}
   \item le processus \textrm{idle}, de pid 0, est un processus de priorité minimale ; c'est le processus courant lorsqu'il n'y a rien à faire. Lorsqu'un processus demande à travailler, si c'est \textrm{idle} le processus courant, alors on attends pas le tic de PIT avant de changer le processus.
   \item le processus \textrm{init}, de pid 1, est le premier processus lancé par le noyau au moment du boot. Il se fork en un \textrm{init1} (qui lance un shell) et attend de récupérer les processus zombies.
@@ -289,10 +289,10 @@
 \begin{frame}
   \frametitle{Système de fichier}
 
-  On n'interragit avec aucune device réelle, par manque de temps, nous avons décidé de simplement simuler les comportement d'un tel composant. Lors de la compilation, nous générons un fichier binaire qui représente le système de fichier et le chargeons directement dans le binaire du noyau.
+  On n'interagit avec aucune device réelle, par manque de temps, nous avons décidé de simplement simuler les comportement d'un tel composant. Lors de la compilation, nous générons un fichier binaire qui représente le système de fichier et le chargeons directement dans le binaire du noyau.
 
 
-  Néamoins nous avons la possibilité d'interagir avec plusieurs devices en même temps. Pour chacune de ces devices, on précise
+  Néanmoins nous avons la possibilité d'interagir avec plusieurs devices en même temps. Pour chacune de ces devices, on précise
   \begin{itemize}
   \item sa position dans le système de fichier parent (si ce dernier existe)
   \item le système de fichier à utiliser pour lire dans cette device
@@ -466,11 +466,11 @@
   \item les appels systèmes, qui se sont plus que des interruptions.
   \end{itemize}
 
-  Il y a également une séquence de controle qui permet d'initialiser la libc, de commencer son programme dans la fonction \textrm{main} et d'\textrm{exit} le programme au retour  de \textrm{main}.
+  Il y a également une séquence de contrôle qui permet d'initialiser la libc, de commencer son programme dans la fonction \textrm{main} et d'\textrm{exit} le programme au retour  de \textrm{main}.
 
   Pour éviter de dupliquer le code de la libc dans les binaires chargées dans le système de fichier, on la charge dynamiquement quand on lance le processus.
 
-  De plus, grâce aux interfaces les plus communes de la libc, du code générique respectant les normes \textrm{POSIX} pourrait être executé sur notre système.
+  De plus, grâce aux interfaces les plus communes de la libc, du code générique respectant les normes \textrm{POSIX} pourrait être exécuté sur notre système.
 
 \end{frame}
 
@@ -486,8 +486,7 @@
   \item Toujours plus de systèmes de fichiers (tmpfs, devfs, ext3, \ldots)
   \item Ajouter des utilisateurs
   \item Les couches réseaux
-  \item Une interface grahique
-  \item Mode installation sur une clé bootable
+  \item Une interface graphique
   \item Processus légers
   \item Mémoire partagée
   \end{itemize}
