@@ -11,11 +11,6 @@
 #include <util/elf64.h>
 #include <util/misc.h>
 
-/**
- * Syscalls
- * TODO: check args domain
- */
-
 void sys_exit(int status) {
     klogf(Log_info, "syscall", "exit pid %d with status %d",
           state.st_curr_pid, status);
@@ -250,6 +245,10 @@ pid_t sys_fork() {
 
 int sys_setpriority(int prio) {
     proc_t *p = state.st_proc + state.st_curr_pid;
+	if (prio < 0 || prio >= NB_PRIORITY_LVL - 1) {
+		set_errno(EINVAL);
+		return -1;
+	}
     if (prio > p->p_prio) {
 		set_errno(EPERM);
 		return -1;

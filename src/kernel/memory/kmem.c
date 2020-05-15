@@ -292,7 +292,7 @@ void* kalloc_page() {
 	return (void*)v_addr;
 }
 
-void  kfree_page(void* a) {
+void kfree_page(void* a) {
 	uint_ptr v_addr = (uint_ptr) a;
 	phy_addr p_addr = (*paging_page_entry(v_addr & PAGE_MASK)) & PAGE_MASK;
 	kmem_free_page(p_addr);

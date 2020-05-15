@@ -424,13 +424,6 @@ static int fdi_stat(file_ins* n __attribute__((unused)), struct stat* st) {
     st->st_blocks  = PROC_STAT_BSIZE;
     return st->st_ino;
 }
-static int fdi_read(file_ins* ins __attribute__((unused)),
-        void* d __attribute__((unused)),
-        off_t ofs __attribute__((unused)),
-        size_t sz __attribute__((unused))) {
-    //TODO: obtenir le chemin du fichier
-    return -1;
-}
 
 static ino_t fdi_readlink(file_ins* ins, char* d, size_t len) {
     proc_t *p  = state.st_proc + ins->pid;
@@ -574,7 +567,7 @@ static struct fs_proc_file
             .open     = NULL,
             .close    = NULL,
             .stat     = fdi_stat,
-            .read     = fdi_read,
+            .read     = NULL,
             .write    = NULL,
             .lookup   = NULL,
             .getdents = NULL,

@@ -1,4 +1,3 @@
-/*TODO: taille de l'image générée = 1MB ?!*/
 OUTPUT_FORMAT(elf64-x86-64)
 
 ENTRY(kernel_entry)

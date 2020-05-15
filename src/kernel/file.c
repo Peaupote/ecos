@@ -410,10 +410,6 @@ int vfs_write(vfile_t *vfile, void *buf, off_t pos, size_t len) {
     fs->fs_stat(vfile->vf_stat.st_ino, &vfile->vf_stat, &dev->dev_info);
     vfile->vf_stat.st_dev = dev_id;
 
-    // TODO : what happend for waiting ps if error ?
-    if (rc > 0)
-        vfs_unblock(vfile);
-
     return rc;
 }
 

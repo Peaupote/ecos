@@ -8,6 +8,8 @@
 #include <headers/types.h>
 #include <headers/signal.h>
 
+#include <libc/string.h>
+
 #include "proc.h"
 #include "memory/shared_pages.h"
 
@@ -49,6 +51,22 @@ static inline bool check_argW(void* pbg, size_t sz) {
                 == (PAGING_FLAG_P | PAGING_FLAG_W) );
 }
 
+/**
+ * Vérifie que la chaine de caractère ne dépasse pas maxlen et est dans
+ * l'userspace
+ * Provoque un #PF si une page n'est pas présente
+ * renvoie < 0 si l'adresse n'est pas valide, la longueur de la chaine sinon
+ */
+static inline ssize_t check_argstrR(const char* pbg, size_t maxlen) {
+	if (cur_proc()->p_ring < 3) return strlen(pbg);
+	size_t len = 0;
+	while (len <= maxlen && check_arg_ubound((uint_ptr)pbg, sizeof(char))) {
+		if (!*pbg) return len;
+		++pbg;
+		++len;
+	}
+	return -1;
+}
 
 int      sys_usleep(usecond_t tm);
 void     lookup_end_sleep(void);

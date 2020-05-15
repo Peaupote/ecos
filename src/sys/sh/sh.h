@@ -242,7 +242,7 @@ typedef struct {
 	size_t pk2;
 	char   peek2[2];
 	enum src_peek_ty pkty;
-	char*  peekw;// si PEEK_KW: may be NULL
+	char*  peek_w;// si PEEK_KW: may be NULL
 	int    keyw;
 } src_t;
 

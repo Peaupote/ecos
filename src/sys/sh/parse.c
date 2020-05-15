@@ -78,7 +78,7 @@ void mk_ssrc(src_t* rt, const char* src) {
 	rt->pos_c  = 1;
 	rt->pk2    = 0;
 	rt->pkty   = PEEK_W0;
-	rt->peekw  = NULL;
+	rt->peek_w = NULL;
 }
 
 void mk_fsrc(src_t* rt, FILE* src) {
@@ -89,14 +89,14 @@ void mk_fsrc(src_t* rt, FILE* src) {
 	rt->pos_c  = 1;
 	rt->pk2    = 0;
 	rt->pkty   = PEEK_W0;
-	rt->peekw  = NULL;
+	rt->peek_w = NULL;
 }
 
 void destr_src(src_t* s) {
 	if (s->pkty) {
-		free(s->peekw);
-		s->peekw = NULL;
-		s->pkty  = PEEK_W0;
+		free(s->peek_w);
+		s->peek_w = NULL;
+		s->pkty   = PEEK_W0;
 	}
 }
 
@@ -151,9 +151,10 @@ static inline void peek_vald(src_t* s, size_t len) {
 // must be PEEK_W0
 static inline void put_peek_wd(src_t* s, enum src_peek_ty ty,
 									const char* c, size_t len) {
-	s->pkty  = ty;
-	s->peekw = malloc(len * sizeof(char));
-	memcpy(s->peekw, c, len);
+	s->pkty   = ty;
+	s->peek_w = malloc((len + 1) * sizeof(char));
+	memcpy(s->peek_w, c, len);
+	s->peek_w[len] = '\0';
 }
 
 void wait_nspace(src_t* s) {
@@ -195,11 +196,11 @@ static inline char* read_varname(src_t* s) {
 		case PEEK_WDR: return NULL;
 		case PEEK_KW: {
 			cbuf_init(&buf, 32);
-			size_t len = strlen(s->peekw);
-			cbuf_putn(&buf, s->peekw, len);
-			free(s->peekw);
-			s->peekw = NULL;
-			s->pkty  = PEEK_W0;
+			size_t len = strlen(s->peek_w);
+			cbuf_putn(&buf, s->peek_w, len);
+			free(s->peek_w);
+			s->peek_w = NULL;
+			s->pkty   = PEEK_W0;
 		} break;
 		case PEEK_W0:
 			cbuf_init(&buf, 32);
@@ -291,19 +292,19 @@ int read_word1(src_t* s, cbuf_t* b, bool acc_red) {
 	switch (s->pkty) {
 		case PEEK_WDR:
 			if (acc_red) {
-				size_t len = strlen(s->peekw);
-				cbuf_putn(b, s->peekw, len);
-				free(s->peekw);
-				s->peekw = NULL;
-				s->pkty  = PEEK_W0;
+				size_t len = strlen(s->peek_w);
+				cbuf_putn(b, s->peek_w, len);
+				free(s->peek_w);
+				s->peek_w = NULL;
+				s->pkty   = PEEK_W0;
 				return 0;
 			} else return 1;
 		case PEEK_KW:
-			if (s->peekw) {
-				size_t len = strlen(s->peekw);
-				cbuf_putn(b, s->peekw, len);
-				free(s->peekw);
-				s->peekw = NULL;
+			if (s->peek_w) {
+				size_t len = strlen(s->peek_w);
+				cbuf_putn(b, s->peek_w, len);
+				free(s->peek_w);
+				s->peek_w = NULL;
 			}
 			s->pkty = PEEK_W0;
 			break;
@@ -374,20 +375,20 @@ static int read_keyw(src_t* s) {
 	if (len == 0) {
 		switch (c) {
 			case '{':
-				s->pkty  = PEEK_KW;
-				s->peekw = NULL;
+				s->pkty   = PEEK_KW;
+				s->peek_w = NULL;
 				return s->keyw = (int) KW_group_bg;
 			case '}':
-				s->pkty  = PEEK_KW;
-				s->peekw = NULL;
+				s->pkty   = PEEK_KW;
+				s->peek_w = NULL;
 				return s->keyw = (int) KW_group_ed;
 			default:
 				return -1;
 		}
 	} else {
-		buf[len] = '\0';
-		s->pkty  = PEEK_KW;
-		s->peekw = strdup(buf);
+		buf[len]  = '\0';
+		s->pkty   = PEEK_KW;
+		s->peek_w = strdup(buf);
 		s->keyw = (getctype(c) <= CT_CNJ ? find_kw(buf) : -1);
 		return s->keyw;
 	}
@@ -398,11 +399,11 @@ static void keyw_vald(src_t* s) {
 			peek_vald(s, 1);
 		break;
 		default:
-			free(s->peekw);
-			s->peekw = NULL;
-			s->pkty  = PEEK_W0;
+			free(s->peek_w);
+			s->peek_w = NULL;
 		break;
 	}
+	s->pkty  = PEEK_W0;
 }
 
 static int read_words(src_t* s, char** rt) {

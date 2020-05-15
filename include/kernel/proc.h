@@ -111,7 +111,8 @@ typedef struct proc {
     sigset_t         p_spnd;     // pending signals
     struct proc_shnd p_shnd;
 
-    int*             p_errno;    // pointer to errno of libc
+    int*             p_errno;    // pointer to errno of libc, dans l'userspace
+	                             // mais peut provoquer un #PF
     int              p_werrno;   // waiting errno
 } proc_t;
 
@@ -375,7 +376,7 @@ static inline void proc_self_block(proc_t* p) {
     p->p_prwl = &p->p_nxwl;
 }
 
-// On doit être dans le paging du processus
+// On doit être dans le paging du processus, peut provoquer un #PF
 static inline void set_proc_errno(proc_t *p, int e) {
     if (p->p_errno) *p->p_errno = e;
 }

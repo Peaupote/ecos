@@ -27,10 +27,14 @@
 #define NB_PRIORITY_LVL 41
 
 // Quantité maximale de mémoire qu'un processus peut allouer avec sbrk
-#define PROC_MAX_BRK 0x400000 //4MB
+#define PROC_MAX_BRK 0x1000000 //16MB
 
 // Nombre maximal de #! qu'execve peut suivre
-#define EXECVE_FOLLOW_MAX 10
+#define EXECVE_FOLLOW_MAX  10
+#define EXECVE_MAX_ARGS_SZ 0x20000 //128KB
+
+// taille maximale par défaut des arguments des appels systèmes
+#define SYSCALL_MAX_STR_LEN 0x4000 //16KB
 
 // Empêche les processus de modifier leurs arguments / env
 // #define PROC_RO_ARGS

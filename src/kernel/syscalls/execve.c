@@ -139,6 +139,18 @@ extern void call_execve_tr_do_alloc_pg(uint_ptr page_v_addr);
 extern uint8_t call_execve_do_salloc(uint_ptr bg, uint_ptr ed,
                     uint16_t flags, uint16_t p_flags);
 
+static inline bool check_args(char** args, size_t* maxlen) {
+	while ((*maxlen)-- && check_arg_ubound((uint_ptr)args, sizeof(char*))) {
+		if (!*args)   return true;
+		if (!*maxlen) return false;
+		ssize_t a = check_argstrR(*args, *maxlen - 1);
+		if (a < 0) return false;
+		*maxlen -= a + 1;
+		++args;
+	}
+	return false;
+}
+
 // --Ring 1--
 
 static inline bool execve_tr_alloc_pg_s(uint_ptr v_addr) {
@@ -487,12 +499,28 @@ void proc_execve_entry(const char *fname, const char **argv, const char **env);
 
 // --Ring 0--
 int sys_execve(reg_t fname, reg_t argv, reg_t env) {
+
+	if (cur_proc()->p_ring == 3) {
+		if (check_argstrR(fname.p, ~(size_t)0) < 0) {
+			set_errno(EINVAL);
+			return -1;
+		}
+		size_t max_sz = EXECVE_MAX_ARGS_SZ;
+		if (!check_args(argv.p, &max_sz) || !check_args(env.p, &max_sz)) {
+			set_errno(~max_sz ? EINVAL : E2BIG);
+			return -1;
+		}
+	}
+
     pid_t  pid = state.st_curr_pid;
     klogf(Log_info, "syscall", "process %d called execve", (int)pid);
     proc_t  *p = cur_proc();
 
     pid_t epid = find_new_pid();
-    if (!~epid) return -1;
+    if (!~epid) {
+		set_errno(ENOMEM);
+		return -1;
+	}
     klogf(Log_verb, "syscall", "execve aux process: %d", (int)epid);
 
     proc_t* ep = state.st_proc + epid;

@@ -2,6 +2,9 @@
 #include <util/elf64.h>
 #include <util/misc.h>
 #include <util/paging.h>
+#include <def.h>
+#include <util/hdw.h>
+#include <util/vga.h>
 
 //Informations fournies par GRUB
 extern multiboot_info_t* mb_info;
@@ -16,6 +19,23 @@ extern uint32_t page_t_23[2*1024];
 
 const char kernel_cmd[] = "KERNEL_BIN";
 
+#ifdef BOOT_DISPLAY_ERR
+void display_err(const char* str) {
+	uint16_t* it = (uint16_t*) VGA_BUFFER;
+	while (*str) {
+		*it = vga_entry(*str,
+				vga_entry_color(VGA_COLOR_RED, VGA_COLOR_BLACK));
+		++str;
+		++it;
+	}
+	while(1) asm("hlt");
+}
+#else
+void display_err(const char* str __attribute__((unused))) {
+	while(1) asm("hlt");
+}
+#endif
+
 static inline void* virt2phys(Elf64_Addr a){
     // base du kernel dans les adresses virtuelles: KVA,
     // effacée par le cast
@@ -25,10 +45,8 @@ static inline void* virt2phys(Elf64_Addr a){
 
 uint8_t* virt2phys_section(Elf64_Xword flags, Elf64_Addr a, uint64_t sz){
     uint8_t* p_dst = (uint8_t*) virt2phys(a);
-	if (p_dst + sz > KPA_end) {
-		//TODO ERROR
-		while(1) asm("hlt");
-	}
+	if (p_dst + sz > KPA_end)
+		display_err("KPA END");
 	if (flags & SHF_WRITE) {
 		for (uint32_t addr = ((uint32_t)a) & PAGE_MASK;
 				addr < (uint32_t)(a + sz);
@@ -52,15 +70,6 @@ void simp_copy(void* none __attribute__((unused)), Elf64_Xword flags,
     for(uint64_t i=0; i<sz; ++i)
         p_dst[i] = ((uint8_t*) src)[i];
 }
-
-struct VbeInfoBlock {
-   char VbeSignature[4];             // == "VESA"
-   uint16_t VbeVersion;                 // == 0x0300 for VBE 3.0
-   uint16_t OemStringPtr[2];            // isa vbeFarPtr
-   uint8_t Capabilities[4];
-   uint16_t VideoModePtr[2];         // isa vbeFarPtr
-   uint16_t TotalMemory;             // as # of 64KB blocks
-} __attribute__((packed));
 
 static int ustrcmp(const char *lhs, const char *rhs) {
     while(*lhs && *rhs){

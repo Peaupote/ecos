@@ -12,10 +12,18 @@
 #include <util/misc.h>
 
 void sys_errno(int *errno) {
-    state.st_proc[state.st_curr_pid].p_errno = errno;
+	if (cur_proc()->p_ring == 3
+			&& !check_arg_ubound((uint_ptr)errno, sizeof(int)))
+		return;
+    cur_proc()->p_errno = errno;
 }
 
 int sys_open(const char *fname, int oflags, int perms) {
+	if (check_argstrR(fname, SYSCALL_MAX_STR_LEN) < 0) {
+		set_errno(EINVAL);
+		return -1;
+	}
+
     proc_t *p = &state.st_proc[state.st_curr_pid];
 
     cid_t cid;
@@ -156,6 +164,11 @@ int sys_dup2(int fd1, int fd2) {
 }
 
 int sys_pipe(int fd[2]) {
+	if (!check_argW(fd, 2 * sizeof(int))) {
+		set_errno(EINVAL);
+		return -1;
+	}
+
     proc_t *p = &state.st_proc[state.st_curr_pid];
 
     if (!fd) return -1;
@@ -190,9 +203,9 @@ int sys_pipe(int fd[2]) {
     cwt->chann_mode = WRITE;
 
     vfile_t* fvf[2];
-    if (!~vfs_pipe(fvf))
-        return -1; //TODO errno
-    crd->chann_vfile = fvf[0];
+    if (!~vfs_pipe(fvf)) goto err_enfile;
+    
+	crd->chann_vfile = fvf[0];
     cwt->chann_vfile = fvf[1];
     kAssert(fvf[0] != NULL);
     kAssert(fvf[1] != NULL);
@@ -306,7 +319,7 @@ ssize_t sys_write(int fd, uint8_t *s, size_t len) {
     switch (vfile->vf_stat.st_mode&0xf000) {
     case TYPE_REG:
         rc = vfs_write(vfile, s, chann->chann_pos, len);
-        if (rc < 0) goto err_overflow; // TODO correct
+        if (rc < 0) goto err_fs;
         chann->chann_pos += rc;
         goto succ;
 
@@ -316,7 +329,7 @@ ssize_t sys_write(int fd, uint8_t *s, size_t len) {
         if (rc == -2)
             wait_file(state.st_curr_pid, cid);
         else if (rc < 0)
-            goto err_overflow; //TODO
+            goto err_fs;
         goto succ;
 
     default:
@@ -327,13 +340,13 @@ succ:
     set_errno(SUCC);
     return rc;
 
-err_overflow:
-    set_errno(EOVERFLOW);
-    return -1;
-
 err_badf:
     set_errno(EBADF);
     return -1;
+
+err_fs:
+	set_errno(EIO);
+	return -1;
 }
 
 off_t sys_lseek(int fd, off_t off, int whence) {
@@ -380,6 +393,10 @@ err_einval:
 }
 
 int sys_fstat(int fd, struct stat *st) {
+	if (!check_argW(st, sizeof(*st))) {
+		set_errno(EINVAL);
+		return -1;
+	}
     proc_t *p = cur_proc();
 
     if (fd < 0 || fd > NFD || p->p_fds[fd] == -1) goto err_badf;
@@ -398,6 +415,10 @@ err_badf:
 
 int sys_mkdir(const char *path, mode_t mode) {
     if (!path) return 0;
+	if (check_argstrR(path, SYSCALL_MAX_STR_LEN) < 0) {
+		set_errno(EINVAL);
+		return -1;
+	}
 
     uint32_t ino = vfs_create(path, TYPE_DIR|mode);
     set_errno(SUCC);
@@ -405,7 +426,7 @@ int sys_mkdir(const char *path, mode_t mode) {
 }
 
 int sys_chdir(const char *fname) {
-    if (!fname) {
+    if (!fname || check_argstrR(fname, SYSCALL_MAX_STR_LEN) < 0) {
         set_errno(EINVAL);
         return -1;
     }
@@ -435,13 +456,28 @@ int sys_chdir(const char *fname) {
 
 
 int sys_link(const char *path1, const char *path2) {
+	if (check_argstrR(path1, SYSCALL_MAX_STR_LEN) < 0
+	 || check_argstrR(path2, SYSCALL_MAX_STR_LEN) < 0) {
+		set_errno(EINVAL);
+		return -1;
+	}
     return vfs_link(path1, path2);
 }
 
 int sys_symlink(const char *path1, const char *path2) {
+	if (check_argstrR(path1, SYSCALL_MAX_STR_LEN) < 0
+	 || check_argstrR(path2, SYSCALL_MAX_STR_LEN) < 0) {
+		set_errno(EINVAL);
+		return -1;
+	}
     return vfs_symlink(path1, path2);
 }
 
 int sys_readlink(const char *path, char *buf, size_t len) {
+	if (check_argstrR(path, SYSCALL_MAX_STR_LEN) < 0
+	 || !check_argW(buf, len)) {
+		set_errno(EINVAL);
+		return -1;
+	}
     return vfs_readlink(path, buf, len);
 }
