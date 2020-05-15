@@ -56,7 +56,7 @@ Voici la liste des combinaisons gcc/émulateurs que nous avons pu tester:
 Informations sur le fonctionnement et l'interface de certaines sections du 
 projet :
 
- - [processus](./doc/proc.md])
+ - [processus](./doc/proc.md)
  - [paging et mémoire](./doc/paging.md)
  - [signaux](./doc/signal.md)
  - [tty](./doc/tty.md)
