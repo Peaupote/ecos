@@ -2,8 +2,9 @@
 #include <unistd.h>
 #include <stdio.h>
 #include <string.h>
+#include <stdbool.h>
 
-#define NB_TEST 6
+#define NB_TEST 8
 
 int test_0(int ac __attribute__((unused)),
 		char** av __attribute__((unused)) ) {
@@ -96,8 +97,26 @@ int test_5(int ac __attribute__((unused)), char** av __attribute__((unused))) {
 	return 0;
 }
 
+int test_6(int ac __attribute__((unused)), char** av __attribute__((unused))) {
+	while (true) {
+		int v = 0;
+		int st = scanf("%d", &v);
+		printf("scanf returned %d v=%d\n", st, v);
+	}
+	return 0;
+}
+
+int test_7(int ac __attribute__((unused)), char** av __attribute__((unused))) {
+	const char* arg[] = {NULL};
+	const char* env[] = {NULL};
+	execve("/proc/tty/tty0", arg, env);
+	return 1;
+}
+
 typedef int (*test_t)(int argc, char** argv);
-test_t tests[NB_TEST] = {test_0, test_1, test_2, test_3, test_4, test_5};
+test_t tests[NB_TEST] = {
+	test_0, test_1, test_2, test_3, test_4, test_5, test_6, test_7
+};
 
 int main(int argc, char* argv[]) {
 	if (argc < 2) return 2;

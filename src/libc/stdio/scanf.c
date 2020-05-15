@@ -5,6 +5,8 @@
 #include <stdint.h>
 #include <stdbool.h>
 
+#define MAX_SIG64 (((uint64_t)1) << 63)
+
 const uint8_t hexa_digit_of_char_tb0[16] =
     {0x16,0x16,0x16,0x00, 0x0f,0x16,0x0f,0x16,
      0x16,0x16,0x16,0x16, 0x16,0x16,0x16,0x16};
@@ -26,7 +28,6 @@ static uint8_t oct_digit_of_char(char c) {
 }
 typedef uint8_t (*digit_parser)(char);
 
-//TODO: overflow
 static ssize_t parse_unsigned(string_reader r, void* ri, size_t slim,
 		digit_parser f, uint8_t base, uint64_t* rt) {
 	*rt = 0;
@@ -38,9 +39,18 @@ static ssize_t parse_unsigned(string_reader r, void* ri, size_t slim,
 		if (st < 0) return st;
 		if ( ! st ) return hrd ? 0 : 1;
 		d = f(ic);
-		if (d != (uint8_t)~0)
-			*rt = (*rt) * base + d;
-		else {
+		if (d != (uint8_t)~0) {
+			uint64_t high = (*rt) >> 32,
+					 low  = (*rt) & ((((uint64_t)1) << 32) - 1);
+			high *= base;
+			low   = low * base + d;
+			if (high >> 32)
+				return 1; //overflow
+			uint64_t cmb = (high << 32) + low;
+			if ((high >> 31) && !(cmb >> 63))
+				return 1; //overflow
+			*rt = cmb;
+		} else {
 			r.unget(ri);
 			return hrd ? 0 : 1;
 		}
@@ -60,6 +70,8 @@ static ssize_t parse_signed(string_reader r, void* ri, size_t slim,
 	if (ic == '-') {
 		uint64_t urt;
 		st = parse_unsigned(r, ri, slim - 1, f, base, &urt);
+		if (st) return st;
+		if (urt > MAX_SIG64) return 1; //overflow
 		*rt = -urt;
 		return st;
 	} if (ic == '+')
@@ -67,6 +79,8 @@ static ssize_t parse_signed(string_reader r, void* ri, size_t slim,
 	else
 		r.unget(ri);
 	st = parse_unsigned(r, ri, slim, f, base, &urt);
+	if (st) return st;
+	if (urt >= MAX_SIG64) return 1; //overflow
 	*rt = urt;
 	return st;
 }
@@ -120,7 +134,14 @@ static ssize_t parse_signedi(string_reader r, void* ri, size_t slim,
 	
 	uint64_t urt;
 	st = parse_unsigned(r, ri, slim, f, base, &urt);
-	*rt = neg ? -urt : urt;
+	if (st) return st;
+	if (neg) {
+		if (urt > MAX_SIG64) return 1;
+		*rt = -urt;
+	} else {
+		if (urt >= MAX_SIG64) return 1;
+		*rt = urt;
+	}
 	return st;
 }
 
@@ -257,9 +278,12 @@ ssize_t fpscanf(string_reader r, void* ri, const char* fmt, va_list ps) {
 					if (rd_nb_st < 0) return rd_nb_st;
 					if (rd_nb_st)     return matched;
 					if (ignore)       break;
-					++matched;
 					switch(mod) {
 						case 0:
+							if ((rd_nb < 0
+							    ? ~((uint64_t)rd_nb) : ((uint64_t)rd_nb))
+								>> (8 * sizeof(int) - 1))
+								return matched; //overflow
 							*va_arg(ps, int*)           = rd_nb;
 							break;
 						case 1:
@@ -269,6 +293,7 @@ ssize_t fpscanf(string_reader r, void* ri, const char* fmt, va_list ps) {
 							*va_arg(ps, long long int*) = rd_nb;
 							break;
 					}
+					++matched;
 					break;
 				case 'u':
 					skip_space(r, ri);
@@ -286,9 +311,10 @@ ssize_t fpscanf(string_reader r, void* ri, const char* fmt, va_list ps) {
 					if (rd_nb_st < 0) return rd_nb_st;
 					if (rd_nb_st)     return matched;
 					if (ignore)       break;
-					++matched;
 					switch(mod) {
 						case 0:
+							if (rd_nb_u >> (8 * sizeof(unsigned)))
+								return matched; //overflow
 							*va_arg(ps, unsigned*)           = rd_nb_u;
 							break;
 						case 1:
@@ -301,6 +327,7 @@ ssize_t fpscanf(string_reader r, void* ri, const char* fmt, va_list ps) {
 							*va_arg(ps, uint64_t*)           = rd_nb_u;
 							break;
 					}
+					++matched;
 					break;
 			}
 

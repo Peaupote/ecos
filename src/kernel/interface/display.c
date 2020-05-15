@@ -221,8 +221,8 @@ void display_cursor_at(size_t x, size_t y, uint16_t e) {
 void display_print_info() {
 	kprintf("ty:%d w:%d h:%d bpp=%d pitch=%d bgr=%d\n"
 			"dc:%lu cw:%d ch:%d\n"
-			"Ro:%d Vo:%d Go:%d\n"
-			"Rm:%d Vm:%d Gm:%d\n"
+			"Ro:%d Vo:%d Bo:%d\n"
+			"Rm:%d Vm:%d Bm:%d\n"
 			,
 			(int)type, (int)wdt, (int)hgt,
 			(int)bpp, (int)pitch, (int)(is_bgr ? 1 : 0),

@@ -2,6 +2,7 @@ FORMATS
 	c	char
 	s	string
 	d	entier
+	u   entier non signé
 	x	entier hexadécimal
 	p	pointeur
 MODIFICATEURS
