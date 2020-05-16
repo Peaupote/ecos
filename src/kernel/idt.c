@@ -86,6 +86,9 @@ void kill_cur_for_err(uint8_t errnum, uint64_t errcode) {
     proc_t* p = cur_proc();
 
 	if (klog_level >= Log_error) {
+		// Affichage des 6*8 premiers octets de la pile du kernel
+		// qui contiennent (sauf réinitialisation par schedule) la
+		// structure d'iret de la dernière entrée dans le kernel
 		uint64_t* stack_top = (uint64_t*)kernel_stack_top;
 		for (unsigned i = 0; i < 3; ++i) {
 			kprintf("-%02x: %p -%02x: %p\n",

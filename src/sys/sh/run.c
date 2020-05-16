@@ -161,7 +161,7 @@ static int redir_file_open(const redir_t* r) {
 	}
 	char* file = *buf.c;
 
-	int ffd = open(file, red_file_flag[r->type], 0640); // TODO: umask
+	int ffd = open(file, red_file_flag[r->type], 0640);
 	if (ffd < 0) {
         char buf2[256];
 		if (buf.sz > 200) file[200] = '\0';

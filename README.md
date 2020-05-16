@@ -52,7 +52,8 @@ Voici la liste des combinaisons gcc/émulateurs que nous avons pu tester:
 
  - `GCC 5.4.0` `QEMU 2.5.0`
  - `GCC 5.4.0` `Bochs 2.6.11`
- - `GCC 9.3.0` `QEMU 4.2`
+ - `GCC 9.3.0` `QEMU 4.2`, il est nécessaire d'ajouter `FIX_FLOAT_OPT=1`
+   dans `vars_local.Makefile`
 
 ### Documentation
 

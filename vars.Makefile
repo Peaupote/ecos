@@ -5,13 +5,17 @@ export NAME_LC?=libc
 export NAME_LK?=libk
 export TSFX?=
 
-OPT?=-O2
-FIX_FLOAT_OPT=1
+include $(ROOT)/vars_local.Makefile
+
+# Semble empêcher gcc d'utiliser des instructions utilisant
+# les flottants comme optimisation
+FIX_FLOAT_OPT?=0
+
 ifeq ($(FIX_FLOAT_OPT), 1)
 # options may not be valid for your GCC
 # you can find which one your GCC know with.
 #   gcc -Q --help=optimizers -O2
-OPT=\
+OPT?=\
   -faggressive-loop-optimizations	\
   -falign-functions					\
   -falign-jumps						\
@@ -142,7 +146,7 @@ OPT=\
   -funwind-tables					\
   -fweb
 else
-include $(ROOT)/vars_local.Makefile
+OPT?=-O2
 endif
 
 #Communs
