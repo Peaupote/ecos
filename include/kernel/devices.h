@@ -9,16 +9,23 @@
 
 #define MIADT_SIZE 18
 
+/**
+ * Informations about the mount point
+ */
 struct mount_info {
-    void    *sp;
+    void    *sp; // pointer to superblock
     uint32_t block_size;
     uint32_t root_ino;
 
+    // some padding for each file system to store diverse informations
     char space[MIADT_SIZE] __attribute__((aligned(8)));
 };
 
 #define ROOT_DEV 0
 
+/**
+ * Une device est un point de montage pour un système de fichier
+ */
 struct device {
     dev_t             dev_id;
 

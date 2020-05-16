@@ -98,13 +98,23 @@ struct fs_proc_dir {
     fpd_dt_t dt;
 };
 
+/**
+ * Type générique pour représenter les argument qu'une fonction peut attendre
+ */
 typedef union {
+    // si on lit un dossier
     struct fs_proc_dir d;
+
+    // si on regarde /proc/<pid>/fd/<fd>
     struct {
         pid_t pid;
         int    fd;
     };
+
+    // si on regarde /proc/tty/<ttyi>
     uint8_t  ttyi;
+
+    // si on regarde /proc/pipes/<pipei>
     uint32_t pipei;
 } file_ins;
 
@@ -734,6 +744,21 @@ int fs_proc_mount(void *partition __attribute__((unused)),
     return 1;
 }
 
+// sans effet
+ino_t fs_proc_link(ino_t target __attribute__((unused)),
+                   ino_t parent __attribute__((unused)),
+                   const char *name __attribute__((unused)),
+                   struct mount_info*info __attribute__((unused))) {
+    return 0;
+}
+
+ino_t fs_proc_symlink(ino_t parent __attribute__((unused)),
+                      const char *name __attribute__((unused)),
+                      const char *target __attribute__((unused)),
+                      struct mount_info *info __attribute__((unused))) {
+    return 0;
+}
+
 uint32_t fs_proc_mkdir(ino_t n1 __attribute__((unused)),
           const char*        n2 __attribute__((unused)),
           uint16_t           n3 __attribute__((unused)),
@@ -764,6 +789,8 @@ ino_t fs_proc_truncate(ino_t ino __attribute__((unused)),
     return 0;
 }
 
+// macros qui produisent les fonctions du vfs pour qu'elles convertissent
+// les entrées au format de procfs et appelle les fonctions définies ci dessus
 #define GEN_RRT(R, M, E, AT, AN) \
     R fs_proc_##M(ino_t ino AT,\
             struct mount_info* none __attribute__((unused))) {\
@@ -794,20 +821,8 @@ int fs_proc_stat(ino_t ino, struct stat* st,
     return -1;
 }
 
-ino_t fs_proc_link(ino_t target __attribute__((unused)),
-                   ino_t parent __attribute__((unused)),
-                   const char *name __attribute__((unused)),
-                   struct mount_info*info __attribute__((unused))) {
-    return 0;
-}
-
-ino_t fs_proc_symlink(ino_t parent __attribute__((unused)),
-                      const char *name __attribute__((unused)),
-                      const char *target __attribute__((unused)),
-                      struct mount_info *info __attribute__((unused))) {
-    return 0;
-}
-
+// génération des fonctions pour qu'elles correspondent à l'interface
+// du système de fichier
 GEN_RRTV(opench, VAH(chann_adt_t* cdt), VAH(cdt))
 GEN_RRTV(open,   VAH(vfile_t* vf), VAH(vf))
 GEN_RRTV(close,  VAH(), VAH())

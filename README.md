@@ -29,10 +29,10 @@ Il implémente une partie de la norme *POSIX*.
  - `tests`
    - `host`: contient des tests pouvant être effectué automatiquement sur
      l'hôte via `make tests`
-	 - `ext2`: propose une interface en ligne de commande pour tester les
-	   opérations
-	 - `libc`
-	 - `unit`: extractions de parties pouvant provoquer des difficultées
+     - `ext2`: propose une interface en ligne de commande pour tester les
+       opérations
+     - `libc`
+     - `unit`: extractions de parties pouvant provoquer des difficultées
    - `run`: programmes de tests à exécuter sur le système, placés dans
      `/home/test`
  - `tools`: contient des scripts et programmes utilitaires utilisés pour la
@@ -52,10 +52,11 @@ Voici la liste des combinaisons gcc/émulateurs que nous avons pu tester:
 
  - `GCC 5.4.0` `QEMU 2.5.0`
  - `GCC 5.4.0` `Bochs 2.6.11`
+ - `GCC 9.3.0` `QEMU 4.2`
 
 ### Documentation
 
-Informations sur le fonctionnement et l'interface de certaines sections du 
+Informations sur le fonctionnement et l'interface de certaines sections du
 projet :
 
  - [processus](./doc/proc.md)
@@ -64,6 +65,7 @@ projet :
  - [signaux](./doc/signal.md)
  - [tty](./doc/tty.md)
  - [shell](./doc/sh.md)
+ - [système de fichier](./doc/fs.md)
 
 ### Bugs
 
@@ -72,8 +74,8 @@ projet :
    d'effectuer un appel à *read* par caractère.
    Ceci pose problème s'il lit des caractères destinés à un autre processus.
    Par exemple, la builtin `read` se comporte mal sur les pipes,
-   c'est la raison pour laquelle on passe par un fichier intermédiaire 
-   dans `sh/colors.sh` pour la partie utilisant des boucles *while* 
+   c'est la raison pour laquelle on passe par un fichier intermédiaire
+   dans `sh/colors.sh` pour la partie utilisant des boucles *while*
    (même si dans ce cas simple l'utilisation d'un buffer global au shell,
    comme avec *fread*, résoudrait le problème).
 

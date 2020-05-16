@@ -17,7 +17,7 @@ typedef struct vfile {
 
 // File system table
 #define NFST 3
-#define DUMMY_FS 0
+#define DUMMY_FS 0 // obsolete, replaced by ext2
 #define PROC_FS 1
 #define EXT2_FS  2
 
@@ -26,6 +26,8 @@ typedef struct vfile {
 typedef struct {
     char d[CADT_SIZE] __attribute__((aligned(8)));
 } chann_adt_t;
+
+// Interface d'un système de fichier
 
 /**
  * First parameter is a pointer to the beginning of the partition
@@ -136,6 +138,8 @@ struct fs {
     fs_readlink_t       *fs_readlink;
 } fst [NFST];
 
+// Système de fichier virtuel
+
 void vfs_init();
 int  vfs_mount_root(uint8_t fs, void* partition);
 int  vfs_mount(const char *path, uint8_t fs, void *partition);
@@ -150,10 +154,13 @@ bool vfs_find(const char* path, const char* pathend, dev_t* dev, ino_t* ino);
 vfile_t *vfs_load(const char *path, int flags);
 void     vfs_opench(vfile_t *vf, chann_adt_t* cdt);
 
+// cherche le chemin absolu du fichier indiqué et l'écrit dans dst
 int vfs_absolute_path(ino_t ino, dev_t dev_id, char *dst, size_t len);
 
+// débloque les processus qui étaient en attente sur le fichié indiqué
 void vfs_unblock(vfile_t* vfile);
 
+// opérations classiques sur les fichiers ouverts
 int   vfs_close(vfile_t *vfile);
 int   vfs_read(vfile_t *vfile, void *buf, off_t pos, size_t len);
 int   vfs_write(vfile_t *vfile, void *buf, off_t pos, size_t len);
@@ -162,9 +169,11 @@ ino_t vfs_truncate(vfile_t *vfile);
 int   vfs_getdents(vfile_t *vf, struct dirent* dst, size_t sz,
                    chann_adt_t* cdt);
 
+// supression
 int   vfs_rm(const char *fname);
 ino_t vfs_rmdir(const char *fname, uint32_t rec);
 
+// liens
 int vfs_link(const char *path1, const char *path2);
 int vfs_symlink(const char *path1, const char *path2);
 int vfs_readlink(const char *path, char *buf, size_t len);

@@ -9,6 +9,7 @@
 #include <fs/ext2.h>
 #include <fs/proc.h>
 
+// partitions ext2 chargées dans data.S
 extern char root_partition[];
 extern char root_partition_end[];
 
@@ -77,10 +78,16 @@ void vfs_init() {
     klogf(Log_info, "ext2", "home_part: %p - %p",
                     home_partition, home_partition_end);
     vfs_mount("/home", EXT2_FS, home_partition);
-
 }
 
-bool vfs_find(const char* path1, const char* pathend1, dev_t* dev, ino_t* ino) {
+/**
+ * Converti un nom de fichier un couple numéro d'inoeud et device.
+ * Suit les liens symboliques sauf le dernier, si fichier indiqué en est un.
+ * Au delà de 10 liens symbolique on considère qu'on est bloqué
+ * dans une boucle et on renvoit une erreur.
+ */
+bool vfs_find(const char* path1, const char* pathend1,
+              dev_t* dev, ino_t* ino) {
     char buf[1024], *path = buf, *pathend;
     memcpy(path, path1, pathend1 - path1);
     pathend = path + (pathend1 - path1);
@@ -91,7 +98,7 @@ bool vfs_find(const char* path1, const char* pathend1, dev_t* dev, ino_t* ino) {
     int cnt = 0;
 
 begin:
-    if (*path == '/') {
+    if (*path == '/') { // si chemin absolu alors on commence à la racine
         *dev = ROOT_DEV;
         *ino = devices[ROOT_DEV].dev_info.root_ino;
         while(*path == '/') ++path;
@@ -106,6 +113,7 @@ begin:
         size_t len = end_part - path;
         if (len == 2 && path[0] == '.' && path[1] == '.'
             && *ino == dv->dev_info.root_ino) {
+            // on se déplace à la device parent
             *ino = dv->dev_parent_ino;
             *dev = dv->dev_parent_dev;
             dv   = devices + *dev;
@@ -127,8 +135,8 @@ begin:
             }
 
             fs->fs_stat(*ino, &st, &dv->dev_info);
-			switch (st.st_mode & FTYPE_MASK) {
-			case TYPE_SYM:{
+            switch (st.st_mode & FTYPE_MASK) {
+            case TYPE_SYM:{
                 int rc = fs->fs_readlink(*ino, name, 255, &dv->dev_info);
                 kAssert(rc >= 0);
                 name[rc] = 0;
@@ -154,20 +162,20 @@ begin:
                     goto begin;
                 }
             } break;
-			case TYPE_DIR:
-				for (dev_t d = dv->dev_childs; ~d; d = devices[d].dev_sib)
-					if (devices[d].dev_parent_red == *ino) {
-						*ino = devices[d].dev_info.root_ino;
-						*dev = d;
-						dv   = devices + *dev;
-						fs   = fst + dv->dev_fs;
-						break;
-					}
-			break;
-			default:
-				// On ne peut pas ajouter de '/' après un nom de fichier
-				return end_part == pathend;
-			}
+            case TYPE_DIR:
+                for (dev_t d = dv->dev_childs; ~d; d = devices[d].dev_sib)
+                    if (devices[d].dev_parent_red == *ino) {
+                        *ino = devices[d].dev_info.root_ino;
+                        *dev = d;
+                        dv   = devices + *dev;
+                        fs   = fst + dv->dev_fs;
+                        break;
+                    }
+            break;
+            default:
+                // On ne peut pas ajouter de '/' après un nom de fichier
+                return end_part == pathend;
+            }
         }
 
         path = end_part;
@@ -235,6 +243,8 @@ int vfs_mount(const char *path, uint8_t m_fst, void *partition) {
     return d;
 }
 
+//
+
 uint32_t vfs_pipe(vfile_t* rt[2]) {
     uint32_t pipeid = fs_proc_alloc_pipe(TYPE_FIFO|0400, TYPE_FIFO|0200);
     if (!~pipeid) return ~(uint32_t)0;
@@ -247,6 +257,13 @@ uint32_t vfs_pipe(vfile_t* rt[2]) {
     return pipeid;
 }
 
+/**
+ * Renvoie un fichier virtuel pour un nom de fichier. Si le fichier est déjà
+ * ouvert, alors il renvoit un le fichier virtuel préexistant,
+ * sinon il en alloue un nouveau.
+ * load_cnt est le nombre de liens symbolique (et donc de load) qu'on a fait,
+ * au delà de 10 on considère qu'on est dans une boucle.
+ */
 static vfile_t *vfs_load_cnt(const char *filename, int flags, int load_cnt) {
     if (!filename || !*filename) return NULL;
     if (++load_cnt > 10) { // probably in a symlink loop
@@ -308,6 +325,7 @@ static vfile_t *vfs_load_cnt(const char *filename, int flags, int load_cnt) {
     return state.st_files + free;
 }
 
+// appel de load avec un load_cnt à 0
 vfile_t *vfs_load(const char *filename, int flags) {
     return vfs_load_cnt(filename, flags, 0);
 }
@@ -318,6 +336,7 @@ void vfs_opench(vfile_t *vf, chann_adt_t* cdt) {
     return fs->fs_opench(vf->vf_stat.st_ino, cdt, &dev->dev_info);
 }
 
+// cherche le nom absolu d'un dossier
 int vfs_absolute_path(ino_t ino, dev_t dev_id, char *dst, size_t len) {
     ino_t root_root_dev = devices[ROOT_DEV].dev_info.root_ino;
     ino_t pino;
@@ -371,6 +390,8 @@ int vfs_absolute_path(ino_t ino, dev_t dev_id, char *dst, size_t len) {
     return len - pos;
 }
 
+//
+
 int vfs_read(vfile_t *vfile, void *buf, off_t pos, size_t len) {
     dev_t dev_id = vfile->vf_stat.st_dev;
     struct device *dev = devices + dev_id;
@@ -413,6 +434,7 @@ int vfs_write(vfile_t *vfile, void *buf, off_t pos, size_t len) {
     return rc;
 }
 
+// libère le fichier virtuel
 int vfs_destroy(vfile_t *vf) {
     klogf(Log_info, "vfs", "destroy vfile for inode %d (device %d)",
           vf->vf_stat.st_ino, vf->vf_stat.st_dev);
@@ -422,6 +444,7 @@ int vfs_destroy(vfile_t *vf) {
     return 0;
 }
 
+// ferme un accès au fichier, et le ferme s'il n'est plus ouvert
 int vfs_close(vfile_t *vf) {
     if (vf) {
         klogf(Log_info, "vfs", "close file %d (device %d)",
@@ -438,6 +461,9 @@ int vfs_close(vfile_t *vf) {
     return 0;
 }
 
+/**
+ * Création d'un fichier ou d'un dossier en fonction du type indiqué
+ */
 ino_t vfs_create(const char *fullname, mode_t perm) {
     ino_t par_ino = cur_proc()->p_cino;
     dev_t par_dev = cur_proc()->p_dev;
@@ -473,6 +499,7 @@ ino_t vfs_create(const char *fullname, mode_t perm) {
     return create(par_ino, filename, perm, &dev->dev_info);
 }
 
+// réduit la taille du fichier à 0
 ino_t vfs_truncate(vfile_t *vf) {
     struct device *dev = devices + vf->vf_stat.st_dev;
     struct fs *fs = fst + dev->dev_fs;
@@ -481,6 +508,7 @@ ino_t vfs_truncate(vfile_t *vf) {
     return ino;
 }
 
+// lecture des entrées d'un dossier
 int vfs_getdents(vfile_t *vf, struct dirent* dst, size_t sz,
                     chann_adt_t* cdt) {
 
@@ -622,7 +650,8 @@ destroy_root:
     return root;
 }
 
-
+// créer un lien dur de path2 vers le fichier indiqué par path1
+// on ne peut créer des liens dur qu'entre les fichier d'une même partition
 int vfs_link(const char *path1, const char *path2) {
     ino_t pino = cur_proc()->p_cino, tino = pino;
     dev_t pdev_id = cur_proc()->p_dev, tdev_id = pdev_id;
@@ -654,6 +683,7 @@ int vfs_link(const char *path1, const char *path2) {
     return fs->fs_link(tino, pino, parent_end, &dev->dev_info);
 }
 
+// lien symbolique
 int vfs_symlink(const char *path1, const char *path2) {
     ino_t pino = cur_proc()->p_cino;
     dev_t pdev_id = cur_proc()->p_dev;

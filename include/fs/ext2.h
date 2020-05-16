@@ -11,6 +11,7 @@ struct ext2_mount_info {
     uint32_t                block_size;
     uint32_t                root_ino;
 
+    // position of the first block group descriptor
     struct ext2_group_desc *bg;
     uint32_t                group_count;
     uint32_t                group_size;
@@ -218,6 +219,7 @@ struct ext2_inode {
     // ..
     uint32_t in_block[EXT2_DIRECT_BLOCK + 3];
 
+    // unused
     uint32_t in_gen;
     uint32_t in_file_acl;
     uint32_t in_dir_acl;
@@ -294,11 +296,14 @@ uint32_t ext2_alloc_inode_block(struct ext2_inode *inode,
                                 uint32_t blknb, uint32_t block,
                                 struct ext2_mount_info *info);
 
+// create new file
 uint32_t ext2_touch(uint32_t parent, const char *fname, uint16_t type,
                     struct ext2_mount_info *info);
 
+// set file size to 0
 uint32_t ext2_truncate(uint32_t ino, struct ext2_mount_info *info);
 
+// functions to find blocks
 uint32_t *ext2_get_inode_block_ptr(uint32_t block,
                                    struct ext2_inode *inode,
                                    struct ext2_mount_info *info);
