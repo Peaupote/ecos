@@ -46,6 +46,8 @@ l'option `-mcmodel=large`.
 Il est aussi nécessaire de disposer de `GRUB` et de l'ensemble d'utilitaires
 `e2tools` permettant de générer les images *ext2*.
 
+`make` produit une image `ecos.iso`.
+
 Voici la liste des combinaisons gcc/émulateurs que nous avons pu tester:
 
  - `GCC 5.4.0` `QEMU 2.5.0`
@@ -57,6 +59,7 @@ Informations sur le fonctionnement et l'interface de certaines sections du
 projet :
 
  - [processus](./doc/proc.md])
+ - [appels systèmes](./doc/syscall.md)
  - [paging et mémoire](./doc/paging.md)
  - [signaux](./doc/signal.md)
  - [tty](./doc/tty.md)
@@ -73,3 +76,12 @@ projet :
    dans `sh/colors.sh` pour la partie utilisant des boucles *while* 
    (même si dans ce cas simple l'utilisation d'un buffer global au shell,
    comme avec *fread*, résoudrait le problème).
+
+ - __Dépendance lors de la compilation:__ afin d'éviter d'avoir à recompiler
+   tous le projet en cas de modifications, on utilise `gcc -M` pour générer
+   les dépendances entre les différents fichiers.
+   La compilation effectue tout de même de nombreuses opérations même en
+   l'absence de modifications à cause des appels entre les différents
+   Makefiles.
+   Il semble de plus que certaines dépendances ne soient pas correctement
+   prises en compte et `make re` est parfois nécessaire.

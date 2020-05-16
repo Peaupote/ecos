@@ -41,7 +41,7 @@ syscall_tab:
     .quad sys_sigreturn
     .quad sys_signal
     .quad sys_kill
-    .quad sys_errno
+    .quad sys_seterrno
     .quad sys_pause
     .quad sys_link
     .quad sys_symlink

@@ -17,7 +17,7 @@ static inline bool key_state(keycode k) {
     return (keyboard_state[k>>3]>>(k & 0x7)) & 1;
 }
 
-// Touches lshift / rshift, ne tiend pas compte de verr. maj.
+// Touches lshift / rshift, ne tient pas compte de verr. maj.
 static inline bool key_state_shift() {
     return key_state(KEY_LSHIFT) || key_state(KEY_RSHIFT);
 }

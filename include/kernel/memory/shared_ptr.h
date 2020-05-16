@@ -15,6 +15,23 @@ struct sptr_hd {
 	uint64_t count;
 };
 
+/* Nœud de l'arbre binaire de recherche utilisé pour référencer les
+   entrées non utilisées, l'indices des entrées sert de clef ce qui permet
+   d'accéder à l'indice le plus faible (allocation) et à l'indice le plus
+   élevé (libération de la mémoire)
+   Chaque indice a une place fixe dans l'arbre (mais peut remonter s'il
+   manque des nœuds intermédiaires) qui est déséquilibré pour indexer un
+   nombre arbitrairement grand d'entrée.
+  
+      1    3    7
+   -> . -- . -- . ...
+           |    |
+           |    |
+           .2   .5
+                | \
+                |  \
+                .4  .6
+*/
 typedef struct {
 	uint64_t left;
 	uint64_t right;

@@ -14,9 +14,10 @@
 #define MBLOC_OFS_MASK ( (uint64_t) 0x1fffff)
 #define MBLOC_SHIFT    21
 
-//Gère un bloc de 2MB
-//1: free
-//0: pris
+// Gère un bloc de 2MB
+// Arbre d'arité 8 à 3 subdivisions
+// 1: free
+// 0: pris
 struct MemBlock {//Taille multiple de 8 octets
 	union {
 		uint64_t n_empt;
@@ -28,7 +29,8 @@ struct MemBlock {//Taille multiple de 8 octets
 	uint8_t  lvl_0_0 [64]; //8 * 1
 };
 
-//Arbre d'arité 64, la racine est au bit 63
+// Arbre d'arité 64, la racine est au bit 63
+// permet de trouver rapidement un élément ayant une valeur à 1
 struct MemBlockTree {
 	size_t    height;
 	size_t    lvs; //indice de la première feuille

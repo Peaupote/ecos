@@ -212,17 +212,21 @@ void idt_init(void) {
     // start init seq
     outb(PIC1_PORT, PIC_ICW1_INIT | PIC_ICW1_ICW4);
     outb(PIC2_PORT, PIC_ICW1_INIT | PIC_ICW1_ICW4);
+	io_wait();
 
     // change vector offset
     outb(PIC1_DATA, PIC1_OFFSET);
     outb(PIC2_DATA, PIC2_OFFSET);
+	io_wait();
 
     // PIC layout
     outb(PIC1_DATA, 1 << PIC1_IRQ_PIC2);
     outb(PIC2_DATA, PIC2_IDENT);
+	io_wait();
 
     outb(PIC1_DATA, PIC_ICW4_8086);
     outb(PIC2_DATA, PIC_ICW4_8086);
+	io_wait();
     
     // -- PIT init --
     outb(PIT_CONF_PORT,  PIT_CHAN(0) | PIT_SQRGEN | PIT_LOBYTE | PIT_HIBYTE);

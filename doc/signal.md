@@ -22,3 +22,7 @@ gestionnaire correspondant au `sigid` puis lance l'appel système
 |   17   | SIGSTOP | arrêt, non contrôlable        |
 |   18   | SIGTSTP | arrêt                         |
 |   19   | SIGCONT | reprise, même si gestionnaire |
+
+Sauf pour SIGKILL et SIGCONT, l'action n'est effectuée que lorsque le signal
+est délivré, c'est à dire à un moment où le processus commence son quota de
+temps ou est interrompu par le PIT.

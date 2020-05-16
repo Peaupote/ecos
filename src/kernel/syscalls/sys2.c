@@ -11,7 +11,7 @@
 #include <util/elf64.h>
 #include <util/misc.h>
 
-void sys_errno(int *errno) {
+void sys_seterrno(int *errno) {
 	if (cur_proc()->p_ring == 3
 			&& !check_arg_ubound((uint_ptr)errno, sizeof(int)))
 		return;

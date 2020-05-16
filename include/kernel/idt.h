@@ -1,6 +1,10 @@
 #ifndef _IDT_H
 #define _IDT_H
 
+/*
+ * Gestion des interruptions
+ */
+
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>

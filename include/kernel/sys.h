@@ -1,6 +1,10 @@
 #ifndef _H_SYS
 #define _H_SYS
 
+/*
+ * Appels systèmes
+ */
+
 #include <headers/sys.h>
 
 #ifndef ASM_FILE
@@ -13,6 +17,8 @@
 #include "proc.h"
 #include "memory/shared_pages.h"
 
+
+// --vérification des arguments pointeurs --
 static inline bool check_arg_ubound(uint_ptr bg, uint64_t sz) {
     return bg + sz >= bg
         && bg + sz <= paging_set_lvl(pgg_pml4, PML4_END_USPACE);
@@ -68,6 +74,8 @@ static inline ssize_t check_argstrR(const char* pbg, size_t maxlen) {
 	return -1;
 }
 
+
+
 int      sys_usleep(usecond_t tm);
 void     lookup_end_sleep(void);
 
@@ -84,6 +92,7 @@ pid_t    sys_getppid(void);
 int      sys_open(const char* fname, int oflags, int perms);
 int      sys_close(int fd);
 int      sys_dup(int fd);
+int      sys_dup2(int fd1, int fd2);
 int      sys_pipe(int fds[2]);
 ssize_t  sys_write(int fd, uint8_t *s, size_t len);
 ssize_t  sys_read(int fd, uint8_t *buf, size_t len);
@@ -107,6 +116,8 @@ void     sys_sigsethnd(sighandler_t);
 
 __attribute__ ((noreturn))
 void     sys_sigreturn();
+
+void     sys_seterrno(int *errno);
 
 // 0 <= sigid < SIG_COUNT
 // hnd[0]: ign, hnd[1]: dfl

@@ -12,9 +12,7 @@
 
 #include <kernel/memory/shared_ptr.h>
 
-// Present: set si une page est enregistrée
 #define SPAGING_FLAG_P   PAGING_FLAG_Y1
-// Value: set si référence une page partagée
 #define SPAGING_FLAG_V   PAGING_FLAG_Y2
 #define SPAGING_FLAGS_1 (PAGING_FLAG_W|PAGING_FLAG_U|PAGING_FLAG_G) 
 // numéro du spg_info

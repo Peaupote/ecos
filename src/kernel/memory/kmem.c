@@ -21,7 +21,7 @@ phy_addr kernel_pml4;
 uint64_t dslot_pt[512] __attribute__ ((aligned (PAGE_SIZE)));
 
 // Heap: stocke les structures du kernel
-// de tailles déterminiées à l'éxécution
+// de tailles déterminées à l'éxécution
 uint64_t heap_pd [512] __attribute__ ((aligned (PAGE_SIZE)));
 uint64_t heap_pt0[512] __attribute__ ((aligned (PAGE_SIZE)));
 // Allocation des adresses virtuelles du tas
@@ -274,7 +274,6 @@ uint8_t kmem_paging_alloc_rng(uint_ptr bg, uint_ptr ed,
 }
 
 uint8_t paging_unmap(uint_ptr v_pg_addr) {
-	//TODO: parents ?
 	*paging_page_entry(v_pg_addr) = 0;
 	return 0;
 }

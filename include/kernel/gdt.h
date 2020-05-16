@@ -1,6 +1,10 @@
 #ifndef _GDT_H
 #define _GDT_H
 
+/*
+ * Initialisation de la GDT et du TSS
+ */
+
 #include <util/gdt.h>
 
 #define GDT_RING_OFS   0x08
@@ -43,7 +47,7 @@ struct TSS {//size = 0x68
 	uint16_t iomap_base;
 } __attribute__((packed));
 
-//from boot_data
+// from boot_data
 extern uint8_t         kernel_stack_top[];
 extern struct GDT      gd_table;
 extern struct GDT_desc gdt_desc;

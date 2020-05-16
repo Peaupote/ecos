@@ -1,6 +1,10 @@
 #ifndef _KUTIL_H
 #define _KUTIL_H
 
+/*
+ * Gestion des log et panic
+ * */
+
 #include <stdint.h>
 #include <stddef.h>
 #include <stdarg.h>
@@ -13,8 +17,6 @@
 #define kAssert(P) kassert(P, __FILE__":"STR(__LINE__)" "#P)
 #define never_reached kpanic(__FILE__":"STR(__LINE__)\
 									" never reached assert");
-
-int  wprintf(stringl_writer, void*, const char* fmt, va_list params);
 
 int  kprintf(const char *format, ...);
 

@@ -58,6 +58,8 @@ permettant d'inspecter l'état du système, les mêmes commandes peuvent
 être accessibles en cas de `panic` (dépend de la gravité et de la source
 du problème).
 
+ - `a`: passe le clavier en AZERTY (par défaut)
+ - `q`: passe le clavier en QWERTY
  - `memat addr`: affiche l'octet à l'adresse demandée
  - `pg2 addr`: affiche les différentes entrées de paging jusqu'à l'adresse
  - `kprint`: affiche les entrées claviers
