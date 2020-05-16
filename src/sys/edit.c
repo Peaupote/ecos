@@ -13,11 +13,13 @@
 #include <headers/display.h>
 #include <headers/keyboard.h>
 
+// which buffer user writes to
 enum edit_mode {
-    BUFFER,
-    QUERY
+    BUFFER, // buffer containing edited file
+    QUERY   // buffer answering a query
 };
 
+// define color of status bar
 enum bar_status {
     NONE,
     INFO,
@@ -69,6 +71,7 @@ typedef struct screen {
     struct screen *nx, *pv;
 } screen_t;
 
+// screen width and height
 unsigned int W, H;
 
 void cursor_at(int l, int c) {
@@ -76,6 +79,8 @@ void cursor_at(int l, int c) {
     int ccmd = sprintf(cmd, "\033c%u;%u;", l, c);
     write(STDOUT_FILENO, cmd, ccmd);
 }
+
+// global variables
 
 enum edit_mode mode = BUFFER;
 
@@ -108,6 +113,7 @@ buf_t *create(size_t size) {
     return b;
 }
 
+// write buffer content to string
 void buffer_to_string(buf_t *buf, char *dst) {
     for (size_t i = 0; i < buf->size; ++i) {
         char *ptr = buf->buf + i;
@@ -121,12 +127,14 @@ int is_empty_buffer(buf_t *buf) {
     return buf->cur1 == buf->buf && buf->cur2 == buf->buf + buf->size - 1;
 }
 
+// remove content from buffer
 void empty_buffer(buf_t *buf) {
     buf->line = 1;
     buf->cur1 = buf->buf;
     buf->cur2 = buf->buf + buf->size - 1;
 }
 
+// write to buffer
 char put(buf_t **b, char c) {
     if ((*b)->cur1 == (*b)->cur2) { // realloc in a twice bigger buffer
         buf_t *n = create((*b)->size << 1);
@@ -178,6 +186,8 @@ char rm(buf_t *b) {
     return 0;
 }
 
+// move cursor
+
 char left(buf_t *b) {
     if (b->cur1 > b->buf) {
         char r = b->cur1[-1];
@@ -213,6 +223,7 @@ char right(buf_t *b) {
     return 0;
 }
 
+// save buffer to file
 void save(char *fname) {
     int fd = open(fname, O_WRONLY|O_TRUNC|O_CREAT);
     if (fd < 0) {
@@ -239,6 +250,8 @@ void save(char *fname) {
     print_msg(INFO, "%s saved !", curr->fname);
 }
 
+// callback functions for save query
+
 void save_and_close(char *fname) {
     save(fname);
     close_current_screen();
@@ -252,6 +265,7 @@ void save_close(char *ans) {
     else print_msg(ERR, "please answer by yes or no");
 }
 
+// read file into buffer
 buf_t *open_buf(const char *fname) {
     int fd = open(fname, O_RDONLY);
     if (fd < 0) {
@@ -284,6 +298,8 @@ buf_t *open_buf(const char *fname) {
 
     return b;
 }
+
+// move cursor
 
 char next_line(buf_t *buf) {
     if (buf->line == buf->nline) return 0;
@@ -560,19 +576,22 @@ void make_query(const char *q, void (*callback)(char*)) {
     empty_buffer(input);
 }
 
+// --
+
 void sighdl(int signum) {
-	int sv_errno = errno;
-	if (signum == SIGTSTP) {
-		write(STDIN_FILENO, "\033d", 2);
-		kill(getpid(), SIGSTOP);
-	} else if (signum == SIGCONT) {
-		write(STDOUT_FILENO, "\033l", 2);
-		clean();
-		display();
-	}
-	errno = sv_errno;
+    int sv_errno = errno;
+    if (signum == SIGTSTP) {
+        write(STDIN_FILENO, "\033d", 2);
+        kill(getpid(), SIGSTOP);
+    } else if (signum == SIGCONT) {
+        write(STDOUT_FILENO, "\033l", 2);
+        clean();
+        display();
+    }
+    errno = sv_errno;
 }
 
+// read inputs from live tty
 bool get_live(tty_live_t* rt) {
     int c;
     while ((c = fgetc(stdin)) != TTY_LIVE_MAGIC) {
@@ -604,8 +623,8 @@ int main(int argc, char *argv[]) {
     while (get_live(&lt) && !lt.ev.key && lt.ev.ascii != ';')
         H = H * 10 + lt.ev.ascii - '0';
 
-	signal(SIGTSTP, sighdl);
-	signal(SIGCONT, sighdl);
+    signal(SIGTSTP, sighdl);
+    signal(SIGCONT, sighdl);
     // switch to live mode
     write(STDOUT_FILENO, "\033l", 2);
 
@@ -625,7 +644,7 @@ int main(int argc, char *argv[]) {
         key_event *ev = &lt.ev;
 
         if ((ev->flags & (KEY_FLAG_MODS | KEY_FLAG_PRESSED))
-            == (KEY_FLAG_CTRL | KEY_FLAG_PRESSED)) {
+            == (KEY_FLAG_CTRL | KEY_FLAG_PRESSED)) { // commands
             switch(ev->ascii) {
             case 's':
                 if (!curr->fname) make_query("save to file ? ", &save);
@@ -650,7 +669,7 @@ int main(int argc, char *argv[]) {
             }
 
             display();
-        } else if (ev->flags & KEY_FLAG_PRESSED) {
+        } else if (ev->flags & KEY_FLAG_PRESSED) { // action on current buffer
             buf_t **t = mode == BUFFER ? &curr->buf : &input;
 
             switch (ev->key) {

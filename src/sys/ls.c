@@ -43,7 +43,7 @@ int list_files(const char *fname) {
 
     for (size_t i = 0; (dir = readdir(dirp)); ++i) {
         sprintf(buf2, "%s/%s", fname, dir->d_name);
-        rc = lstat(buf2, &st);
+        rc = lstat(buf2, &st); // dont follow symlink
         if (rc < 0) {
             sprintf(buf2, "ls: '%s/%s'", fname, dir->d_name);
             perror(buf2);
@@ -112,7 +112,7 @@ void read_flags(const char *flags) {
 int main (int argc, char *argv[]) {
     int i, rc = 0, count = 0;
     char *fnames[256], **fptr = fnames;
-    char *cwd = "."; // TODO getcwd
+    char *cwd = ".";
 
     for (i = 1; i < argc; i++) {
         if (*argv[i] == '-') read_flags(argv[i]);

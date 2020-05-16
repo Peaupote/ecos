@@ -438,8 +438,6 @@ int vfs_write(vfile_t *vfile, void *buf, off_t pos, size_t len) {
 int vfs_destroy(vfile_t *vf) {
     klogf(Log_info, "vfs", "destroy vfile for inode %d (device %d)",
           vf->vf_stat.st_ino, vf->vf_stat.st_dev);
-
-    // TODO tell channels
     vf->vf_cnt = 0;
     return 0;
 }
