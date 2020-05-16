@@ -55,4 +55,4 @@ Notre implémentation de ext2 est loin d'être complète ou optimale. En particu
 
 Notre implémentation de procfs réuni en réalité les idées de `procfs` et de `devfs`. En effet, à travers ce système de fichier nous pouvous accéder à des informations sur l'état noyau ; mais procfs est en plus un pont entre le hardware et le système de fichier virtuel. Les entrées clavier sont directement redirigées sur le fichier `/proc/tty/tty0` et l'affichage suit ce qui est écrit sur le fichier `/proc/tty/tty1`. De plus, le système de fichier virtuel accède aux pipes grâce à leur numéro d'inoeud dans `procfs`.
 
-Les actions en écriture sur ce système de fichier sont sans effet.
+Les éditions sur une partition procfs sont sans effet. On ne peut pas y créer ni supprimer de fichiers ou de dossier. On peut toutefois écrire dans un pipe de un programme qui ne l'a pas créé en accèdant simplement au fichier correspondant. Pour empêcher un programmer malveillant ou buggé d'interférer sur le pipes d'un programme essentiel, on pourrait par exemple ajouter un système d'utilisateur et de droits.
