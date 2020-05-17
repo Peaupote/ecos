@@ -3,6 +3,8 @@
 __ecos__ est un système d'exploitation pour l'architecture *x86_64*.
 Il implémente une partie de la norme *POSIX*.
 
+Le dépôt est accessible sur [le gitlab de l'ENS](https://git.eleves.ens.fr/mflin/ecos).
+
 ### Organisation du dépôt
 
  - `data`
